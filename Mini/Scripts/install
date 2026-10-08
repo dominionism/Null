@@ -1,0 +1,47 @@
+#!/bin/sh
+# Build Null Mini, put it in /Applications, make it start at login, and start it.
+#
+#   Mini/Scripts/install
+#
+# The app is signed ad hoc, so macOS treats every new build as a new app: after
+# an install you have to switch Null Mini on again in System Settings > Privacy &
+# Security > Accessibility. The box says so when it needs it.
+set -eu
+
+here=$(cd "$(dirname "$0")/.." && pwd)
+app="Null Mini.app"
+installed="/Applications/$app"
+agent="$HOME/Library/LaunchAgents/io.github.dominionism.null-mini.plist"
+
+cd "$here"
+cargo tauri build
+
+# Stop the copy that is running, if any, before replacing it.
+launchctl bootout "gui/$(id -u)" "$agent" 2>/dev/null || true
+pkill -x null-mini 2>/dev/null || true
+
+rm -rf "$installed"
+ditto "target/release/bundle/macos/$app" "$installed"
+
+# Start at login. launchd starts the app itself, so the Accessibility grant is the app's own.
+mkdir -p "$(dirname "$agent")"
+cat > "$agent" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>io.github.dominionism.null-mini</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$installed/Contents/MacOS/null-mini</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+</dict>
+</plist>
+PLIST
+launchctl bootstrap "gui/$(id -u)" "$agent"
+
+echo "Installed $installed and started it. fn+Space opens the box."
+echo "If nothing happens, switch Null Mini on in System Settings > Privacy & Security > Accessibility."

@@ -1,0 +1,815 @@
+<!doctype html>
+<!-- Null Mini's box: the whole page.
+
+     Enter sends what you typed to your agent and the reply streams in below.
+     /model opens the model list, /new starts a new conversation, /quit quits
+     the app, Ctrl+C stops a reply, Esc hides the box.
+
+     Nothing is shown but the arrow and the text box until there is something
+     to say. The arrow is the status: it pulses while the agent works and turns
+     amber while it waits for an answer. Press and drag anywhere that is not
+     text to move the box.
+
+     The page talks to the app through commands (invoke) and hears from it
+     through events; see src/harness.rs and src/panel.rs. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Null Mini</title>
+    <style>
+      /* Sizing contract with src/panel.rs. The window is transparent and
+         exactly the box plus the room its shadow needs: 8px above, 16px each side,
+         24px below (the .box margin). FRAME in the script is top + bottom (32);
+         WIDTH on the Rust side is the 584px box plus both sides (616). Every height
+         here is a fixed number of pixels so MAX_HEIGHT there can be exact:
+         2 border + 42 row + 344 transcript + 26 notice + 32 margins = 446. */
+      :root {
+        --accent: 255, 255, 255;
+        --amber: 255, 212, 121;
+        --text: #f4f4f7;
+        --soft: #dcdce4;
+        --dim: #9a9aa6;
+        --faint: #777783;
+        --red: #ff8078;
+        --line: rgba(255, 255, 255, 0.09);
+        --sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+      }
+      html,
+      body {
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+        font: 14px/1.4 var(--sans);
+        color: var(--text);
+        cursor: default;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-font-smoothing: antialiased;
+      }
+      ::selection {
+        background: rgba(var(--accent), 0.28);
+      }
+
+      /* The box is one opaque shape, so its outline is a single smooth curve.
+         The edge is a second background that shows only in the 1px border, drawn
+         over the box's own fill. A see-through border would sit over whatever is
+         behind the window and pick up its detail, which reads as a rough line.
+         A half-pixel dark line outside keeps the box apart from light windows, and
+         the shadow fits inside the margin instead of being cut off by the window. */
+      @property --edge-top {
+        syntax: '<color>';
+        inherits: false;
+        initial-value: #74747c;
+      }
+      @property --edge-bottom {
+        syntax: '<color>';
+        inherits: false;
+        initial-value: #4c4c53;
+      }
+      .box {
+        --edge-top: #74747c;
+        --edge-bottom: #4c4c53;
+        --ring: 1px;
+        /* The fill's corners are a little rounder than the edge's inner curve (13px)
+           would be, which leaves a sliver more edge on each corner. A thin light line
+           on a dark ground otherwise looks thinner on a curve than on a straight: the
+           half-covered pixels along a curve come out darker than half as bright.
+           Measured in the app's web engine, the edge carried 7 to 11% less light on
+           the corners at 13px, and is within 2% of the straights at 13.5px. */
+        --fill-radius: 13.5px;
+        position: relative;
+        isolation: isolate;
+        margin: 8px 16px 24px;
+        border: var(--ring) solid transparent;
+        border-radius: 14px;
+        background: linear-gradient(180deg, var(--edge-top), var(--edge-bottom)) border-box;
+        box-shadow:
+          0 0 0 0.5px rgba(0, 0, 0, 0.6),
+          0 2px 5px rgba(0, 0, 0, 0.28),
+          0 10px 22px -8px rgba(0, 0, 0, 0.6);
+        overflow: hidden;
+        transition:
+          --edge-top 0.18s ease,
+          --edge-bottom 0.18s ease;
+      }
+      /* The fill, drawn over the edge colour so that only the ring shows. */
+      .box::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: var(--fill-radius);
+        background: linear-gradient(180deg, #28282e, #18181c);
+      }
+      /* Typing lands here: the edge turns white. */
+      .box:focus-within {
+        --edge-top: #ffffff;
+        --edge-bottom: #d6d6dc;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        height: 42px;
+        padding: 0 14px;
+      }
+      /* The arrow is the whole status display: steady when idle, pulsing while
+         the agent works, amber while the agent waits for an answer. */
+      .caret {
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 10px;
+        height: 22px;
+        color: rgb(var(--accent));
+        font-size: 0; /* the › in the markup is drawn below, so it is the same shape in any font */
+        transition: color 0.2s ease;
+      }
+      .caret::before {
+        content: '';
+        width: 5.5px;
+        height: 5.5px;
+        border: solid currentColor;
+        border-width: 1.75px 1.75px 0 0;
+        border-radius: 1px;
+        transform: translateX(-1.5px) rotate(45deg);
+      }
+      .caret.working {
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      .caret.asking {
+        color: rgb(var(--amber));
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.25;
+        }
+      }
+      input,
+      #ruler {
+        font: 400 15px/22px var(--sans);
+      }
+      input {
+        flex: 1;
+        min-width: 0;
+        height: 22px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+        caret-color: rgb(var(--accent));
+        cursor: text;
+        /* Said outright: the page as a whole is not selectable, and a field that
+           picks that up cannot be typed in. */
+        user-select: text;
+        -webkit-user-select: text;
+      }
+      /* Never seen: measures where the typed text ends, so the unused part of the
+         field can be used to move the box. */
+      #ruler {
+        position: absolute;
+        top: 0;
+        left: 0;
+        visibility: hidden;
+        pointer-events: none;
+        white-space: pre;
+      }
+      #notice {
+        display: none;
+        box-sizing: border-box;
+        height: 26px;
+        padding: 0 14px 0 33px;
+        font: 11.5px/18px var(--sans);
+        color: var(--dim);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* The transcript and the model list share the space under the row. */
+      #out,
+      #pick {
+        display: none;
+        box-sizing: border-box;
+        border-top: 1px solid var(--line);
+        overflow-y: auto;
+      }
+      #out::-webkit-scrollbar,
+      #pick::-webkit-scrollbar {
+        width: 10px;
+      }
+      #out::-webkit-scrollbar-thumb,
+      #pick::-webkit-scrollbar-thumb {
+        border: 3px solid transparent;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.2);
+        background-clip: padding-box;
+      }
+      #out {
+        max-height: 344px;
+        padding: 10px 14px 12px 18px; /* 18 + the "› " of a prompt line = where the field's text starts */
+        font: 12.5px/19px var(--mono);
+        color: var(--soft);
+        cursor: auto;
+        user-select: text;
+        -webkit-user-select: text;
+      }
+      #out > div {
+        padding-left: 2ch;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #out > .you {
+        margin-top: 10px;
+        padding-left: 0;
+        color: rgb(var(--accent));
+      }
+      #out > .you:first-child {
+        margin-top: 0;
+      }
+      .tool,
+      .note {
+        color: var(--dim);
+      }
+      .note {
+        font-style: italic;
+      }
+      .tool.failed,
+      .error {
+        color: var(--red);
+      }
+      #out > .ask {
+        margin: 6px 0 6px 2ch;
+        padding: 7px 10px 9px;
+        border: 1px solid rgba(var(--amber), 0.26);
+        border-radius: 9px;
+        background: rgba(var(--amber), 0.07);
+        color: rgb(var(--amber));
+      }
+      /* The choices sit side by side under the question. */
+      .ask br ~ br {
+        display: none;
+      }
+      .ask button {
+        margin: 6px 6px 0 0;
+        padding: 1px 9px;
+        border: 1px solid rgba(var(--amber), 0.4);
+        border-radius: 6px;
+        background: rgba(var(--amber), 0.06);
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: background-color 0.12s ease;
+      }
+      .ask button:not(:disabled):hover {
+        background: rgba(var(--amber), 0.18);
+      }
+      .ask button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      #pick {
+        max-height: 300px;
+        padding: 6px;
+        scroll-padding: 6px; /* the chosen row keeps clear of the edge when keys scroll to it */
+        font: 12.5px/19px var(--mono);
+        color: var(--soft);
+      }
+      .provider {
+        margin-top: 8px;
+        padding: 0 12px;
+        color: var(--faint);
+        font: 600 10px/18px var(--sans);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .provider:first-child {
+        margin-top: 0;
+      }
+      .option {
+        padding: 2px 12px;
+        border-radius: 7px;
+        cursor: pointer;
+        white-space: pre;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .option:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .option.selected {
+        background: rgba(var(--accent), 0.15);
+        color: #fff;
+      }
+      .option .id {
+        color: var(--dim);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+        .caret.working {
+          opacity: 0.45;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box" id="box">
+      <div class="row">
+        <span class="caret" id="caret">›</span>
+        <input id="q" autofocus spellcheck="false" />
+      </div>
+      <div id="pick"></div>
+      <div id="out"></div>
+      <div id="notice"></div>
+    </div>
+    <span id="ruler" aria-hidden="true"></span>
+    <script>
+      const { invoke } = window.__TAURI__.core;
+      const { listen } = window.__TAURI__.event;
+      const input = document.getElementById('q');
+      const out = document.getElementById('out');
+      const noticeLine = document.getElementById('notice');
+      const caret = document.getElementById('caret');
+      const box = document.getElementById('box');
+      const pick = document.getElementById('pick');
+      const ruler = document.getElementById('ruler');
+
+      let lastSeq = 0; // the number of the last event shown
+      let busy = false;
+      let lastPrompt = '';
+      let replyLine = null; // the element the current answer streams into
+      let pendingAsk = null; // { requestId, options, element }
+      let picker = null; // { models, current, shown, index } while the model list is open
+      const toolLines = new Map();
+
+      // ── Display ────────────────────────────────────────────────────────
+
+      // The window is the box plus the margin its shadow sits in: 8px above and
+      // 24px below. Keep in step with the .box margin and src/panel.rs.
+      const FRAME = 32;
+      let lastHeight = 0;
+      const fit = () => {
+        requestAnimationFrame(() => {
+          const height = Math.ceil(box.getBoundingClientRect().height) + FRAME;
+          if (height !== lastHeight) {
+            lastHeight = height;
+            invoke('resize', { height });
+          }
+        });
+      };
+
+      const line = (className, text) => {
+        const element = document.createElement('div');
+        element.className = className;
+        element.textContent = text;
+        out.style.display = 'block';
+        out.appendChild(element);
+        out.scrollTop = out.scrollHeight;
+        fit();
+        return element;
+      };
+
+      // '' when idle, 'working' while the agent works, 'asking' while it waits for an answer.
+      const mark = (state) => {
+        caret.className = state ? `caret ${state}` : 'caret';
+      };
+
+      // Words appear only for something the user has to know, and then go away.
+      let noticeTimer = null;
+      const notice = (text, stay = false) => {
+        noticeLine.textContent = text;
+        noticeLine.style.display = 'block';
+        clearTimeout(noticeTimer);
+        if (!stay) {
+          noticeTimer = setTimeout(() => {
+            noticeLine.style.display = 'none';
+            fit();
+          }, 4000);
+        }
+        fit();
+      };
+
+      const toolMark = { pending: '…', in_progress: '…', completed: '✓', failed: '✗' };
+
+      // ── Events from the app ────────────────────────────────────────────
+
+      const show = (event) => {
+        switch (event.type) {
+          case 'user_message':
+            replyLine = null;
+            line('you', `› ${event.text}`);
+            break;
+          case 'text_delta':
+            if (event.thinking) {
+              mark('working');
+              break;
+            }
+            if (!replyLine) replyLine = line('reply', '');
+            replyLine.textContent += event.text;
+            out.scrollTop = out.scrollHeight;
+            fit();
+            break;
+          case 'tool_activity': {
+            replyLine = null;
+            let element = toolLines.get(event.call_id);
+            if (!element) {
+              element = line('tool', '');
+              toolLines.set(event.call_id, element);
+            }
+            element.className = event.status === 'failed' ? 'tool failed' : 'tool';
+            element.textContent = `${toolMark[event.status] || '…'} ${event.title}`;
+            mark('working');
+            break;
+          }
+          case 'approval_request': {
+            replyLine = null;
+            const element = line('ask', `Your agent asks: ${event.title}`);
+            event.options.forEach((option, index) => {
+              const button = document.createElement('button');
+              button.textContent = `${index + 1} ${option.label}`;
+              button.addEventListener('click', () => answer(option.option_id));
+              element.appendChild(document.createElement('br'));
+              element.appendChild(button);
+            });
+            pendingAsk = { requestId: event.request_id, options: event.options, element };
+            mark('asking');
+            fit();
+            break;
+          }
+          case 'status_change':
+            if (event.status === 'running') {
+              busy = true;
+              mark('working');
+            }
+            break;
+          case 'model_changed':
+            replyLine = null;
+            line('note', `now on ${event.model}`);
+            break;
+          case 'message_done':
+            replyLine = null;
+            if (event.stop_reason === 'cancelled') line('note', 'stopped');
+            if (event.stop_reason === 'truncated') line('note', 'the reply was cut short');
+            if (event.stop_reason === 'refused') line('note', 'the model refused');
+            break;
+          case 'error':
+            replyLine = null;
+            line('error', `error: ${event.message}${event.details ? `\n${event.details}` : ''}`);
+            break;
+        }
+        // Either of these ends the reply.
+        if (event.type === 'message_done' || event.type === 'error') {
+          busy = false;
+          pendingAsk = null;
+          mark('');
+        }
+      };
+
+      // ── Talking to the app ─────────────────────────────────────────────
+
+      // Each event carries a running number, so one that arrives twice (once
+      // live, once while catching up) is shown once.
+      const apply = (item) => {
+        if (item.seq <= lastSeq) return;
+        lastSeq = item.seq;
+        show(item.event);
+      };
+
+      // Live events are held back while a catch-up is in flight, so that they
+      // are shown after the older ones it brings.
+      let held = null;
+      listen('mini:event', (message) => {
+        if (held) held.push(message.payload);
+        else apply(message.payload);
+      });
+
+      // Everything that happened while the page was not listening: before it
+      // loaded, or while the box was hidden.
+      const catchUp = async () => {
+        if (held) return;
+        held = [];
+        try {
+          const snapshot = await invoke('events_since', { after: lastSeq });
+          snapshot.events.forEach(apply);
+          busy = snapshot.busy;
+          if (!busy && !picker) mark('');
+        } catch (error) {
+          line('error', `could not reach the app: ${error}`);
+        } finally {
+          const waiting = held;
+          held = null;
+          waiting.forEach(apply);
+        }
+      };
+
+      // ── Choosing a model ───────────────────────────────────────────────
+
+      const drawPicker = () => {
+        const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+        picker.shown = picker.models.filter((model) => {
+          const haystack = `${model.id} ${model.label}`.toLowerCase();
+          return words.every((word) => haystack.includes(word));
+        });
+        picker.index = Math.min(picker.index, Math.max(picker.shown.length - 1, 0));
+        pick.textContent = '';
+        let provider = null;
+        picker.shown.forEach((model, index) => {
+          if (model.provider !== provider) {
+            provider = model.provider;
+            const heading = document.createElement('div');
+            heading.className = 'provider';
+            heading.textContent = provider || 'models';
+            pick.appendChild(heading);
+          }
+          const row = document.createElement('div');
+          row.className = index === picker.index ? 'option selected' : 'option';
+          const name = document.createElement('span');
+          name.textContent = `${model.id === picker.current ? '● ' : '  '}${model.label} `;
+          const id = document.createElement('span');
+          id.className = 'id';
+          id.textContent = model.id;
+          row.appendChild(name);
+          row.appendChild(id);
+          row.addEventListener('click', () => chooseModel(model));
+          pick.appendChild(row);
+          if (index === picker.index && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+        });
+        if (!picker.shown.length) {
+          const none = document.createElement('div');
+          none.className = 'provider';
+          none.textContent = 'no model matches';
+          pick.appendChild(none);
+        }
+        fit();
+      };
+
+      const closePicker = () => {
+        picker = null;
+        pick.style.display = 'none';
+        pick.textContent = '';
+        if (out.textContent) out.style.display = 'block';
+        input.value = '';
+        mark('');
+        fit();
+      };
+
+      const openPicker = async (filter = '') => {
+        if (picker) return;
+        if (busy) {
+          notice('stop the reply with ctrl+c before switching models');
+          return;
+        }
+        mark('working');
+        let listed;
+        try {
+          listed = await invoke('models');
+        } catch (error) {
+          line('error', `could not list models: ${error}`);
+          mark('');
+          return;
+        }
+        if (!listed.models.length) {
+          line('note', 'this harness offers no model list');
+          mark('');
+          return;
+        }
+        const at = listed.models.findIndex((model) => model.id === listed.current);
+        picker = { models: listed.models, current: listed.current, shown: [], index: filter ? 0 : Math.max(at, 0) };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        input.value = filter;
+        mark('');
+        drawPicker();
+      };
+
+      const chooseModel = async (model) => {
+        if (!model) return;
+        const current = picker && picker.current;
+        closePicker();
+        if (model.id === current) return;
+        mark('working');
+        try {
+          await invoke('set_model', { id: model.id }); // the change arrives as an event
+        } catch (error) {
+          line('error', `could not switch to ${model.id}: ${error}`);
+        }
+        mark('');
+      };
+
+      const send = async (text) => {
+        if (text === '/model' || text.startsWith('/model ')) {
+          openPicker(text.slice(6).trim());
+          return;
+        }
+        if (text === '/quit') {
+          invoke('quit');
+          return;
+        }
+        if (text === '/new') {
+          try {
+            await invoke('new_conversation');
+          } catch (error) {
+            notice(String(error));
+            return;
+          }
+          out.textContent = '';
+          out.style.display = 'none';
+          toolLines.clear();
+          fit();
+          return;
+        }
+        if (busy) {
+          notice('still working. ctrl+c stops it');
+          return;
+        }
+        busy = true;
+        lastPrompt = text;
+        mark('working');
+        try {
+          await invoke('send', { text }); // the reply arrives as events
+        } catch (error) {
+          busy = false;
+          line('error', `could not send: ${error}`);
+          mark('');
+        }
+      };
+
+      const answer = async (optionId) => {
+        if (!pendingAsk) return;
+        const { requestId, element } = pendingAsk;
+        pendingAsk = null;
+        element.querySelectorAll('button').forEach((button) => (button.disabled = true));
+        try {
+          await invoke('respond', { requestId, answer: optionId });
+        } catch (error) {
+          line('error', `could not answer: ${error}`);
+        }
+      };
+
+      // ── Moving the box ─────────────────────────────────────────────────
+      //
+      // Press and drag anywhere that is not text. The frame (the edge, the arrow,
+      // the gaps, the shadow's margin, empty transcript space) moves the box at
+      // once. The unused part of the text field moves it only after the pointer has
+      // travelled, so a plain click there still just puts the typing cursor in the
+      // field. Typed text, transcript text, buttons, model rows and scroll bars
+      // keep their presses.
+
+      const TRAVEL = 4; // pixels before a press in the text field becomes a move
+      const SCROLL_BAR = 12;
+      let press = null; // where a press in the unused part of the text field began
+
+      const moveBox = () => {
+        press = null;
+        window.__TAURI__.window.getCurrentWindow().startDragging().catch(() => {});
+      };
+
+      // Where the typed text ends inside the field, in page pixels.
+      const typedEnd = () => {
+        ruler.textContent = input.value;
+        const end = input.getBoundingClientRect().left + ruler.getBoundingClientRect().width - input.scrollLeft;
+        ruler.textContent = '';
+        return end;
+      };
+
+      // True on a line of text, or left of where that line ends: where the I-beam
+      // shows and a press should start selecting.
+      const onText = (element, x, y) => {
+        const range = document.createRange();
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) {
+            if (y >= rect.top - 3 && y <= rect.bottom + 3 && x <= rect.right + 8) return true;
+          }
+        }
+        return false;
+      };
+
+      // 'frame', 'field', or null when the press belongs to what is under it.
+      const grip = (event) => {
+        const target = event.target;
+        const within = (selector) => (target.closest ? target.closest(selector) : null);
+        if (within('button, .option')) return null;
+        if (target === input) {
+          if (event.detail > 1) return null; // a double click selects
+          return event.clientX > typedEnd() + 8 ? 'field' : null;
+        }
+        const pane = within('#out, #pick');
+        if (pane) {
+          const scrolls = pane.scrollHeight > pane.clientHeight;
+          if (scrolls && event.clientX >= pane.getBoundingClientRect().right - SCROLL_BAR) return null;
+          if (pane === out && (event.shiftKey || onText(target, event.clientX, event.clientY))) return null;
+        }
+        return 'frame';
+      };
+
+      window.addEventListener('mousedown', (event) => {
+        press = null;
+        if (event.button !== 0 || event.ctrlKey) return; // not a right click, nor control-click
+        const kind = grip(event);
+        if (!kind) return;
+        event.preventDefault(); // keep the typing cursor and any selection as they are
+        if (kind === 'frame') {
+          moveBox();
+          return;
+        }
+        // What a click past the end of the text does anyway.
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        press = { x: event.clientX, y: event.clientY };
+      });
+
+      window.addEventListener('mousemove', (event) => {
+        if (!press) return;
+        if (!(event.buttons & 1)) {
+          press = null;
+          return;
+        }
+        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) >= TRAVEL) moveBox();
+      });
+
+      window.addEventListener('mouseup', () => {
+        press = null;
+      });
+
+      // ── Keys ───────────────────────────────────────────────────────────
+
+      input.addEventListener('input', () => {
+        if (picker) {
+          picker.index = 0;
+          drawPicker();
+        }
+      });
+
+      input.addEventListener('keydown', (event) => {
+        if (picker) {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
+            drawPicker();
+          } else if (event.key === 'Enter' && !event.isComposing) {
+            chooseModel(picker.shown[picker.index]);
+          }
+          return;
+        }
+        if (event.key === 'Enter' && !event.isComposing) {
+          const text = input.value.trim();
+          if (!text) return;
+          input.value = '';
+          send(text);
+        } else if (event.key === 'ArrowUp' && !input.value && lastPrompt) {
+          input.value = lastPrompt;
+          event.preventDefault();
+        } else if (pendingAsk && !input.value && /^[1-9]$/.test(event.key)) {
+          const option = pendingAsk.options[Number(event.key) - 1];
+          if (option) {
+            event.preventDefault();
+            answer(option.option_id);
+          }
+        }
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          if (picker) closePicker();
+          else invoke('hide_box');
+        } else if (event.key === 'c' && event.ctrlKey && busy) {
+          event.preventDefault();
+          invoke('interrupt').catch(() => {});
+        }
+      });
+
+      listen('mini:shown', () => {
+        input.focus();
+        if (!picker) catchUp(); // anything that arrived while hidden
+        fit();
+      });
+
+      // The app cannot hear fn+Space until macOS lets it. Say so, and say when it can.
+      listen('mini:permission', (message) => {
+        if (message.payload) notice('fn+Space now opens this box');
+        else notice('Turn on Null Mini in System Settings › Privacy & Security › Accessibility', true);
+      });
+
+      catchUp();
+      fit();
+      invoke('page_ready');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,3 @@
+# Build output and files Tauri generates on every build.
+/target/
+/gen/

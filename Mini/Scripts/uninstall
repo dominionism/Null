@@ -1,0 +1,15 @@
+#!/bin/sh
+# Stop Null Mini, remove it from /Applications and stop it starting at login.
+# Its settings and logs are left in place.
+#
+#   Mini/Scripts/uninstall
+set -eu
+
+agent="$HOME/Library/LaunchAgents/io.github.dominionism.null-mini.plist"
+
+launchctl bootout "gui/$(id -u)" "$agent" 2>/dev/null || true
+pkill -x null-mini 2>/dev/null || true
+rm -f "$agent"
+rm -rf "/Applications/Null Mini.app"
+
+echo "Null Mini is removed. Settings stay in ~/Library/Application Support/io.github.dominionism.null-mini."

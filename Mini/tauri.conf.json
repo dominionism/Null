@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Null Mini",
+  "version": "0.1.0",
+  "identifier": "io.github.dominionism.null-mini",
+  "build": {
+    "frontendDist": "Page"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app"],
+    "icon": ["Icons/32x32.png", "Icons/128x128.png", "Icons/128x128@2x.png", "Icons/icon.icns"],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  }
+}
