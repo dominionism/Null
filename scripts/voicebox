@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+#
+# Voicebox power control — start, stop, and inspect the stack without a terminal.
+#
+# The desktop app cannot start the backend in a dev tree: the sidecar in
+# tauri/src-tauri/binaries/ is a placeholder that exits 1, so the server must be
+# run separately. This script is that "separately", minus the terminal.
+#
+#   voicebox start [--app]   start the server detached (and optionally the app)
+#   voicebox stop            stop whatever this script started
+#   voicebox restart [--app]
+#   voicebox status          what is running, and on which pid
+#   voicebox logs [-f]       the server log
+#   voicebox install         start the server at login (launchd), no command needed
+#   voicebox uninstall       remove that login item
+#
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"   # uvicorn resolves `backend.main:app` from the cwd
+VENV="$ROOT/backend/venv"
+PY="$VENV/bin/python"
+PORT="${VOICEBOX_PORT:-17493}"
+WORKER_PORT="${VOICEBOX_WORKER_PORT:-17494}"
+SERVER_PID_FILE="$ROOT/data/voicebox-server.pid"
+APP_PID_FILE="$ROOT/data/voicebox-app.pid"
+LOG_DIR="$ROOT/data/logs"
+LOG_FILE="$LOG_DIR/voicebox-server.log"
+APP_LOG_FILE="$LOG_DIR/voicebox-app.log"
+PLIST="$HOME/Library/LaunchAgents/dev.voicebox.server.plist"
+LABEL="dev.voicebox.server"
+
+die() { echo "voicebox: $*" >&2; exit 1; }
+
+health() {
+  curl -sf -m 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1
+}
+
+server_pid() {
+  if [ -f "$SERVER_PID_FILE" ]; then
+    local pid; pid="$(cat "$SERVER_PID_FILE" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then echo "$pid"; return; fi
+  fi
+  # Fall back to whatever is actually listening, so a server started by hand is
+  # still visible and stoppable.
+  pgrep -f "uvicorn backend.main:app.*--port $PORT" | head -1 || true
+}
+
+app_pid() {
+  if [ -f "$APP_PID_FILE" ]; then
+    local pid; pid="$(cat "$APP_PID_FILE" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then echo "$pid"; return; fi
+  fi
+  pgrep -f "target/debug/voicebox" | head -1 || true
+}
+
+cmd_start() {
+  local with_app=0
+  [ "${1:-}" = "--app" ] && with_app=1
+
+  if health; then
+    echo "server already up on $PORT (pid $(server_pid))"
+  elif [ -f "$PLIST" ]; then
+    # The login item owns the server; loading it is the start.
+    echo "starting via the login item (launchd)"
+    launchctl load "$PLIST" 2>/dev/null || true
+    launchctl kickstart -k "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    for _ in $(seq 1 60); do health && break; sleep 0.5; done
+    health || die "server did not become healthy — see $LOG_FILE"
+    echo "server healthy (pid $(server_pid))"
+  else
+    mkdir -p "$LOG_DIR"
+    echo "starting server on $PORT (detached, log: $LOG_FILE)"
+    # setsid where available so the server is not in our process group; on macOS
+    # nohup + disown is the portable equivalent. The server monitors its parent
+    # pid and would shut itself down when this script exits, so we disable that
+    # watchdog as soon as it is healthy (below) — that is the same mechanism the
+    # app uses for "keep server running when app closes".
+    nohup "$PY" "$VENV/bin/uvicorn" backend.main:app \
+      --port "$PORT" --log-level info >>"$LOG_FILE" 2>&1 &
+    echo $! >"$SERVER_PID_FILE"
+    disown 2>/dev/null || true
+
+    for _ in $(seq 1 60); do health && break; sleep 0.5; done
+    health || die "server did not become healthy — see $LOG_FILE"
+    echo "server healthy (pid $(server_pid))"
+  fi
+
+  # Survive this script exiting: the parent watchdog watches *our* shell's pid.
+  curl -sf -m 5 -X POST "http://127.0.0.1:$PORT/watchdog/disable" >/dev/null 2>&1 \
+    && echo "watchdog disabled (server outlives this shell)" \
+    || echo "warning: could not disable the parent watchdog — the server may exit with this shell"
+
+  # The narration worker is spawned by the server a few seconds in; wait for it
+  # so "power on" means the whole stack, not just the API.
+  for _ in $(seq 1 60); do
+    curl -sf -m 2 "http://127.0.0.1:$WORKER_PORT/health" >/dev/null 2>&1 && break
+    sleep 0.5
+  done
+  if curl -sf -m 2 "http://127.0.0.1:$WORKER_PORT/health" >/dev/null 2>&1; then
+    echo "narration worker up on $WORKER_PORT"
+  else
+    echo "note: narration worker has not answered yet (agent speech will still work, without the dedicated lane)"
+  fi
+
+  if [ "$with_app" = "1" ]; then
+    if [ -n "$(app_pid)" ]; then
+      echo "app already running (pid $(app_pid))"
+    else
+      echo "starting the desktop app (log: $APP_LOG_FILE)"
+      nohup bun run dev >>"$APP_LOG_FILE" 2>&1 &
+      echo $! >"$APP_PID_FILE"
+      disown 2>/dev/null || true
+      for _ in $(seq 1 60); do [ -n "$(pgrep -f 'target/debug/voicebox' | head -1)" ] && break; sleep 1; done
+      echo "app pid $(app_pid)"
+    fi
+  fi
+}
+
+cmd_stop() {
+  local keep_app=0
+  [ "${1:-}" = "--keep-app" ] && keep_app=1
+  local via_login=0
+  if [ -f "$PLIST" ] && launchctl list 2>/dev/null | grep -q "$LABEL"; then
+    # KeepAlive would restart the server the moment we kill it.
+    echo "unloading the login item (which also stops the server it owns)"
+    launchctl unload "$PLIST" 2>/dev/null || true
+    via_login=1
+  fi
+
+  local pid; pid="$(server_pid)"
+  if [ -n "$pid" ]; then
+    echo "stopping server (pid $pid)"
+    kill "$pid" 2>/dev/null || true
+    for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.25; done
+    kill -9 "$pid" 2>/dev/null || true
+  elif [ "$via_login" = "0" ]; then
+    echo "server not running"
+  fi
+  rm -f "$SERVER_PID_FILE"
+
+  # A stale pid file must never leave a server behind: kill whatever is really
+  # listening on our port, whatever started it.
+  pkill -f "uvicorn backend.main:app.*--port $PORT" 2>/dev/null || true
+
+  # The narration worker is a child of the server and exits with it; sweep any
+  # survivor so the next start is clean.
+  pkill -f "backend.narration_main" 2>/dev/null || true
+
+  if [ "$keep_app" = "1" ]; then
+    echo "app left running (--keep-app)"
+    return 0
+  fi
+
+  local apid; apid="$(app_pid)"
+  if [ -n "$apid" ]; then
+    echo "stopping app (pid $apid)"
+    pkill -P "$apid" 2>/dev/null || true
+    kill "$apid" 2>/dev/null || true
+    # `tauri dev` leaves the compiled binary running under its own name.
+    pkill -f "target/debug/voicebox" 2>/dev/null || true
+  fi
+  rm -f "$APP_PID_FILE"
+
+  for _ in $(seq 1 20); do
+    health || { echo "stopped"; return; }
+    sleep 0.25
+  done
+  echo "warning: something still answers on $PORT"
+}
+
+cmd_status() {
+  local pid apid
+  pid="$(server_pid)"; apid="$(app_pid)"
+  if health; then
+    echo "server   up    pid ${pid:-?}   http://127.0.0.1:$PORT"
+  else
+    echo "server   down"
+  fi
+  if curl -sf -m 2 "http://127.0.0.1:$WORKER_PORT/health" >/dev/null 2>&1; then
+    echo "worker   up    http://127.0.0.1:$WORKER_PORT (narration)"
+  else
+    echo "worker   down"
+  fi
+  if [ -n "$apid" ]; then echo "app      up    pid $apid"; else echo "app      down"; fi
+  if [ -f "$PLIST" ]; then
+    if launchctl list 2>/dev/null | grep -q "$LABEL"; then
+      echo "login    installed + loaded ($LABEL)"
+    else
+      echo "login    installed, not loaded (voicebox start loads it)"
+    fi
+  else
+    echo "login    not installed"
+  fi
+}
+
+cmd_demo() {
+  # Speak through the narration lane: streamed, ephemeral, never in history.
+  local voice
+  voice="$(curl -sf -m 5 "http://127.0.0.1:$PORT/settings/captures" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('default_playback_voice_id') or '')" 2>/dev/null)"
+  local text="${1:-Voicebox is up. This is the agent voice, speaking through the narration lane. Nothing here lands in your history.}"
+  [ -n "$voice" ] || die "no default playback voice set (Settings → MCP)"
+
+  local payload
+  payload="$(VOICEBOX_DEMO_TEXT="$text" VOICEBOX_DEMO_VOICE="$voice" python3 -c \
+    'import json, os; print(json.dumps({"text": os.environ["VOICEBOX_DEMO_TEXT"], "profile_id": os.environ["VOICEBOX_DEMO_VOICE"]}))')"
+
+  echo "speaking through the narration lane..."
+  curl -sf -m 10 -X POST "http://127.0.0.1:$PORT/speak/narrate" \
+    -H 'content-type: application/json' -d "$payload" \
+    >/dev/null || die "narration request failed — is agent voice muted? (voicebox status)"
+  echo "requested. It plays on the speaking pill; with the app closed it plays on this machine."
+}
+
+cmd_logs() {
+  [ -f "$LOG_FILE" ] || die "no log yet at $LOG_FILE"
+  if [ "${1:-}" = "-f" ]; then tail -f "$LOG_FILE"; else tail -n 40 "$LOG_FILE"; fi
+}
+
+cmd_install() {
+  mkdir -p "$(dirname "$PLIST")" "$LOG_DIR"
+  cat >"$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$PY</string>
+    <string>$VENV/bin/uvicorn</string>
+    <string>backend.main:app</string>
+    <string>--port</string><string>$PORT</string>
+    <string>--log-level</string><string>info</string>
+  </array>
+  <key>WorkingDirectory</key><string>$ROOT</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$LOG_FILE</string>
+  <key>StandardErrorPath</key><string>$LOG_FILE</string>
+</dict>
+</plist>
+PLIST_EOF
+  launchctl unload "$PLIST" 2>/dev/null || true
+  launchctl load "$PLIST"
+  # RunAtLoad can leave the spawn pending right after a load/unload cycle
+  # ("domain in on-demand-only mode"); kick it so install is deterministic.
+  launchctl kickstart -k "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  echo "installed: $PLIST (server starts at login and is kept alive)"
+  echo "the app is still yours to launch — the pill lives in it."
+}
+
+cmd_uninstall() {
+  if [ -f "$PLIST" ]; then
+    launchctl unload "$PLIST" 2>/dev/null || true
+    rm -f "$PLIST"
+    echo "removed $PLIST"
+  else
+    echo "not installed"
+  fi
+}
+
+case "${1:-status}" in
+  start)   shift; cmd_start "${1:-}" ;;
+  stop)    cmd_stop ;;
+  restart)
+    shift || true
+    if [ "${1:-}" = "--app" ]; then cmd_stop; cmd_start --app; else cmd_stop --keep-app; cmd_start; fi
+    ;;
+  status)  cmd_status ;;
+  demo)    shift; cmd_demo "${1:-}" ;;
+  logs)    shift; cmd_logs "${1:-}" ;;
+  install) cmd_install ;;
+  uninstall) cmd_uninstall ;;
+  *) die "usage: voicebox {start [--app]|stop|restart [--app]|status|demo [text]|logs [-f]|install|uninstall}" ;;
+esac

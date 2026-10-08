@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+"""Per-stage latency table for one voice-loop turn, against a running server.
+
+Measures the stages the app really drives, over HTTP, with no browser and no mic:
+
+  stt        POST /captures with a WAV      — upload + decode + Whisper (the app's path)
+  stt-webm   POST /captures with a WebM/Opus — the same, through librosa's ffmpeg decode,
+                                              which is what a real dictation uploads
+  narration  POST /speak/narrate then GET /speak/{id}/stream — time to the first chunk
+  delivery   the herdr CLI's own wall time  — the handoff into an agent session
+
+Every capture it creates is deleted again, so the Captures tab is left as it was.
+
+    scripts/loop-bench [--wav PATH] [--repeat N] [--agent] [--port N]
+
+`--agent` sends the transcript to the configured agent target. That injects text into
+a live agent session, so it is off by default and you should mean it.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+
+BOUNDARY = "----loopbench7f3a"
+
+
+def _request(method: str, url: str, body: bytes | None = None, headers: dict | None = None, timeout: float = 900):
+    req = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
+def get(base: str, path: str):
+    with _request("GET", f"{base}{path}") as response:
+        return json.load(response)
+
+
+def post_json(base: str, path: str, payload: dict, timeout: float = 900):
+    body = json.dumps(payload).encode()
+    started = time.perf_counter()
+    with _request(
+        "POST", f"{base}{path}", body, {"content-type": "application/json"}, timeout
+    ) as response:
+        out = json.load(response)
+    return time.perf_counter() - started, out
+
+
+def post_file(base: str, path: str, file_path: str, fields: dict):
+    """Multipart upload; returns (seconds, parsed response)."""
+    parts = []
+    for key, value in fields.items():
+        parts.append(
+            f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode()
+        )
+    name = os.path.basename(file_path)
+    parts.append(
+        f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="{name}"\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n".encode()
+    )
+    with open(file_path, "rb") as handle:
+        parts.append(handle.read())
+    parts.append(f"\r\n--{BOUNDARY}--\r\n".encode())
+    body = b"".join(parts)
+
+    started = time.perf_counter()
+    with _request(
+        "POST",
+        f"{base}{path}",
+        body,
+        {"content-type": f"multipart/form-data; boundary={BOUNDARY}"},
+    ) as response:
+        out = json.load(response)
+    return time.perf_counter() - started, out
+
+
+def stream_marks(base: str, narration_id: str) -> dict:
+    """Time each narration SSE event relative to the stream opening."""
+    marks: dict[str, float] = {}
+    started = time.perf_counter()
+    with _request("GET", f"{base}/speak/{narration_id}/stream", timeout=900) as response:
+        event = None
+        for raw in response:
+            line = raw.decode("utf-8", "replace").rstrip("\n")
+            if line.startswith("event:"):
+                event = line[6:].strip()
+            elif line.startswith("data:") and event:
+                elapsed = (time.perf_counter() - started) * 1000
+                if event in ("ready", "loading", "waiting", "done", "error"):
+                    marks.setdefault(event, elapsed)
+                elif event == "chunk":
+                    marks.setdefault("first_chunk", elapsed)
+                    marks["last_chunk"] = elapsed
+    return marks
+
+
+def to_webm(wav: str) -> str | None:
+    """Transcode to the WebM/Opus the browser records, so the decode path is real."""
+    if not shutil.which("ffmpeg"):
+        return None
+    out = os.path.join(tempfile.mkdtemp(prefix="loopbench-"), "clip.webm")
+    proc = subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-c:a", "libopus", "-b:a", "32k", out],
+        capture_output=True,
+    )
+    return out if proc.returncode == 0 else None
+
+
+def capture_stage(base: str, label: str, file_path: str, rows: list) -> None:
+    """Upload, time it, delete the row, record the result."""
+    try:
+        seconds, body = post_file(base, "/captures", file_path, {"source": "file", "language": "en"})
+    except urllib.error.HTTPError as exc:
+        rows.append((label, None, f"HTTP {exc.code}: {exc.read()[:120].decode(errors='replace')}"))
+        return
+
+    transcript = (body.get("transcript_raw") or "").strip()
+    try:
+        _request("DELETE", f"{base}/captures/{body['id']}").close()
+    except Exception:  # noqa: BLE001 - cleanup is best-effort
+        pass
+    rows.append((label, seconds, f"{len(transcript)} chars  {transcript[:52]!r}"))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--wav", help="capture to use (default: newest under data/captures)")
+    parser.add_argument("--repeat", type=int, default=3)
+    parser.add_argument("--agent", action="store_true", help="also send the transcript to the agent target")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("VOICEBOX_PORT", 17493)))
+    args = parser.parse_args()
+
+    base = f"http://127.0.0.1:{args.port}"
+    try:
+        health = get(base, "/health")
+    except Exception as exc:  # noqa: BLE001 - the whole point is to report this
+        print(f"no server at {base}: {exc}", file=sys.stderr)
+        return 1
+    if health.get("status") != "healthy":
+        print(f"server at {base} is not healthy: {health.get('status')}", file=sys.stderr)
+        return 1
+
+    wav = args.wav
+    if not wav:
+        directory = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "captures")
+        wavs = sorted(
+            (os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".wav")),
+            key=os.path.getmtime,
+            reverse=True,
+        )
+        if not wavs:
+            print("no captures found; pass --wav", file=sys.stderr)
+            return 1
+        wav = wavs[0]
+
+    settings = get(base, "/settings/captures")
+    voice = settings.get("default_playback_voice_id")
+    print(f"server   {base}  ({health.get('gpu_type')}, stt={settings.get('stt_model')}, refine={settings.get('auto_refine')})")
+    print(f"audio    {wav}  ({os.path.getsize(wav) / 1024:.0f} KB)")
+    print(f"voice    {voice}")
+    if not voice:
+        print("no default playback voice; the narration stage will be skipped", file=sys.stderr)
+
+    rows: list[tuple[str, float | None, str]] = []
+
+    for index in range(args.repeat):
+        capture_stage(base, f"stt (wav){'' if index == 0 else ' [warm]'}", wav, rows)
+
+    webm = to_webm(wav)
+    if webm:
+        for index in range(args.repeat):
+            capture_stage(base, f"stt (webm/opus){'' if index == 0 else ' [warm]'}", webm, rows)
+
+    if voice:
+        for index in range(args.repeat):
+            try:
+                _, body = post_json(
+                    base,
+                    "/speak/narrate",
+                    {"text": "Starting the build now. I will report back when the tests are green.", "profile_id": voice},
+                )
+                if body.get("mode") != "narration":
+                    rows.append(("narration", None, f"degraded to the queued path ({body.get('mode')})"))
+                    continue
+                marks = stream_marks(base, body["narration_id"])
+                rows.append(
+                    (
+                        f"narration → first chunk{'' if index == 0 else ' [warm]'}",
+                        marks.get("first_chunk", float("nan")) / 1000,
+                        " ".join(f"{k}={v:.0f}ms" for k, v in marks.items()),
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001 - report, keep going
+                rows.append(("narration", None, f"{type(exc).__name__}: {exc}"))
+
+    if shutil.which("herdr"):
+        started = time.perf_counter()
+        subprocess.run(["herdr", "agent", "list"], capture_output=True, timeout=30)
+        rows.append(("delivery (herdr agent list)", time.perf_counter() - started, "no prompt sent"))
+    else:
+        rows.append(("delivery (herdr agent list)", None, "herdr not on PATH"))
+
+    if args.agent:
+        transcript = next((r[2] for r in rows if r[0].startswith("stt (wav)")), "")
+        try:
+            seconds, body = post_json(base, "/voice-targets/message", {"text": "loop-bench probe — ignore"})
+            rows.append(("delivery (agent prompt)", seconds, f"agent={body.get('agent')} status={body.get('status')}"))
+        except Exception as exc:  # noqa: BLE001 - report, keep going
+            rows.append(("delivery (agent prompt)", None, f"{type(exc).__name__}: {exc}"))
+
+    print()
+    width = max(len(name) for name, _, _ in rows) + 2
+    print(f"{'stage'.ljust(width)}{'seconds':>9}   note")
+    for name, seconds, note in rows:
+        value = "     —   " if seconds is None else f"{seconds:9.2f}"
+        print(f"{name.ljust(width)}{value}   {note}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
