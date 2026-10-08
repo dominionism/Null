@@ -1,0 +1,401 @@
+<!doctype html>
+<!-- PROTOTYPE — throwaway. Delete when Context/Plans/NullMini.md items 7 and 8 land.
+     Loaded only by tauri/src-tauri/src/prototype_mini_spike.rs when the app is
+     started with NULL_MINI_SPIKE=1.
+
+     Now wired to the backend's /mini endpoints: Enter sends what you typed to
+     the harness and the reply streams in below. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Null Mini</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+        font: 14px -apple-system, system-ui, sans-serif;
+        color: #eee;
+      }
+      .box {
+        margin: 8px;
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: rgba(20, 20, 22, 0.94);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .caret {
+        color: #8b8bf5;
+        font: 16px ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: #fff;
+        font: inherit;
+        font-size: 16px;
+      }
+      #status {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #9a9aa2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #out {
+        display: none;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        max-height: 330px;
+        overflow-y: auto;
+        font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+        user-select: text;
+        -webkit-user-select: text;
+      }
+      #out > div {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .you {
+        color: #8b8bf5;
+        margin-top: 8px;
+      }
+      .you:first-child {
+        margin-top: 0;
+      }
+      .tool {
+        color: #9a9aa2;
+      }
+      .tool.failed,
+      .error {
+        color: #ff7b72;
+      }
+      .note {
+        color: #9a9aa2;
+        font-style: italic;
+      }
+      .ask {
+        margin: 4px 0;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: rgba(255, 200, 80, 0.1);
+        color: #ffd479;
+      }
+      .ask button {
+        margin: 4px 6px 0 0;
+        padding: 2px 8px;
+        border: 1px solid rgba(255, 212, 121, 0.5);
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box" id="box">
+      <div class="row" data-tauri-drag-region>
+        <span class="caret">›</span>
+        <input id="q" placeholder="Ask or tell your agent. Enter sends, Esc hides." autofocus spellcheck="false" />
+      </div>
+      <div id="out"></div>
+      <div id="status" data-tauri-drag-region>starting…</div>
+    </div>
+    <script>
+      const { emit, listen } = window.__TAURI__.event;
+      const input = document.getElementById('q');
+      const out = document.getElementById('out');
+      const statusLine = document.getElementById('status');
+      const box = document.getElementById('box');
+
+      let api = 'http://127.0.0.1:17493';
+      let token = '';
+      let session = null; // { id, harness, model }
+      let lastSeq = 0;
+      let busy = false;
+      let tailing = false;
+      let lastPrompt = '';
+      let replyLine = null; // the element the current answer streams into
+      let pendingAsk = null; // { requestId, options, element }
+      const toolLines = new Map();
+
+      // ── Display ────────────────────────────────────────────────────────
+
+      let lastHeight = 0;
+      const fit = () => {
+        requestAnimationFrame(() => {
+          const height = Math.ceil(box.getBoundingClientRect().height) + 16;
+          if (height !== lastHeight) {
+            lastHeight = height;
+            emit('mini-spike:resize', { height });
+          }
+        });
+      };
+
+      const line = (className, text) => {
+        const element = document.createElement('div');
+        element.className = className;
+        element.textContent = text;
+        out.style.display = 'block';
+        out.appendChild(element);
+        out.scrollTop = out.scrollHeight;
+        fit();
+        return element;
+      };
+
+      const say = (text) => {
+        statusLine.textContent = text;
+      };
+
+      const shortModel = () => (session && session.model ? session.model.split('/').pop() : '');
+      const idleStatus = () => (session ? `${session.harness} · ${shortModel()} · /new starts over` : 'ready');
+
+      const toolMark = { pending: '…', in_progress: '…', completed: '✓', failed: '✗' };
+
+      // ── Events from the backend ────────────────────────────────────────
+
+      const show = (event) => {
+        switch (event.type) {
+          case 'user_message':
+            replyLine = null;
+            line('you', `› ${event.text}`);
+            break;
+          case 'text_delta':
+            if (event.thinking) {
+              say('thinking… (ctrl+c stops)');
+              break;
+            }
+            if (!replyLine) replyLine = line('reply', '');
+            replyLine.textContent += event.text;
+            out.scrollTop = out.scrollHeight;
+            fit();
+            break;
+          case 'tool_activity': {
+            replyLine = null;
+            let element = toolLines.get(event.call_id);
+            if (!element) {
+              element = line('tool', '');
+              toolLines.set(event.call_id, element);
+            }
+            element.className = event.status === 'failed' ? 'tool failed' : 'tool';
+            element.textContent = `${toolMark[event.status] || '…'} ${event.title}`;
+            say('working… (ctrl+c stops)');
+            break;
+          }
+          case 'approval_request': {
+            replyLine = null;
+            const element = line('ask', `Your agent asks: ${event.title}`);
+            event.options.forEach((option, index) => {
+              const button = document.createElement('button');
+              button.textContent = `${index + 1} ${option.label}`;
+              button.addEventListener('click', () => answer(option.option_id));
+              element.appendChild(document.createElement('br'));
+              element.appendChild(button);
+            });
+            pendingAsk = { requestId: event.request_id, options: event.options, element };
+            say('waiting for your answer: press its number');
+            fit();
+            break;
+          }
+          case 'status_change':
+            if (event.status === 'running') say('working… (ctrl+c stops)');
+            break;
+          case 'message_done':
+            replyLine = null;
+            if (event.stop_reason === 'cancelled') line('note', 'stopped');
+            if (event.stop_reason === 'truncated') line('note', 'the reply was cut short');
+            if (event.stop_reason === 'refused') line('note', 'the model refused');
+            break;
+          case 'error':
+            replyLine = null;
+            line('error', `error: ${event.message}${event.details ? `\n${event.details}` : ''}`);
+            break;
+        }
+      };
+
+      // ── Talking to the backend ─────────────────────────────────────────
+
+      const call = async (path, options = {}) => {
+        const response = await fetch(api + path, {
+          ...options,
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+          let detail = `${response.status}`;
+          try {
+            detail = (await response.json()).detail || detail;
+          } catch (_) {}
+          const error = new Error(detail);
+          error.status = response.status;
+          throw error;
+        }
+        return response;
+      };
+
+      const openSession = async () => {
+        session = await (await call('/mini/sessions', { method: 'POST', body: '{}' })).json();
+        lastSeq = 0;
+      };
+
+      // Read the session's events from where we stopped, until it is idle.
+      const tail = async () => {
+        if (tailing || !session) return;
+        tailing = true;
+        try {
+          const response = await call(`/mini/sessions/${session.id}/events?after=${lastSeq}`);
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const blocks = buffer.split(/\r?\n\r?\n/);
+            buffer = blocks.pop();
+            for (const block of blocks) {
+              let id = null;
+              let data = '';
+              for (const row of block.split(/\r?\n/)) {
+                if (row.startsWith('id:')) id = Number(row.slice(3).trim());
+                if (row.startsWith('data:')) data += row.slice(5).trim();
+              }
+              if (id === null || !data) continue; // a heartbeat
+              lastSeq = Math.max(lastSeq, id);
+              show(JSON.parse(data));
+            }
+          }
+        } catch (error) {
+          if (error.status === 404) {
+            session = null; // the server restarted and forgot the session
+          } else {
+            line('error', `lost the connection: ${error.message}`);
+          }
+        } finally {
+          tailing = false;
+        }
+
+        // The stream ends when the reply does. If it ended early, pick it up again.
+        let state = null;
+        try {
+          state = session && (await (await call(`/mini/sessions/${session.id}`)).json());
+        } catch (_) {}
+        if (state && state.busy) {
+          setTimeout(tail, 500);
+          return;
+        }
+        busy = false;
+        pendingAsk = null;
+        say(idleStatus());
+      };
+
+      const send = async (text) => {
+        if (text === '/new') {
+          session = null;
+          out.textContent = '';
+          out.style.display = 'none';
+          toolLines.clear();
+          say('new conversation');
+          fit();
+          return;
+        }
+        if (busy) {
+          say('still working on the last one. ctrl+c stops it.');
+          return;
+        }
+        busy = true;
+        lastPrompt = text;
+        say('sending…');
+        try {
+          if (!session) await openSession();
+          try {
+            await call(`/mini/sessions/${session.id}/messages`, { method: 'POST', body: JSON.stringify({ text }) });
+          } catch (error) {
+            if (error.status !== 404) throw error;
+            await openSession(); // the server restarted; start a fresh conversation
+            await call(`/mini/sessions/${session.id}/messages`, { method: 'POST', body: JSON.stringify({ text }) });
+          }
+        } catch (error) {
+          busy = false;
+          const hint = error.status ? '' : ' — is the Null server running?';
+          line('error', `could not send: ${error.message}${hint}`);
+          say(idleStatus());
+          return;
+        }
+        tail();
+      };
+
+      const answer = async (optionId) => {
+        if (!pendingAsk || !session) return;
+        const { requestId, element } = pendingAsk;
+        pendingAsk = null;
+        element.querySelectorAll('button').forEach((button) => (button.disabled = true));
+        try {
+          await call(`/mini/sessions/${session.id}/respond`, {
+            method: 'POST',
+            body: JSON.stringify({ request_id: requestId, answer: optionId }),
+          });
+        } catch (error) {
+          line('error', `could not answer: ${error.message}`);
+        }
+      };
+
+      // ── Keys ───────────────────────────────────────────────────────────
+
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.isComposing) {
+          const text = input.value.trim();
+          if (!text) return;
+          input.value = '';
+          send(text);
+        } else if (event.key === 'ArrowUp' && !input.value && lastPrompt) {
+          input.value = lastPrompt;
+          event.preventDefault();
+        } else if (pendingAsk && !input.value && /^[1-9]$/.test(event.key)) {
+          const option = pendingAsk.options[Number(event.key) - 1];
+          if (option) {
+            event.preventDefault();
+            answer(option.option_id);
+          }
+        }
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          emit('mini-spike:hide');
+        } else if (event.key === 'c' && event.ctrlKey && busy && session) {
+          event.preventDefault();
+          say('stopping…');
+          call(`/mini/sessions/${session.id}/interrupt`, { method: 'POST' }).catch(() => {});
+        }
+      });
+
+      listen('mini-spike:shown', (event) => {
+        const payload = event.payload || {};
+        if (payload.token) token = payload.token;
+        if (payload.api) api = payload.api;
+        input.focus();
+        if (!token) {
+          say('no token yet — is the Null server running?');
+        } else if (!busy) {
+          say(idleStatus());
+        }
+        tail(); // catch up on anything that arrived while hidden
+        fit();
+      });
+
+      fit();
+    </script>
+  </body>
+</html>

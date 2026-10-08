@@ -12,6 +12,9 @@ mod input_monitoring;
 #[cfg(desktop)]
 mod key_codes;
 mod keyboard_layout;
+// PROTOTYPE — remove with Context/Plans/NullMini.md item 7.
+#[cfg(target_os = "macos")]
+mod prototype_mini_spike;
 mod speak_monitor;
 mod synthetic_keys;
 
@@ -1488,6 +1491,13 @@ pub fn run() {
 
                 ensure_dictate_window(app.handle());
                 speak_monitor::spawn_speak_monitor(app.handle().clone());
+
+                // PROTOTYPE — remove with Context/Plans/NullMini.md item 7.
+                // Does nothing unless the app is started with NULL_MINI_SPIKE=1.
+                #[cfg(target_os = "macos")]
+                if prototype_mini_spike::enabled() {
+                    prototype_mini_spike::start(app.handle());
+                }
             }
 
             // Hide title bar icon on Windows
