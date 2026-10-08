@@ -930,3 +930,56 @@ class CloudStatusResponse(BaseModel):
     key_prefix: Optional[str] = None
     connected_at: Optional[datetime] = None
     dashboard_url: str
+
+
+# ─── Mini (a conversation with the user's agent harness) ────────────────
+
+
+class HarnessInfoResponse(BaseModel):
+    """One harness Null can drive, and what is needed to use it."""
+
+    name: str  # registry key, e.g. "omp"
+    display_name: str
+    installed: bool
+    binary: Optional[str] = None
+    version: Optional[str] = None
+    signed_in: Optional[bool] = None  # None when the harness cannot say without a session
+    fix_command: Optional[str] = None
+
+
+class MiniSessionCreate(BaseModel):
+    """Open a conversation. Both fields fall back to the defaults."""
+
+    harness: Optional[str] = None
+    cwd: Optional[str] = None
+
+
+class MiniSessionResponse(BaseModel):
+    """One open conversation with a harness."""
+
+    id: str  # the harness's own session id
+    harness: str
+    cwd: str
+    model: Optional[str] = None
+    status: str  # running | needs_input | ready | blocked
+    busy: bool
+    last_seq: int  # cursor of the latest event
+
+
+class MiniMessageRequest(BaseModel):
+    """A message typed into the mini."""
+
+    text: str = Field(..., min_length=1, max_length=100000)
+
+
+class MiniMessageResponse(BaseModel):
+    """The reply was started; its events come after this cursor."""
+
+    after: int
+
+
+class MiniRespondRequest(BaseModel):
+    """An answer to an approval request: an option id, or free text."""
+
+    request_id: str
+    answer: str
