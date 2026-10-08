@@ -360,6 +360,15 @@ async def _run_startup(application: FastAPI) -> None:
         logger.info("Ready")
         return
 
+    # The mini's endpoints are locked by a per-install secret. Create it now so
+    # the desktop host can read it before the first request arrives.
+    from .services.mini_auth import ensure_token
+
+    try:
+        ensure_token()
+    except OSError as e:
+        logger.warning("Could not create the mini's token; its endpoints will refuse callers: %s", e)
+
     backend_type = get_backend_type()
     logger.info("Backend: %s", backend_type.upper())
     logger.info("GPU: %s", _get_gpu_status())
@@ -485,8 +494,13 @@ async def _run_shutdown() -> None:
     """Unload models on lifespan exit."""
     logger.info("Voicebox server shutting down...")
     if os.environ.get("VOICEBOX_ROLE", "main") == "main":
+        from .services import mini
         from .services.narration_worker import stop_worker
 
+        try:
+            await mini.shutdown()
+        except Exception:
+            logger.exception("Failed to stop the mini's harnesses")
         stop_worker()
     try:
         tts.unload_tts_model()

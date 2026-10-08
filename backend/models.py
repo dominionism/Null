@@ -930,3 +930,79 @@ class CloudStatusResponse(BaseModel):
     key_prefix: Optional[str] = None
     connected_at: Optional[datetime] = None
     dashboard_url: str
+
+
+# ─── Mini (a conversation with the user's agent harness) ────────────────
+
+
+class HarnessInfoResponse(BaseModel):
+    """One harness Null can drive, and what is needed to use it."""
+
+    name: str  # registry key, e.g. "omp"
+    display_name: str
+    installed: bool
+    binary: Optional[str] = None
+    version: Optional[str] = None
+    signed_in: Optional[bool] = None  # None when the harness cannot say without a session
+    fix_command: Optional[str] = None
+
+
+class MiniSessionCreate(BaseModel):
+    """Open a conversation. Every field falls back to its default."""
+
+    harness: Optional[str] = None
+    cwd: Optional[str] = None
+    # A model that is no longer offered is ignored; the response says which one is in use.
+    model: Optional[str] = None
+
+
+class MiniSessionUpdate(BaseModel):
+    """Change an open conversation. Only the fields given are changed."""
+
+    model: Optional[str] = None
+
+
+class MiniModelResponse(BaseModel):
+    """One model a conversation can be moved to."""
+
+    id: str  # e.g. "openai-codex/gpt-5.5"
+    label: str
+    provider: Optional[str] = None
+
+
+class MiniModelsResponse(BaseModel):
+    """The models a conversation can use, and the one it is on."""
+
+    current: Optional[str] = None
+    models: List[MiniModelResponse] = []
+
+
+class MiniSessionResponse(BaseModel):
+    """One open conversation with a harness."""
+
+    id: str  # the harness's own session id
+    harness: str
+    cwd: str
+    model: Optional[str] = None
+    status: str  # running | needs_input | ready | blocked
+    busy: bool
+    last_seq: int  # cursor of the latest event
+
+
+class MiniMessageRequest(BaseModel):
+    """A message typed into the mini."""
+
+    text: str = Field(..., min_length=1, max_length=100000)
+
+
+class MiniMessageResponse(BaseModel):
+    """The reply was started; its events come after this cursor."""
+
+    after: int
+
+
+class MiniRespondRequest(BaseModel):
+    """An answer to an approval request: an option id, or free text."""
+
+    request_id: str
+    answer: str

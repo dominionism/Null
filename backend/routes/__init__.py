@@ -27,6 +27,7 @@ def register_routers(app: FastAPI) -> None:
     from .cloud import router as cloud_router
     from .voice_targets import router as voice_targets_router
     from .turns import router as turns_router
+    from .mini import router as mini_router
 
     app.include_router(health_router)
     app.include_router(profiles_router)
@@ -50,3 +51,4 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(cloud_router)
     app.include_router(voice_targets_router)
     app.include_router(turns_router)
+    app.include_router(mini_router)
