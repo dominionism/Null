@@ -30,10 +30,17 @@ use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 
 const LABEL: &str = "mini-spike";
-const WIDTH: f64 = 600.0;
-const HEIGHT: f64 = 84.0;
-/// The page asks for more room as a reply comes in, up to this.
-const MAX_HEIGHT: f64 = 470.0;
+// Sizing contract with prototype-mini-spike.html. The window is the box plus the
+// transparent margin its shadow is drawn in: 16 px each side, 8 px above, 24 px
+// below. The page measures its box and asks for `box height + 32`. Change the
+// `.box` margin or any height in the page's CSS and these three must follow.
+/// The 584 px box plus 16 px each side.
+const WIDTH: f64 = 616.0;
+/// The idle box (44 px) plus 8 px above and 24 px below.
+const HEIGHT: f64 = 76.0;
+/// The page asks for more room as a reply comes in, up to this: the tallest the
+/// box gets (2 border + 42 row + 344 transcript + 26 notice = 414) plus 32.
+const MAX_HEIGHT: f64 = 446.0;
 
 /// Also written to a file so the results can be read without copying terminal output.
 const LOG_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/logs/mini-spike.log");
@@ -93,6 +100,10 @@ pub fn start(app: &AppHandle) {
     .skip_taskbar(true)
     .resizable(false)
     .shadow(false)
+    // A press acts at once even when the panel is not the key window. Without
+    // this macOS spends that first press on making it key, so a grab to move
+    // the box (or a click on a button in it) would do nothing the first time.
+    .accept_first_mouse(true)
     .visible(false)
     .build()
     {
