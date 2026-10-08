@@ -948,10 +948,33 @@ class HarnessInfoResponse(BaseModel):
 
 
 class MiniSessionCreate(BaseModel):
-    """Open a conversation. Both fields fall back to the defaults."""
+    """Open a conversation. Every field falls back to its default."""
 
     harness: Optional[str] = None
     cwd: Optional[str] = None
+    # A model that is no longer offered is ignored; the response says which one is in use.
+    model: Optional[str] = None
+
+
+class MiniSessionUpdate(BaseModel):
+    """Change an open conversation. Only the fields given are changed."""
+
+    model: Optional[str] = None
+
+
+class MiniModelResponse(BaseModel):
+    """One model a conversation can be moved to."""
+
+    id: str  # e.g. "openai-codex/gpt-5.5"
+    label: str
+    provider: Optional[str] = None
+
+
+class MiniModelsResponse(BaseModel):
+    """The models a conversation can use, and the one it is on."""
+
+    current: Optional[str] = None
+    models: List[MiniModelResponse] = []
 
 
 class MiniSessionResponse(BaseModel):

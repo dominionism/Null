@@ -333,6 +333,31 @@ async def test_changing_the_model_tells_the_agent_and_remembers_the_answer(agent
     assert models_from_config_options(harness._sessions["s1"].config_options)[1] == "codex/luna"
 
 
+async def test_a_model_the_agent_does_not_list_is_refused_without_asking_it(agent):
+    harness = agent.harness
+    await harness.start_session("/work")
+
+    with pytest.raises(ValueError, match="no model named nope/none"):
+        await harness.set_model("s1", "nope/none")
+
+    assert agent.conn.set_calls == []
+
+
+async def test_the_agents_refusal_to_change_model_is_passed_on_in_its_own_words(agent):
+    harness = agent.harness
+
+    async def refuse(config_id, session_id, value):
+        raise RequestError(-32603, "Internal error", {"details": "Provider is signed out"})
+
+    await harness.start_session("/work")
+    agent.conn.set_config_option = refuse
+
+    with pytest.raises(ValueError, match="Provider is signed out"):
+        await harness.set_model("s1", "codex/luna")
+
+    assert models_from_config_options(harness._sessions["s1"].config_options)[1] == "go/flash"
+
+
 async def test_a_session_is_loaded_again_after_the_agent_restarts(agent):
     harness = agent.harness
 

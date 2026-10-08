@@ -20,6 +20,7 @@ from backend.harness import (
     HarnessSession,
     HarnessSpec,
     MessageDone,
+    ModelChoice,
     StatusChange,
     TextDelta,
 )
@@ -35,6 +36,7 @@ class FakeHarness:
         self.fail = False
         self.interrupted = []
         self.answers = []
+        self.model_calls = []
         self._release = asyncio.Event()
 
     async def info(self):
@@ -67,10 +69,15 @@ class FakeHarness:
         self._release.set()
 
     async def list_models(self, session_id=None):
-        return []
+        return [
+            ModelChoice(id="provider/model", label="Model", provider="provider"),
+            ModelChoice(id="other/fast", label="Fast", provider="other"),
+        ]
 
     async def set_model(self, session_id, model_id):
-        pass
+        if model_id not in {choice.id for choice in await self.list_models()}:
+            raise ValueError(f"Fake has no model named {model_id}")
+        self.model_calls.append(model_id)
 
     async def close(self):
         pass
@@ -204,6 +211,60 @@ async def test_a_harness_that_fails_leaves_the_session_blocked_and_free(fake):
     assert not session.busy
 
 
+async def test_a_session_moves_to_another_model_and_says_so(fake):
+    session = await mini.create_session()
+
+    await mini.set_model(session.id, "other/fast")
+
+    assert fake.model_calls == ["other/fast"]
+    assert session.model == "other/fast"
+    assert await _read_all(session.id) == [{"type": "model_changed", "model": "other/fast"}]
+
+
+async def test_choosing_the_model_already_in_use_does_nothing(fake):
+    session = await mini.create_session()
+
+    await mini.set_model(session.id, "provider/model")
+
+    assert fake.model_calls == []
+    assert await _read_all(session.id) == []
+
+
+async def test_a_model_the_harness_does_not_offer_is_refused(fake):
+    session = await mini.create_session()
+
+    with pytest.raises(ValueError, match="no model named nope"):
+        await mini.set_model(session.id, "nope")
+
+    assert session.model == "provider/model"
+    assert await _read_all(session.id) == []
+
+
+async def test_the_model_cannot_change_while_a_reply_is_in_flight(fake):
+    fake.ask_first = True
+    session = await mini.create_session()
+    await mini.send_message(session.id, "hi")
+
+    with pytest.raises(mini.MiniBusyError):
+        await mini.set_model(session.id, "other/fast")
+
+    await mini.interrupt(session.id)
+    await session.task
+
+
+async def test_a_new_session_opens_on_the_model_asked_for(fake):
+    session = await mini.create_session(model="other/fast")
+
+    assert session.model == "other/fast"
+    assert fake.model_calls == ["other/fast"]
+
+
+async def test_a_new_session_falls_back_when_the_model_asked_for_is_gone(fake):
+    session = await mini.create_session(model="retired/model")
+
+    assert session.model == "provider/model"
+
+
 async def test_an_unknown_session_is_reported(fake):
     with pytest.raises(mini.MiniSessionNotFoundError):
         await mini.send_message("nope", "hi")
@@ -287,6 +348,34 @@ def test_a_conversation_over_http(fake):
         assert _types(events) == ["user_message", "status_change", "text_delta", "status_change", "message_done"]
         assert events[2]["text"] == "HI"
         assert client.get(f"/mini/sessions/{session['id']}", headers=_auth()).json()["last_seq"] == 5
+
+
+def test_models_are_listed_and_switched_over_http(fake):
+    with _client() as client:
+        session = client.post("/mini/sessions", json={}, headers=_auth()).json()
+        url = f"/mini/sessions/{session['id']}"
+
+        listed = client.get(f"{url}/models", headers=_auth()).json()
+        assert listed["current"] == "provider/model"
+        assert [(model["id"], model["provider"]) for model in listed["models"]] == [
+            ("provider/model", "provider"),
+            ("other/fast", "other"),
+        ]
+
+        moved = client.patch(url, json={"model": "other/fast"}, headers=_auth())
+        assert moved.status_code == 200
+        assert moved.json()["model"] == "other/fast"
+        assert client.get(f"{url}/models", headers=_auth()).json()["current"] == "other/fast"
+
+        assert client.patch(url, json={"model": "nope"}, headers=_auth()).status_code == 400
+        assert client.patch(url, json={"model": "other/fast"}).status_code == 401
+
+
+def test_a_session_can_be_opened_on_a_chosen_model_over_http(fake):
+    with _client() as client:
+        session = client.post("/mini/sessions", json={"model": "other/fast"}, headers=_auth()).json()
+
+    assert session["model"] == "other/fast"
 
 
 def test_an_unknown_session_is_a_404(fake):

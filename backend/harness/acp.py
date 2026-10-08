@@ -347,8 +347,15 @@ class AcpHarness:
 
     async def set_model(self, session_id: str, model_id: str) -> None:
         session = self._session(session_id)
+        choices, _ = models_from_config_options(session.config_options)
+        if choices and model_id not in {choice.id for choice in choices}:
+            raise ValueError(f"{self._agent.display_name} has no model named {model_id}")
         conn = await self._reattach(session_id, session)
-        response = await conn.set_config_option(config_id="model", session_id=session_id, value=model_id)
+        try:
+            response = await conn.set_config_option(config_id="model", session_id=session_id, value=model_id)
+        except RequestError as exc:
+            data = exc.data if isinstance(exc.data, dict) else {}
+            raise ValueError(data.get("details") or str(exc)) from exc
         options = getattr(response, "config_options", None)
         if options:
             session.config_options = list(options)

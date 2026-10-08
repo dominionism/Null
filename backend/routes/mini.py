@@ -3,6 +3,8 @@
 - ``GET /harnesses`` — which harnesses Null can drive, and whether each is installed.
 - ``POST /mini/sessions`` — open a conversation.
 - ``GET /mini/sessions/{id}`` — its status, and the cursor of its latest event.
+- ``PATCH /mini/sessions/{id}`` — move it to another model.
+- ``GET /mini/sessions/{id}/models`` — the models it can be moved to.
 - ``POST /mini/sessions/{id}/messages`` — send a message. The reply runs in the
   background; read it from the events stream.
 - ``GET /mini/sessions/{id}/events?after=N`` — SSE stream of everything after
@@ -73,7 +75,7 @@ async def list_harnesses() -> list[models.HarnessInfoResponse]:
 async def create_session(data: models.MiniSessionCreate) -> models.MiniSessionResponse:
     """Open a conversation on a harness."""
     try:
-        session = await mini.create_session(harness=data.harness, cwd=data.cwd)
+        session = await mini.create_session(harness=data.harness, cwd=data.cwd, model=data.model)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except HarnessUnavailableError as exc:
@@ -84,6 +86,34 @@ async def create_session(data: models.MiniSessionCreate) -> models.MiniSessionRe
 @router.get("/mini/sessions/{session_id}", response_model=models.MiniSessionResponse)
 async def get_session(session_id: str) -> models.MiniSessionResponse:
     return _session_response(_get_session(session_id))
+
+
+@router.patch("/mini/sessions/{session_id}", response_model=models.MiniSessionResponse)
+async def update_session(session_id: str, data: models.MiniSessionUpdate) -> models.MiniSessionResponse:
+    """Move the conversation to another model. It keeps what was said so far."""
+    session = _get_session(session_id)
+    if data.model:
+        try:
+            session = await mini.set_model(session_id, data.model)
+        except mini.MiniBusyError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Still answering the previous message. Wait for it, or interrupt it first.",
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _session_response(session)
+
+
+@router.get("/mini/sessions/{session_id}/models", response_model=models.MiniModelsResponse)
+async def list_models(session_id: str) -> models.MiniModelsResponse:
+    """The models this conversation can use, across every provider the harness is signed in to."""
+    session = _get_session(session_id)
+    choices = await mini.list_models(session_id)
+    return models.MiniModelsResponse(
+        current=session.model,
+        models=[models.MiniModelResponse(id=c.id, label=c.label, provider=c.provider) for c in choices],
+    )
 
 
 @router.post("/mini/sessions/{session_id}/messages", response_model=models.MiniMessageResponse, status_code=202)

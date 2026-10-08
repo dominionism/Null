@@ -193,7 +193,10 @@ class Harness(Protocol):
         ...
 
     async def set_model(self, session_id: str, model_id: str) -> None:
-        """Switch a session to another model. The conversation carries on."""
+        """Switch a session to another model. The conversation carries on.
+
+        Raises ValueError for a model the harness cannot switch to.
+        """
         ...
 
     async def close(self) -> None:
