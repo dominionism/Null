@@ -314,11 +314,11 @@ async fn converse(
     let request: InitializeRequest = typed(json!({
         "protocolVersion": 1,
         "clientCapabilities": {},
-        "clientInfo": { "name": "null-mini", "title": "Null Mini", "version": env!("CARGO_PKG_VERSION") },
+        "clientInfo": { "name": "null-mini", "title": "Null", "version": env!("CARGO_PKG_VERSION") },
     }))?;
     let init = as_json(&cx.send_request(request).block_task().await.map_err(|e| describe(&e))?);
     if init.get("protocolVersion") != Some(&json!(1)) {
-        return Err(format!("{HARNESS_NAME} speaks protocol version {}; Null Mini speaks version 1", init["protocolVersion"]));
+        return Err(format!("{HARNESS_NAME} speaks protocol version {}; Null speaks version 1", init["protocolVersion"]));
     }
     log!("harness ready: {} {}", init.pointer("/agentInfo/name").and_then(Value::as_str).unwrap_or("?"), init.pointer("/agentInfo/version").and_then(Value::as_str).unwrap_or("?"));
 

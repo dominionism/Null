@@ -1,7 +1,7 @@
 [package]
 name = "null-mini"
 version = "0.1.0"
-description = "Null Mini: a floating box that opens on fn+Space and drives your own agent harness"
+description = "Null: a floating box that opens on fn+Space and drives your own agent harness"
 edition = "2021"
 publish = false
 

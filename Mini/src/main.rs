@@ -1,4 +1,4 @@
-//! Null Mini: a small floating box that opens on fn+Space and drives the user's
+//! Null: a small floating box that opens on fn+Space and drives the user's
 //! own agent harness. It is one app with no server; the page in `Page/` talks to
 //! this process through commands and events.
 //!
@@ -15,7 +15,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[cfg(not(target_os = "macos"))]
-compile_error!("Null Mini is macOS-only for now");
+compile_error!("Null is macOS-only for now");
 
 mod harness;
 mod log;
@@ -89,5 +89,5 @@ fn main() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("Null Mini could not start");
+        .expect("Null could not start");
 }

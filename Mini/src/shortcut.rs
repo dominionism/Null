@@ -56,7 +56,7 @@ fn run() {
         let mask: u64 = (1 << KEY_DOWN) | (1 << KEY_UP);
         let tap = CGEventTapCreate(SESSION_EVENT_TAP, HEAD_INSERT, TAP_OPTION_DEFAULT, mask, tap_callback, std::ptr::null_mut());
         if tap.is_null() {
-            log!("could not create the key tap even with Accessibility permission; quit and reopen Null Mini");
+            log!("could not create the key tap even with Accessibility permission; quit and reopen Null");
             return;
         }
         TAP.store(tap, Ordering::SeqCst);

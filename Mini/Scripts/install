@@ -1,15 +1,15 @@
 #!/bin/sh
-# Build Null Mini, put it in /Applications, make it start at login, and start it.
+# Build Null, put it in /Applications, make it start at login, and start it.
 #
 #   Mini/Scripts/install
 #
 # The app is signed ad hoc, so macOS treats every new build as a new app: after
-# an install you have to switch Null Mini on again in System Settings > Privacy &
+# an install you have to switch Null on again in System Settings > Privacy &
 # Security > Accessibility. The box says so when it needs it.
 set -eu
 
 here=$(cd "$(dirname "$0")/.." && pwd)
-app="Null Mini.app"
+app="Null.app"
 installed="/Applications/$app"
 agent="$HOME/Library/LaunchAgents/io.github.dominionism.null-mini.plist"
 
@@ -44,4 +44,4 @@ PLIST
 launchctl bootstrap "gui/$(id -u)" "$agent"
 
 echo "Installed $installed and started it. fn+Space opens the box."
-echo "If nothing happens, switch Null Mini on in System Settings > Privacy & Security > Accessibility."
+echo "If nothing happens, switch Null on in System Settings > Privacy & Security > Accessibility."

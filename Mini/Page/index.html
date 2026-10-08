@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Null Mini's box: the whole page.
+<!-- Null's box: the whole page.
 
      Enter sends what you typed to your agent and the reply streams in below.
      /model opens the model list, /new starts a new conversation, /quit quits
@@ -15,7 +15,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Null Mini</title>
+    <title>Null</title>
     <style>
       /* Sizing contract with src/panel.rs. The window is transparent and
          exactly the box plus the room its shadow needs: 8px above, 16px each side,
@@ -804,7 +804,7 @@
       // The app cannot hear fn+Space until macOS lets it. Say so, and say when it can.
       listen('mini:permission', (message) => {
         if (message.payload) notice('fn+Space now opens this box');
-        else notice('Turn on Null Mini in System Settings › Privacy & Security › Accessibility', true);
+        else notice('Turn on Null in System Settings › Privacy & Security › Accessibility', true);
       });
 
       catchUp();

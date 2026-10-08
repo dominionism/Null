@@ -1,6 +1,6 @@
 //! The box's window: a transparent panel that takes typing without making Null
-//! Mini the active app, shows over full-screen apps and on every Space, and goes
-//! away on Esc, fn+Space or a click elsewhere.
+//! the active app, shows over full-screen apps and on every Space, and goes away
+//! on Esc, fn+Space or a click elsewhere.
 
 #![allow(deprecated)] // tauri-nspanel re-exports the deprecated cocoa crate
 
@@ -51,7 +51,7 @@ fn reachable(position: (i32, i32), screens: &[Screen]) -> bool {
 /// Build the window, hidden, and turn it into a non-activating panel.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
-        .title("Null Mini")
+        .title("Null")
         .inner_size(WIDTH, HEIGHT)
         .decorations(false)
         .transparent(true)
@@ -130,7 +130,7 @@ pub fn show(app: &AppHandle) {
         panel.show();
         let _ = handle.emit_to(LABEL, "mini:shown", ());
         log!("shown; frontmost app: {before}");
-        // The box must never make Null Mini the active app. Activation, if it
+        // The box must never make Null the active app. Activation, if it
         // happens, lands a moment later, so look again then.
         let later = handle.clone();
         std::thread::spawn(move || {
