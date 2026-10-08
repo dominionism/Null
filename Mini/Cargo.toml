@@ -1,7 +1,7 @@
 [package]
 name = "null-mini"
 version = "0.1.0"
-description = "Null: a floating box that opens on fn+Space and drives your own agent harness"
+description = "Null: a floating box that opens on Control+Space and drives your own agent harness"
 edition = "2021"
 publish = false
 
@@ -16,6 +16,8 @@ serde_json = "1"
 # The Agent Client Protocol: how the app talks to the user's agent harness.
 agent-client-protocol = { version = "3", features = ["process"] }
 futures = "0.3"
+# Control+Space is an ordinary system-wide shortcut, which macOS grants without asking the user.
+tauri-plugin-global-shortcut = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The box is a non-activating panel. Pinned to the revision it was proven with.

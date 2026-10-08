@@ -1,6 +1,6 @@
 //! The box's window: a transparent panel that takes typing without making Null
 //! the active app, shows over full-screen apps and on every Space, and goes away
-//! on Esc, fn+Space or a click elsewhere.
+//! on Esc, Control+Space or a click elsewhere.
 
 #![allow(deprecated)] // tauri-nspanel re-exports the deprecated cocoa crate
 
@@ -166,7 +166,7 @@ pub fn toggle(app: &AppHandle) {
     let _ = app.run_on_main_thread(move || {
         let visible = handle.get_webview_panel(LABEL).map(|panel| panel.is_visible()).unwrap_or(false);
         if visible {
-            hide(&handle, "fn+Space");
+            hide(&handle, "Control+Space");
         } else {
             show(&handle);
         }

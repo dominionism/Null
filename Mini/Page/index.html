@@ -801,11 +801,8 @@
         fit();
       });
 
-      // The app cannot hear fn+Space until macOS lets it. Say so, and say when it can.
-      listen('mini:permission', (message) => {
-        if (message.payload) notice('fn+Space now opens this box');
-        else notice('Turn on Null in System Settings › Privacy & Security › Accessibility', true);
-      });
+      // Something the app needs the user to know, such as its shortcut being unavailable.
+      listen('mini:notice', (message) => notice(message.payload, true));
 
       catchUp();
       fit();

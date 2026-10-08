@@ -1,11 +1,11 @@
-//! Null: a small floating box that opens on fn+Space and drives the user's
+//! Null: a small floating box that opens on Control+Space and drives the user's
 //! own agent harness. It is one app with no server; the page in `Page/` talks to
 //! this process through commands and events.
 //!
 //! Four switches for development, all read from the environment:
 //! - `NULL_MINI_EXIT_WHEN_READY`: quit as soon as the page has loaded, which makes
 //!   "start, load the page, stop" a check a script can run.
-//! - `NULL_MINI_NO_SHORTCUT`: do not listen for fn+Space, and show the box at
+//! - `NULL_MINI_NO_SHORTCUT`: do not listen for Control+Space, and show the box at
 //!   start instead. For running beside another copy that owns the shortcut.
 //! - `NULL_MINI_SMOKE`: send its value to the harness as one message, print what
 //!   comes back, and quit. No window and no shortcut; it checks the harness alone.
@@ -37,9 +37,9 @@ fn page_ready(app: tauri::AppHandle) {
     if let Some(text) = std::env::var_os("NULL_MINI_SELFTEST") {
         harness::selftest(&app, text.to_string_lossy().into_owned());
     }
-    // The page may have loaded after the app found the permission missing.
-    if shortcut::waiting_for_permission() {
-        let _ = app.emit_to(panel::LABEL, "mini:permission", false);
+    // The page loads after the app has tried to register the shortcut.
+    if shortcut::unavailable() {
+        let _ = app.emit_to(panel::LABEL, "mini:notice", shortcut::UNAVAILABLE_NOTICE);
     }
 }
 
@@ -53,6 +53,7 @@ fn quit(app: tauri::AppHandle) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_nspanel::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             page_ready,
             quit,
@@ -81,7 +82,7 @@ fn main() {
             }
             panel::create(handle)?;
             if std::env::var_os("NULL_MINI_NO_SHORTCUT").is_some() {
-                log!("fn+Space is off for this run (NULL_MINI_NO_SHORTCUT)");
+                log!("Control+Space is off for this run (NULL_MINI_NO_SHORTCUT)");
                 panel::show(handle);
             } else {
                 shortcut::start(handle);

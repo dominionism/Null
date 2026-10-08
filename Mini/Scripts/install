@@ -2,10 +2,6 @@
 # Build Null, put it in /Applications, make it start at login, and start it.
 #
 #   Mini/Scripts/install
-#
-# The app is signed ad hoc, so macOS treats every new build as a new app: after
-# an install you have to switch Null on again in System Settings > Privacy &
-# Security > Accessibility. The box says so when it needs it.
 set -eu
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -23,7 +19,7 @@ pkill -x null-mini 2>/dev/null || true
 rm -rf "$installed"
 ditto "target/release/bundle/macos/$app" "$installed"
 
-# Start at login. launchd starts the app itself, so the Accessibility grant is the app's own.
+# Start at login.
 mkdir -p "$(dirname "$agent")"
 cat > "$agent" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -43,5 +39,5 @@ cat > "$agent" <<PLIST
 PLIST
 launchctl bootstrap "gui/$(id -u)" "$agent"
 
-echo "Installed $installed and started it. fn+Space opens the box."
-echo "If nothing happens, switch Null on in System Settings > Privacy & Security > Accessibility."
+echo "Installed $installed and started it. Control+Space opens the box."
+echo "If nothing happens, look in ~/Library/Logs/Null/mini.log."
