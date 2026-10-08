@@ -10,6 +10,11 @@
 > check. Items 4–6 are partly built, items 7–9 remain. Voice is deferred by the user until the text
 > mini is proven.
 
+> **Direction change (2026-10-08):** Null Mini becomes its own app in `Mini/`, separate from the Voice
+> desktop and its server (`Context/ADR/0002-NullMiniIsItsOwnApp.md`). Architecture decision 4 and
+> items 5–9 were written for a mini inside the desktop app; they must be re-planned for `Mini/`
+> before that build starts. Folder names follow `Context/ADR/0001-CapitalizedFolderNames.md`.
+
 ## Goal
 
 Give Null a floating mini that opens on fn+Space as a small, compact text box — a mini CLI — whose
@@ -31,6 +36,9 @@ whichever provider the user chooses. Voice conversation and the pet follow once 
   clicking on fn + space to activate a mini textbox that I can type to (like a mini cli just like
   right now, but very small and compact). We will work on the voice stuff later. I need to prove that
   the Null mini will work first."
+- **Verbatim (user, on the mini's look, 2026-10-08):** "All I really need to see is the text box and
+  the arrow." No placeholder text, no status line, no hints: "there's just a lot of filler that …
+  makes everything look really messy."
 - **Verbatim (user):** "my cloned voice will [be] the voice used during the voice-to-voice mode."
 - **Verbatim (user):** "If I ask Null a question, then it answers. If I ask Null to do something, and
   then it does it." / "the harness's normal permission mode works as well, and spoken approval only
@@ -356,8 +364,17 @@ follows; what is done and what remains is recorded under each.
    - Status: In progress — the conversation path is built; storage and settings are not
    - **Built (2026-10-08):** `backend/services/mini.py`, `backend/routes/mini.py`, request models
      in `backend/models.py`, `backend/tests/test_mini.py`. Routes: `GET /harnesses`,
-     `POST /mini/sessions`, `GET /mini/sessions/{id}`, `POST …/messages`, `GET …/events`,
-     `POST …/respond`, `POST …/interrupt`. Harnesses are stopped when the server shuts down.
+     `POST /mini/sessions`, `GET /mini/sessions/{id}`, `PATCH /mini/sessions/{id}` (model),
+     `GET …/models`, `POST …/messages`, `GET …/events`, `POST …/respond`, `POST …/interrupt`.
+     Harnesses are stopped when the server shuts down.
+   - **Model switching (2026-10-08, acceptance 4):** `PATCH` moves an open conversation to any
+     model OMP lists, on any provider it is signed in to; `POST /mini/sessions` accepts a model
+     to start on. Proven through the running server: a conversation started on opencode-go,
+     moved to openai-codex and back, and recalled a word from its first turn each time. The
+     choice belongs to the session: OMP's own default is untouched and a new session starts on
+     it unless a model is asked for. A change is refused while a reply is in flight, and an
+     unknown model is a 400. A session asked to start on a model that is no longer offered
+     opens on the default instead of failing.
    - **Proven through the running server:** asked to create a file, OMP created
      `data/mini/workspace/hello.txt` and replied.
    - **How events work:** a reply runs as a background task, so hiding the mini does not stop it.
@@ -368,8 +385,8 @@ follows; what is done and what remains is recorded under each.
      restart forgets them (OMP keeps the transcripts). The events stream ends with each reply; it
      is not one long-lived stream.
    - **Remaining:** the `mini_sessions` and `mini_settings` tables and their migration,
-     `GET|PUT /mini/settings`, `GET /mini/sessions`, `PATCH /mini/sessions/{id}` (model change,
-     title), listing models over HTTP.
+     `GET|PUT /mini/settings` (including the default model, which today only the prototype box
+     remembers), `GET /mini/sessions`, a session title.
    - **Noticed:** in development the data directory is inside this repo, so the default
      workspace is too, and OMP may read this repo's project instructions from there.
 
@@ -425,8 +442,22 @@ follows; what is done and what remains is recorded under each.
      the streamed reply, one line per tool action, approval buttons, and errors. Ctrl+C stops a
      reply, `/new` starts a new conversation, up-arrow recalls the last prompt, and the window
      grows with the reply. Its script was run against the live server with a stand-in page
-     (question, task, interrupt) and behaved; on screen it is unverified until the user tries it.
-     It renders plain text, not markdown, and has no model picker.
+     (question, task, interrupt) and behaved. The user tried it on screen and confirmed it works
+     ("This is perfect", 2026-10-08). It renders plain text, not markdown.
+   - **Model picker in the prototype (2026-10-08):** `/model`, `/model <filter>` or a click on
+     the status line lists the models by provider with the current one marked. Typing filters,
+     the arrows move, Enter picks, Esc cancels. The pick is remembered in the box's local
+     storage and new conversations start on it. Run against the live server with a stand-in
+     page; on screen it is unverified until the user tries it.
+   - **Look (2026-10-08, at the user's request):** idle, the box shows only the arrow and the
+     text field. The arrow is the status: it pulses while the agent works and turns amber while
+     it waits for an answer. Words appear only for something the user must know (for example a
+     message sent while a reply is still running) and disappear after four seconds. The real UI
+     should keep this.
+   - **Palette (user, 2026-10-08):** "the primary colors are black and white": a dark fill with a
+     white border, arrow and highlights, no purple. Amber (the agent is asking) and red (errors)
+     remain as the only other colours. The box can be dragged by the arrow, the border, the empty
+     part of the field or any empty space, and has a clear border.
 
 9. **Mini settings page**
    - What: `components/ServerTab/MiniPage.tsx` at `/settings/mini` in `router.tsx`: each harness with
