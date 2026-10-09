@@ -19,6 +19,8 @@ pub struct Settings {
     pub session: Option<String>,
     /// Whether Null has already sent the user to switch on Full Disk Access. It asks once.
     pub asked_full_disk: bool,
+    /// The models to carry on with when the one in use stops answering, in the order to try them.
+    pub backups: Vec<String>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -89,7 +91,7 @@ mod tests {
     #[test]
     fn settings_survive_a_round_trip() {
         let settings =
-            Settings { position: Some((40, -12)), model: Some("a/b".into()), session: Some("s1".into()), asked_full_disk: true };
+            Settings { position: Some((40, -12)), model: Some("a/b".into()), session: Some("s1".into()), asked_full_disk: true, backups: vec!["c/d".into()] };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);
     }

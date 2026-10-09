@@ -20,6 +20,7 @@
 compile_error!("Null is macOS-only for now");
 
 mod access;
+mod backups;
 mod harness;
 mod log;
 mod panel;
@@ -82,6 +83,8 @@ fn main() {
             harness::events_since,
             harness::report,
             providers::providers,
+            backups::backups,
+            backups::set_backups,
             signin::signin_providers,
             signin::signin_start,
             signin::signin_answer,

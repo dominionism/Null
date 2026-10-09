@@ -2,8 +2,9 @@
 <!-- Null's box: the whole page.
 
      Enter sends what you typed to your agent and the reply streams in below.
-     /model opens the model list, /login signs in to a provider, /new starts a
-     new conversation, /quit quits the app and closes the conversation, Ctrl+C
+     /model opens the model list, /backup sets the models to carry on with when
+     the one in use stops answering, /login signs in to a provider, /new starts
+     a new conversation, /quit quits the app and closes the conversation, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
 
@@ -380,7 +381,7 @@
       let lastPrompt = '';
       let replyLine = null; // the element the current answer streams into
       let pendingAsk = null; // { requestId, options, element }
-      let picker = null; // { models, current, shown, index } while the model list is open
+      let picker = null; // { models, current, shown, index, backups } while the model list is open
       const running = new Set(); // the tool calls under way
       let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
       const toolLines = new Map();
@@ -420,11 +421,11 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/login', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/login', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
-          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || COMMANDS.some((name) => name.startsWith(text)));
+          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || text.startsWith('/backup ') || COMMANDS.some((name) => name.startsWith(text)));
         input.classList.toggle('command', command);
       };
 
@@ -599,27 +600,35 @@
 
       // ── Choosing a model ───────────────────────────────────────────────
 
+      // The same list serves /model and /backup. For /backup the models chosen
+      // so far come first, numbered in the order they will be tried.
       const drawPicker = () => {
         const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
-        picker.shown = picker.models.filter((model) => {
+        const matching = picker.models.filter((model) => {
           const haystack = `${model.id} ${model.label}`.toLowerCase();
           return words.every((word) => haystack.includes(word));
         });
+        const order = picker.backups || [];
+        const place = (model) => order.indexOf(model.id);
+        const chosen = matching.filter((model) => place(model) >= 0).sort((a, b) => place(a) - place(b));
+        picker.shown = chosen.concat(matching.filter((model) => place(model) < 0));
         picker.index = Math.min(picker.index, Math.max(picker.shown.length - 1, 0));
         pick.textContent = '';
         let provider = null;
         picker.shown.forEach((model, index) => {
-          if (model.provider !== provider) {
-            provider = model.provider;
+          const group = place(model) >= 0 ? 'backups, in order' : model.provider || 'models';
+          if (group !== provider) {
+            provider = group;
             const heading = document.createElement('div');
             heading.className = 'provider';
-            heading.textContent = provider || 'models';
+            heading.textContent = group;
             pick.appendChild(heading);
           }
           const row = document.createElement('div');
           row.className = index === picker.index ? 'option selected' : 'option';
           const name = document.createElement('span');
-          name.textContent = `${model.id === picker.current ? '● ' : '  '}${model.label} `;
+          const lead = picker.backups ? (place(model) >= 0 ? `${place(model) + 1} ` : '  ') : model.id === picker.current ? '● ' : '  ';
+          name.textContent = `${lead}${model.label} `;
           const id = document.createElement('span');
           id.className = 'id';
           id.textContent = model.id;
@@ -639,7 +648,9 @@
       };
 
       const closePicker = () => {
+        const { backups, saved } = picker;
         picker = null;
+        if (backups && backups.join() !== saved.join()) saveBackups(backups);
         pick.style.display = 'none';
         pick.textContent = '';
         if (out.textContent) out.style.display = 'block';
@@ -649,16 +660,28 @@
         fit();
       };
 
-      const openPicker = async (filter = '') => {
+      const saveBackups = async (ids) => {
+        try {
+          const order = await invoke('set_backups', { ids });
+          line('note', order.length ? `backups: ${order.join(', then ')}` : 'no backups');
+        } catch (error) {
+          line('error', `could not set the backups: ${error}`);
+        }
+      };
+
+      // `backups` is true for /backup: the list then sets the backup order.
+      const openPicker = async (filter = '', backups = false) => {
         if (picker) return;
         if (busy) {
-          notice('stop the reply with ctrl+c before switching models');
+          notice(`stop the reply with ctrl+c before ${backups ? 'changing the backups' : 'switching models'}`);
           return;
         }
         mark('working');
         let listed;
+        let order = null;
         try {
           listed = await invoke('models');
+          if (backups) order = await invoke('backups');
         } catch (error) {
           line('error', `could not list models: ${error}`);
           mark('');
@@ -670,17 +693,27 @@
           return;
         }
         const at = listed.models.findIndex((model) => model.id === listed.current);
-        picker = { models: listed.models, current: listed.current, shown: [], index: filter ? 0 : Math.max(at, 0) };
+        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
         tint();
         mark('');
+        if (order) notice('enter adds or removes a backup. esc is done');
         drawPicker();
       };
 
       const chooseModel = async (model) => {
         if (!model) return;
+        if (picker && picker.backups) {
+          // Add it to the end of the order, or take it out. The list stays open.
+          const order = picker.backups;
+          picker.backups = order.includes(model.id) ? order.filter((id) => id !== model.id) : order.concat(model.id);
+          input.value = '';
+          picker.index = 0;
+          drawPicker();
+          return;
+        }
         const current = picker && picker.current;
         closePicker();
         if (model.id === current) return;
@@ -855,6 +888,10 @@
           openPicker(text.slice(6).trim());
           return;
         }
+        if (text === '/backup' || text.startsWith('/backup ')) {
+          openPicker(text.slice(7).trim(), true);
+          return;
+        }
         if (text === '/login') {
           openSignin();
           return;
@@ -882,7 +919,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /login, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /login, /new and /quit`);
           return;
         }
         if (busy) {

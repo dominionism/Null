@@ -32,7 +32,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
-use crate::{panel, providers, settings};
+use crate::{backups, panel, providers, settings};
 
 /// The harness this app drives. One for now; the name is also its CLI.
 const HARNESS: &str = "omp";
@@ -240,6 +240,7 @@ async fn serve(
     let mut argv = vec![binary.display().to_string()];
     argv.extend(extra_args());
     argv.extend(launch_args(&binary));
+    argv.extend(backups::launch_args(app, &binary));
     argv.push("acp".into());
     log!("starting the harness: {}", argv.join(" "));
     let agent = AcpAgent::from_args(argv).map_err(|e| e.to_string())?;
@@ -681,6 +682,11 @@ fn on_permission(
 
 fn order(harness: &Harness, command: Command) -> Result<(), String> {
     harness.commands.unbounded_send(command).map_err(|_| "the harness thread has stopped".to_string())
+}
+
+/// True while a reply is in flight.
+pub fn busy(app: &AppHandle) -> bool {
+    lock(&app.state::<Harness>().shared).busy
 }
 
 /// Let the running harness process go. The next order starts a fresh one and
