@@ -66,7 +66,7 @@ def prompt(y, cmd, start, name, x=PAD, per_char=0.055):
     svg = (
         f'  {prefix(x, y)}\n'
         f'  <text x="{xc:.1f}" y="{y}" font-size="{FS}" fill="{FG}" textLength="{n * CW:.1f}" '
-        f'lengthAdjust="spacing">{escape(cmd)}</text>\n'
+        f'lengthAdjust="spacing" xml:space="preserve">{escape(cmd)}</text>\n'
         f'  <clipPath id="{name}-clip"><rect x="{xc:.1f}" y="{top}" width="{(n + 1) * CW:.1f}" height="{FS + 5}"/></clipPath>\n'
         f'  <g clip-path="url(#{name}-clip)"><g class="{name}">\n'
         f'    <rect x="{xc:.1f}" y="{top}" width="{n * CW:.1f}" height="{FS + 5}" fill="{BG}"/>\n'
