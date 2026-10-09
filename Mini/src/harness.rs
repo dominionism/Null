@@ -32,7 +32,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
-use crate::{panel, settings};
+use crate::{panel, providers, settings};
 
 /// The harness this app drives. One for now; the name is also its CLI.
 const HARNESS: &str = "omp";
@@ -55,6 +55,9 @@ enum Command {
     Restart,
     Models { reply: oneshot::Sender<Result<ModelList, String>> },
     SetModel { id: String, reply: oneshot::Sender<Result<(), String>> },
+    /// Ask the harness which model the conversation is on now. It can move to a
+    /// backup by itself in the middle of a reply, and does not always say so.
+    CheckModel,
 }
 
 /// What to do with the updates a harness replays while a conversation is loaded back.
@@ -79,6 +82,12 @@ struct Shared {
     pending: HashMap<String, Responder<RequestPermissionResponse>>,
     approvals: u64,
     replay: Replay,
+    /// True while Null itself is opening a conversation or setting its model. A
+    /// change of model then is Null's doing, not the harness moving to a backup.
+    settling: bool,
+    /// A setting of the conversation other than its model, and its value. Setting
+    /// it to that same value changes nothing and answers with the model in use.
+    ask: Option<(String, Value)>,
 }
 
 /// The app's handle on the harness thread.
@@ -174,6 +183,8 @@ pub fn init(app: &AppHandle) {
         pending: HashMap::new(),
         approvals: 0,
         replay: Replay::Live,
+        settling: false,
+        ask: None,
     }));
     let (commands, orders) = mpsc::unbounded();
     app.manage(Harness { shared: shared.clone(), commands });
@@ -208,7 +219,7 @@ fn refuse(app: &AppHandle, shared: &Arc<Mutex<Shared>>, command: Command, reason
         Command::SetModel { reply, .. } => {
             let _ = reply.send(Err(reason.to_string()));
         }
-        Command::Interrupt | Command::NewConversation | Command::Restart => {}
+        Command::Interrupt | Command::NewConversation | Command::Restart | Command::CheckModel => {}
     }
 }
 
@@ -219,7 +230,7 @@ async fn serve(
     first: Command,
     orders: &mut mpsc::UnboundedReceiver<Command>,
 ) -> Result<(), String> {
-    if matches!(first, Command::Restart) {
+    if matches!(first, Command::Restart | Command::CheckModel) {
         return Ok(()); // nothing is running; the next order starts a fresh process anyway
     }
     let Some(binary) = installed() else {
@@ -393,10 +404,19 @@ impl Conversation<'_> {
                     .on_receiving_result(async move |result| {
                         match result {
                             Ok(response) => {
-                                let reason = as_json(&response)["stopReason"].as_str().map(translate::stop_reason).unwrap_or("completed");
+                                let response = as_json(&response);
+                                let reason = response["stopReason"].as_str().map(translate::stop_reason).unwrap_or("completed");
+                                // The harness reports a provider's refusal as a reply like any other.
+                                let failed = translate::reply_failed(&response);
+                                log!("reply ended: {reason}{}", if failed { ", with nothing from the model" } else { "" });
+                                if failed {
+                                    providers::forget(&app);
+                                    publish(&app, &shared, json!({ "type": "reply_failed" }));
+                                }
                                 publish(&app, &shared, json!({ "type": "status_change", "status": "ready", "reason": null }));
                                 publish(&app, &shared, json!({ "type": "message_done", "stop_reason": reason }));
                                 finish(&shared);
+                                let _ = order(&app.state::<Harness>(), Command::CheckModel);
                             }
                             Err(error) => fail_reply(&app, &shared, error_event(&error)),
                         }
@@ -440,12 +460,37 @@ impl Conversation<'_> {
                 let result = self.set_model(&id).await;
                 let _ = reply.send(result);
             }
+            Command::CheckModel => self.check_model().await,
         }
         Ok(())
     }
 
+    /// Learn which model the conversation is on, and say so if the harness moved it.
+    async fn check_model(&mut self) {
+        let (session, ask) = {
+            let shared = lock(self.shared);
+            (shared.session.clone(), shared.ask.clone())
+        };
+        let (Some(session), Some((id, value)), true) = (session, ask, self.loaded) else { return };
+        let Ok(request) = typed::<SetSessionConfigOptionRequest>(json!({ "sessionId": session, "configId": id, "value": value })) else { return };
+        match self.cx.send_request(request).block_task().await {
+            Ok(response) => {
+                let (_, current) = translate::models_from_config_options(&as_json(&response)["configOptions"]);
+                moved(self.app, self.shared, current);
+            }
+            Err(error) => log!("could not ask which model the conversation is on: {}", describe(&error)),
+        }
+    }
+
     /// The conversation's id, opening a new conversation or loading the saved one back as needed.
     async fn open(&mut self) -> Result<String, String> {
+        lock(self.shared).settling = true;
+        let opened = self.open_quietly().await;
+        lock(self.shared).settling = false;
+        opened
+    }
+
+    async fn open_quietly(&mut self) -> Result<String, String> {
         let saved = lock(self.shared).session.clone();
         if let (Some(session), true) = (&saved, self.loaded) {
             return Ok(session.clone());
@@ -521,9 +566,14 @@ impl Conversation<'_> {
             }
         }
         let request: SetSessionConfigOptionRequest = typed(json!({ "sessionId": session, "configId": "model", "value": id }))?;
-        let response = self.cx.send_request(request).block_task().await.map_err(|e| describe(&e))?;
-        self.absorb_options(&as_json(&response)["configOptions"]);
-        lock(self.shared).model = Some(id.to_string());
+        let was_settling = std::mem::replace(&mut lock(self.shared).settling, true);
+        let response = self.cx.send_request(request).block_task().await;
+        if let Ok(response) = &response {
+            self.absorb_options(&as_json(response)["configOptions"]);
+            lock(self.shared).model = Some(id.to_string());
+        }
+        lock(self.shared).settling = was_settling;
+        response.map_err(|e| describe(&e))?;
         settings::update(self.app, |settings| settings.model = Some(id.to_string()));
         publish(self.app, self.shared, json!({ "type": "model_changed", "model": id }));
         Ok(())
@@ -539,23 +589,41 @@ impl Conversation<'_> {
         if current.is_some() {
             shared.model = current;
         }
+        shared.ask = translate::other_option(options);
     }
 }
 
 // ── Calls from the harness ────────────────────────────────────────────────
+
+/// Take note of the model the harness says the conversation is on. When that
+/// is not the model Null left it on, the harness has moved to a backup, and
+/// the box says so: a switch is never silent.
+fn moved(app: &AppHandle, shared: &Arc<Mutex<Shared>>, current: Option<String>) {
+    let Some(current) = current else { return };
+    let from = {
+        let mut shared = lock(shared);
+        if shared.model.as_deref() == Some(current.as_str()) {
+            return;
+        }
+        let from = shared.model.replace(current.clone());
+        if shared.settling {
+            return;
+        }
+        from
+    };
+    log!("the harness moved the conversation from {} to {current}", from.as_deref().unwrap_or("its first model"));
+    publish(app, shared, json!({ "type": "model_switched", "from": from, "to": current }));
+}
 
 fn on_update(app: &AppHandle, shared: &Arc<Mutex<Shared>>, notification: &SessionNotification) {
     let notification = as_json(notification);
     let update = &notification["update"];
     if update["sessionUpdate"] == "config_option_update" {
         let (models, current) = translate::models_from_config_options(&update["configOptions"]);
-        let mut shared = lock(shared);
         if !models.is_empty() {
-            shared.models = models;
+            lock(shared).models = models;
         }
-        if current.is_some() {
-            shared.model = current;
-        }
+        moved(app, shared, current);
         return;
     }
     let event = {
@@ -761,6 +829,11 @@ pub fn smoke(app: &AppHandle, text: String) {
                     "message_done" | "error" => {
                         log!("smoke: {event}");
                         log!("smoke: reply after {:.1} s: {}", started.elapsed().as_secs_f32(), reply.trim());
+                        // Which model answered is asked for once the reply is over.
+                        std::thread::sleep(std::time::Duration::from_millis(1500));
+                        for later in &events_since(app.clone(), item["seq"].as_u64().unwrap_or(cursor)).events {
+                            log!("smoke: after the reply: {}", later["event"]);
+                        }
                         app.exit(if event["type"] == "error" { 1 } else { 0 });
                         return;
                     }

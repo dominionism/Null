@@ -14,7 +14,8 @@ tauri = { version = "2", features = ["macos-private-api"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The Agent Client Protocol: how the app talks to the user's agent harness.
-agent-client-protocol = { version = "3", features = ["process"] }
+# The token count at the end of a reply is how a provider's refusal is told from an answer.
+agent-client-protocol = { version = "3", features = ["process", "unstable_end_turn_token_usage"] }
 futures = "0.3"
 # Control+Space is an ordinary system-wide shortcut, which macOS grants without asking the user.
 tauri-plugin-global-shortcut = "2"

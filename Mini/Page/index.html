@@ -333,6 +333,10 @@
       .option .id {
         color: var(--dim);
       }
+      /* The provider's own words, when it answered in place of the model. */
+      .reply.failed {
+        color: var(--red);
+      }
 
       @media (prefers-reduced-motion: reduce) {
         *,
@@ -377,6 +381,7 @@
       let replyLine = null; // the element the current answer streams into
       let pendingAsk = null; // { requestId, options, element }
       let picker = null; // { models, current, shown, index } while the model list is open
+      const running = new Set(); // the tool calls under way
       let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
       const toolLines = new Map();
 
@@ -438,6 +443,31 @@
         fit();
       };
 
+      const unnotice = () => {
+        clearTimeout(noticeTimer);
+        noticeLine.style.display = 'none';
+        fit();
+      };
+
+      // The harness tries a provider that is slow to answer again and again, and
+      // says nothing while it does. After a while the box says that it is waiting.
+      const QUIET = 20000;
+      let quietTimer = null;
+      let waitingSaid = false;
+      const watchQuiet = () => {
+        clearTimeout(quietTimer);
+        if (waitingSaid) {
+          waitingSaid = false;
+          unnotice();
+        }
+        if (!busy) return;
+        quietTimer = setTimeout(() => {
+          if (!busy || running.size || pendingAsk) return;
+          waitingSaid = true;
+          notice('still waiting on the provider. ctrl+c stops it', true);
+        }, QUIET);
+      };
+
       const toolMark = { pending: '…', in_progress: '…', completed: '✓', failed: '✗' };
 
       // ── Events from the app ────────────────────────────────────────────
@@ -467,6 +497,8 @@
             }
             element.className = event.status === 'failed' ? 'tool failed' : 'tool';
             element.textContent = `${toolMark[event.status] || '…'} ${event.title}`;
+            if (event.status === 'completed' || event.status === 'failed') running.delete(event.call_id);
+            else running.add(event.call_id);
             mark('working');
             break;
           }
@@ -495,6 +527,17 @@
             replyLine = null;
             line('note', `now on ${event.model}`);
             break;
+          case 'model_switched':
+            // The harness moved to a backup by itself. A switch is never silent.
+            replyLine = null;
+            line('note', event.from ? `${event.from} did not answer. now on ${event.to}` : `now on ${event.to}`);
+            break;
+          case 'reply_failed':
+            // What came back is the provider's refusal, not the model's answer.
+            if (replyLine) replyLine.classList.add('failed');
+            replyLine = null;
+            line('note', 'no answer from the provider. /model picks another model');
+            break;
           case 'message_done':
             replyLine = null;
             if (event.stop_reason === 'cancelled') line('note', 'stopped');
@@ -510,8 +553,10 @@
         if (event.type === 'message_done' || event.type === 'error') {
           busy = false;
           pendingAsk = null;
+          running.clear();
           mark('');
         }
+        watchQuiet();
       };
 
       // ── Talking to the app ─────────────────────────────────────────────
@@ -541,6 +586,7 @@
           const snapshot = await invoke('events_since', { after: lastSeq });
           snapshot.events.forEach(apply);
           busy = snapshot.busy;
+          watchQuiet();
           if (!busy && !picker) mark('');
         } catch (error) {
           line('error', `could not reach the app: ${error}`);
@@ -846,6 +892,7 @@
         busy = true;
         lastPrompt = text;
         mark('working');
+        watchQuiet();
         try {
           await invoke('send', { text }); // the reply arrives as events
         } catch (error) {
@@ -1046,9 +1093,7 @@
           notice(message.payload, true);
           return;
         }
-        clearTimeout(noticeTimer);
-        noticeLine.style.display = 'none';
-        fit();
+        unnotice();
       });
 
       catchUp();
