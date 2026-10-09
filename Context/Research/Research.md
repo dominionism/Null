@@ -1,450 +1,487 @@
 # Research: Null
 
-> Last updated: 2026-10-07 (comprehensive). Supersedes the 2026-10-04 baseline and the 2026-10-05
-> voice-loop deep-dive; their findings are kept where still true.
+> Last updated: 2026-10-09 (comprehensive). Current-source map of `null-mini` at `abb114d`;
+> supersedes the 2026-10-07 Voice-only baseline. The unmerged `capital-folders` cleanup branch at
+> `4793f61` uses different paths. Paths below describe the main checkout, not that future layout.
 
-**How to read this.** Unmarked statements were read in the code on 2026-10-07. Statements marked
-*(carried)* come from the 2026-10-04/05 passes and were not re-read. Nothing was executed in this
-pass — no tests, no server, no build. Measured numbers are quoted from
-`Context/Plans/VoiceLoopLatency.md`.
+> Second-session addition, 2026-10-09: the `## Null Mini — deep dive (Mini/)` section below was
+> written by a different session in parallel with this map. It adds module-level detail to the Mini
+> statements above and in `## Architecture`; it does not replace them, and the rest of this file is
+> unchanged.
+
+**Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
+pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
+health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
+provider prompt, sign-in, microphone, audio playback or live conversation was run. Prior hands-on
+and synthesis evidence is attributed to its plan, not claimed as newly verified.
 
 ## What is this?
 
-Null is a derivative of [Voicebox](https://github.com/jamiepine/voicebox) (MIT): a local-first voice
-I/O stack that clones voices and generates speech (7 TTS engines), dictates into any app from a
-global chord, and gives MCP-aware agents a voice — all inference on the user's machine.
+Null is a compact desktop interface to the user's own agent harness: ask a question and get an
+answer, ask for work and have the agent do it, without tying the interface to one provider's quota.
 
-**Naming.** Only the repo name and the README's Provenance section say "Null". Everything else still
-says Voicebox: root package `voicebox` 0.5.0, product name, bundle id `sh.voicebox.app`, MCP server
-name `voicebox`, `VOICEBOX_*` env vars, `voicebox.db`, the `voicebox-server` / `voicebox-mcp`
-binaries, and the updater endpoint. The git history is one commit (`90a885c`, 2026-10-07).
+The intended companion resembles the interaction described in `ChatGPTPetsAndMini.md`, not merely
+a voice studio or decorative pet. Text interaction is the current product. Background work,
+workspace selection, hands-free conversation in the user's cloned voice, and an optional pet are
+later phases. Personal use comes first; making it usable by other people with their own provider
+sign-in or API key is the distribution goal.
 
-## Owner orientation
+### Product direction and authoritative plans
 
-**Product behavior (what the user observes).**
-- Clone a voice from a few seconds of reference audio, then generate speech in it; results land in
-  History as versions (original / effects / takes).
-- Hold a chord anywhere, speak, release → the audio is transcribed (Whisper), optionally refined by a
-  local LLM, and either pasted into the focused field or delivered into a running agent session.
-- Agents speak back in a cloned voice. Two surfaces: the queued `speak` (persisted, plays via the
-  pill) and `narrate` (ephemeral, streamed sentence chunks, plays via the pill's WebAudio player).
-- One always-on-top pill window shows every state: `recording`, `agent`, `transcribing`, `refining`,
-  `speaking`, `completed`, `error`. Agent speech is never silent by design — the pill is the contract.
+- `MiniApp.md` defines the independent app, now called **Null**, opened by **Control+Space**.
+  Older “Null Mini” and “fn+Space” wording is historical. The folder/executable/bundle identifier
+  retain `Mini`, `null-mini`, and `io.github.dominionism.null-mini`.
+- `Providers.md` supersedes Phase 2 of `NullMini.md`: **OMP is the current harness; providers are
+  reached through OMP.** Supporting several providers does not require several harness adapters.
+  Other harnesses are deferred until there is a need.
+- `ConversationDisplay.md` defines the current presentation: compact black-and-white box, SF Mono,
+  one reading edge, null sign beside user messages, no left-side rules, no boxes around code or
+  diagrams, quiet/folded tool activity. The latest look is built but not yet owner-accepted.
+- `NullMini.md` remains the umbrella for later background tasks, workspaces, voice and pet behavior.
+  Its old Voice-server/React implementation sketches must be re-planned against the standalone app
+  when those phases begin, not implemented literally.
+- `VoicePairing.md` concerns talking into an **already-running terminal agent**. It is not the
+  transport used by Null's own conversations. `VoiceLoopLatency.md` and the narration plans contain
+  measured speech constraints, not evidence that Null already has continuous voice conversation.
+- `ChatGPTPetsAndMini.md` remains dated external reference-product research. It was checked for
+  overlap and left unchanged: this pass did not revalidate its external sources or supersede them.
 
-**Must never happen.**
-- Agent speech silently dropping (no audio, no visible pill).
-- Narration or agent chatter writing to History or the data dir — narration is ephemeral by design.
-- Two generations running concurrently on one engine instance → one serial queue owns generation.
-- Dictation pasting into the wrong field, or clobbering the user's clipboard (conditional restore).
-- The pill taking keyboard focus from the app the user is typing in.
+### User-visible guarantees to preserve
 
-**System roles.**
-
-| Role | Owns | Explicitly does not decide |
-|---|---|---|
-| `app/` — React UI source (shared, aliased `@`) | All screens, routing, React Query server state, zustand UI state, the pill's state machine and audio playback | Platform specifics (each host injects `Platform`); when the pill window is shown, hidden or positioned (Rust does) |
-| `tauri/` — desktop host (Rust) | Sidecar supervision, global chords, focus capture, clipboard save/restore, synthetic paste, pill window lifecycle, the `/events/speak` subscription, system-audio capture | Business logic; never touches SQLite or models. It decides *that* a chord fired, not what the transcript is for |
-| `web/` — browser host | Same UI with a browser `Platform` (download vs save, updater disabled, no system audio) | Native features — deliberately unsupported |
-| `backend/` — FastAPI sidecar | Domain, persistence, engine execution, MCP, the narration lane, agent delivery | UI presentation; native key handling; whether audio is actually audible |
-| `backend/backends/` — engine adapters | One TTS/STT/LLM engine each behind a `runtime_checkable` Protocol | Engine selection (registry decides), chunking, effects, persistence |
-| `landing/` + `docs/` | Next.js marketing site and docs site, independent | Everything app-related |
-
-**One execution path — a voice turn into an agent.**
-
-1. User holds the agent chord. `keytap` → `hotkey_monitor.rs` resolves `ChordAction::AgentPushToTalk`
-   → snapshots focus → positions and shows the pill (no `set_focus`) → emits `dictate:start`
-   `{focus, action: "agent"}`.
-2. `DictateWindow` begins a turn trace, cancels any agent speech (barge-in), emits `speak:interrupt`
-   to the main window, and starts recording.
-3. Chord release → `dictate:stop` → recording stops → WAV upload to `POST /captures` → Whisper →
-   one JSON body with `transcript_raw` and the paste flags.
-4. If `auto_refine`, the client makes a second request, `POST /captures/{id}/refine`.
-5. `onFinalText` forks on `action`: `"agent"` → `POST /voice-targets/message` → `herdr agent prompt`;
-   anything else → Rust `paste_final_text`.
-6. The agent replies by calling MCP `voicebox.speak` — a new request, not part of the loop. The
-   backend publishes `speak-start` on `/events/speak`; Rust `speak_monitor` re-emits
-   `dictate:speak-start`; the pill plays the audio and shows itself when sound actually starts.
-
-*(carried)* **REST generation path.** `POST /generate` → validate profile + resolve engine → insert
-`generations` row (`status=generating`) → enqueue on the single asyncio queue → `run_generation` →
-lazy `load_engine_model` → cached voice prompt → `generate_chunked` (sentence split + crossfade) →
-normalize → atomic WAV under `data/generations/` → `create_version` (`original`) → terminal status →
-publish `speak-end`. Clients observe via SSE `GET /generate/{id}/status` (DB polled at 1 Hz).
+- The box opens quickly, hides completely, and takes typing without activating Null over the app
+  the user was using. Idle UI is the text field and arrow, not a dashboard of status and hints.
+- Null exposes real harness tools and work, not only chat. It mirrors harness approval semantics
+  rather than adding a second permission system.
+- Provider sign-ins and retry behavior belong to OMP. Null supplies choices and displays outcomes;
+  a model being listed does not prove the account may use it.
+- The current credential decision permits transient answers passed to the harness's own local
+  sign-in process. Null must not retain or log them. This supersedes older absolute “never
+  forwards a provider token” wording. Provider-policy statements in plans are dated research,
+  not a fresh legal review.
+- Text Null must not require the Voice desktop/server. Voice cloning and speech remain separate
+  for now. Ordinary dictation/paste and herdr delivery must not be broken by future integration.
+- Local speech is the intended voice path. Do not equate that with “nothing leaves the machine”:
+  OMP can call remote providers and tools, and the inherited Voice app has optional cloud features.
 
 ## Architecture
 
-React UI in a Tauri webview talks HTTP to a bundled Python FastAPI server on `127.0.0.1:17493`; that
-server owns SQLite, model weights, audio files, TTS/STT/LLM inference, and the MCP endpoint at `/mcp`.
-A second process — the narration worker (`VOICEBOX_ROLE=narration`, port 17494) — runs the same
-`create_app()` with only `/health` and `POST /narration/{warm,synthesize}`, so agent commentary can
-synthesize while a generation holds the main process's engine. The desktop host supervises the
-sidecar and injects native input; it holds no domain state.
+Null's static page sends commands to its own Rust host, which lazily starts OMP and exchanges ACP
+messages over stdio; OMP executes tools and streams replies back. The page decides presentation,
+not provider behavior; the Rust host decides window/process/session coordination, not credentials
+or inference. Separately, Voice's React application calls a Python FastAPI service that owns SQLite,
+audio and local inference; its native host decides OS integration, not domain state. Voice has two
+agent routes of its own: a retained Python ACP API and herdr delivery into terminal sessions.
 
-**Entry points.**
+### Roles and responsibility exclusions
 
-| Entry | What starts |
-|---|---|
-| `backend/main.py` | Dev server (`python -m backend.main`, or `uvicorn backend.main:app`) |
-| `backend/server.py` | PyInstaller sidecar: `--host/--port/--data-dir/--parent-pid/--version`; picks CPU/CUDA/ROCm variant from the binary name; parent-pid watchdog |
-| `backend/narration_main.py` | Narration worker; sets `VOICEBOX_ROLE` before importing the app |
-| `tauri/src-tauri/src/main.rs::run` | Desktop host: plugins, state, the hidden pill window, `speak_monitor` |
-| `tauri/src/main.tsx`, `web/src/main.tsx` | Mount shared `<App/>` inside `PlatformProvider` |
-| `backend/mcp_shim/__main__.py` | `voicebox-mcp`: stdio ↔ Streamable-HTTP proxy for stdio-only MCP clients |
-| `scripts/voicebox` *(carried)* | `start/stop/restart/status/logs/install/uninstall`; `install` writes a launchd LaunchAgent |
+| Role | Owns | Does not decide |
+| --- | --- | --- |
+| `Mini/Page/index.html` | Input, command pickers, transcript, structured reply DOM, scrolling/dragging requests | Process launch, durable transcript, provider catalogue, retry policy |
+| `Mini/src/` | Non-activating panel, shortcut, settings, OMP lifecycle, ACP client, event buffer, local sign-in presentation | Provider entitlement/authentication internals, tool execution, model inference |
+| Installed OMP | Credentials, provider/model catalogue, tools, transcript, approvals, actual retries/fallback | Null window and visual layout |
+| `app/` | Shared Voice screens, API orchestration, recording state, React Query/zustand state, playback | OS shortcuts, native clipboard/focus transactions, model execution |
+| `tauri/` | Voice desktop, sidecar supervision, global chords, focus/paste, pill window, speak subscription | SQLite, profiles, transcription, speech engine selection |
+| `web/` | Browser host for shared Voice UI, browser download/playback adapters | Native capability emulation or server supervision |
+| `backend/` | Voice HTTP/MCP, domain persistence, audio files, engines, generation queue, narration, Python ACP, herdr delivery | Null's independent UI/session settings, native window visibility |
+| macOS / launchd | Shortcut registration, permissions, process launch at login | Harness approval policy or provider access |
+| `docs/`, `landing/` | Inherited Voicebox documentation and marketing sites | Application runtime; removed only on the unmerged cleanup branch |
 
-**Main-role startup order** (`app.py::_run_startup`): `init_db` → `init_queue` → mark stale
-`generating`/`loading_model` rows failed → GPU compatibility log → CUDA/ROCm binary update checks
-(background) → HF cache dir → start narration worker (background) → warm models (background).
+### One complete Null text turn
 
-**Hard boundaries.**
-1. **Persistent generation goes through one serial queue** (`services/task_queue.py`: one
-   `asyncio.Queue`, one `_generation_worker`). Routes must not call the engine directly.
-   *Caveats:* `POST /generate/stream` and `generate_audio_sync` bypass it *(carried)*; in-process
-   narration does not enqueue — it takes a per-engine `asyncio.Lock` and `wait_until_idle`s (up to
-   180 s, then drops); the queue is per-process, so the narration worker is outside it.
-2. **Engine choice is by engine-name string.** MLX-vs-PyTorch is decided only for `qwen`,
-   `qwen_custom_voice`, `qwen_llm` and Whisper via `utils/platform_detect.get_backend_type()`
-   *(carried)*.
+1. `Mini/src/main.rs::main` initializes settings, harness command handling, sign-in/cache state and
+   the panel. OMP is **not** started merely by opening the app.
+2. `shortcut.rs::start` registers Control+Space; `panel.rs::toggle/show` brings up a non-activating
+   NSPanel. The page receives `mini:shown`, focuses its input and requests missed events.
+3. Enter in `Mini/Page/index.html` handles `/model`, `/backup`, `/usage`, `/login`, `/new`, `/quit`
+   locally. Ordinary text invokes `harness::send`; blank input and a second concurrent turn are
+   rejected. A lone unknown slash-word is rejected, not sent to the agent.
+4. `harness.rs` discovers OMP by executable path/fallback install directories and starts
+   `omp [--profile ...] [--approval-mode ...] [--config ...] acp`. It reads OMP's configured approval
+   mode explicitly and supplies supported MCP definitions from `~/.omp/agent/mcp.json`, because
+   ACP did not inherit these terminal settings in the recorded spike.
+5. ACP protocol v1 is initialized. `session/load` resumes a saved conversation when possible;
+   otherwise `session/new` creates one in the app's `Workspace` directory. The selected model is
+   restored if offered. Null persists the session ID; OMP persists its transcript.
+6. `session/prompt` produces text/tool/status notifications. `translate.rs` maps them to numbered
+   `mini:event` messages; a 5,000-event in-memory buffer supports `events_since` catch-up. Hiding
+   the panel does not stop the turn.
+7. The page immediately displays text, then calls Rust `layout` (`markdown.rs`, `pulldown-cmark`)
+   to obtain a structural tree. DOM elements and `textContent` render it, never model-authored HTML.
+   Code/tables/ASCII diagrams preserve width, shrink where appropriate, then scroll horizontally.
+   Tool steps fold; failed steps remain visible. Thinking text and raw tool output are not shown.
+8. OMP permission requests retain their protocol responder in Rust until a page button/number-key
+   answer or cancellation. Ctrl+C during work sends session cancel; while idle it quits and clears
+   the saved conversation. `/new` starts a fresh conversation; `/quit` also clears its pointer.
+   An involuntary restart instead attempts to resume it.
 
-**Sidecar lifecycle** (outlined from `main.rs`, `start_server` body not read in full): the host
-reuses a healthy server already on 17493, kills orphans on legacy port 8000, and spawns the sidecar
-otherwise. On exit the server self-terminates through the parent-pid watchdog unless "keep server
-running" is set (a `.keep-running` sentinel plus `POST /watchdog/disable`).
+### Provider behavior in the current app
 
-**Cross-cutting.**
-- **Auth:** none. Loopback by default; CORS allowlist plus `VOICEBOX_CORS_ORIGINS`. One explicit
-  guard seen: MCP `transcribe(audio_path=…)` is loopback-only. Routes were not audited for others.
-- **Caller identity:** `ClientIdMiddleware` copies `X-Voicebox-Client-Id` into a ContextVar. `.mcp.json`
-  registers this repo's server for Claude Code as client `claude-code`.
-- **Config:** `config.py` data dir (`--data-dir`; dev default `./data`), `VOICEBOX_MODELS_DIR` →
-  `HF_HUB_CACHE`, `VOICEBOX_ROLE`, `VOICEBOX_TRACE`, `VOICEBOX_NARRATION_WORKER`, cloud URLs.
-- **Errors:** services raise, routes translate to `HTTPException`. MCP tools raise `ValueError` with
-  agent-directed wording ("Do not retry").
-- **Logging:** stderr, uvicorn-style colours; the host forwards sidecar output as `server-log` events.
+- `/model` uses OMP's session config options, not a Null catalogue. Changing model/provider retains
+  the session and is refused while a turn runs. Opening `/model` or `/usage` can initialize a
+  harness session even before the first prompt.
+- `signin.rs` runs **OMP's own `login` command** on pipes, reads its provider list and incremental
+  questions, and forwards answers only to its stdin. The page masks sign-in input. Success causes
+  a harness restart/cache invalidation and a before/after model-provider comparison. Esc/Ctrl+C
+  cancels. No `/logout` or active-sign-in timeout is built.
+- `providers.rs` runs `omp usage --json --redact` with a 15-second deadline and 60-second cache;
+  `/usage` forces freshness. It stores provider/limit data, not account names. Missing/key-only/local
+  reports mean “no usage report,” not no usable model. Tier limits do not exhaust an entire provider.
+- `backups.rs` stores the user's ordered model list and writes an OMP config overlay. Null's order
+  goes before existing model/provider-specific fallback entries for that run; original OMP settings
+  remain unchanged. **OMP retries and resends; Null does not implement a second retry loop.**
+- Fallback is not exclusive to quota exhaustion: refusal and authentication failures can trigger it.
+  Null announces model changes. Since OMP can omit a change notification, it also queries config
+  after a turn by setting an existing non-model option to its current value.
+- Provider failures can arrive as ordinary reply text with `end_turn`, not protocol errors.
+  `translate.rs` uses absent token usage to flag a failed reply, enabled by ACP's
+  `unstable_end_turn_token_usage` feature. This is version-sensitive, not a universal protocol rule.
+- After 20 quiet seconds without tools/approval, the box explains it is still waiting. Failed reply
+  text stays visible in red; manual model selection does not automatically resend the failed prompt.
 
-**HTTP surface** — 22 routers on the main role: health/shutdown/watchdog, profiles (+samples, avatar,
-export, channels, effects), channels, generate (+retry, cancel, status SSE, stream, import), history,
-transcribe, llm, captures (+refine, retranscribe, readiness), stories, effects (+versions), audio,
-models, settings (`/settings/captures`, `/settings/generation`), tasks/cache, cuda, rocm, speak,
-mcp bindings, `/events/speak`, cloud, agents + voice-targets, turns.
+### Voice surfaces and execution paths
 
-**MCP tools:** `voicebox.speak`, `voicebox.transcribe`, `voicebox.list_captures`,
-`voicebox.list_profiles`.
+The shared React routes expose Generate/history, Stories/timeline, Captures, Voices, Effects, Models,
+and General/Generation/Captures/MCP/GPU/Logs/Changelog/About settings. The browser host shares the
+screens but lacks native shortcuts, paste/focus, pill, system audio, server supervision and updater.
 
-**Tauri commands (23):** server (`start_server`, `stop_server`, `restart_server`,
-`set_keep_server_running`, `set_backend_override`), audio (`start/stop_system_audio_capture`,
-`is_system_audio_supported`, `list_audio_output_devices`, `play_audio_to_devices`,
-`stop_audio_playback`), permissions (`check_/open_accessibility…`, `check_/open_input_monitoring…`),
-dictation (`paste_final_text`, `enable_hotkey`, `disable_hotkey`, `update_chord_bindings`), and four
-`debug_*` commands.
+**Dictation and agent delivery:**
 
-## The pill window
+1. `useChordSync` sends saved chord sets to `hotkey_monitor.rs` after readiness checks. Rust captures
+   foreground application identity, shows the hidden `?view=dictate` webview without focusing it,
+   and emits `dictate:start`; release emits `dictate:stop`.
+2. `DictateWindow` stops its current speech and main-window playback, then
+   `useCaptureRecordingSession` records via `useAudioRecording`. MediaRecorder audio is normally
+   converted to WAV and uploaded to `POST /captures`.
+3. `backend/services/captures.py` decodes/transcodes, runs Whisper, stores audio/transcript and
+   returns capture-time paste/refine flags. Optional refinement is a separate local-LLM request.
+4. Normal dictation invokes Rust `paste_final_text`: reactivate the captured PID, snapshot the
+   clipboard, write text, paste, conditionally restore the clipboard only if no one else changed
+   it, and optionally press Return. It restores the app, not an exact previously focused element.
+5. Agent dictation instead calls `/voice-targets/message`. The backend validates a live herdr target,
+   adds `[voice turn] reply aloud, two sentences max.`, and invokes `herdr agent prompt`. Delivery
+   does not read the reply. Failure produces an error, not the old plan's proposed paste fallback.
+6. The agent must separately request speech through MCP/REST. Null's independent text app does not
+   currently synthesize each text reply or own a hands-free voice loop.
 
-The pill is a second Tauri webview, not a component of the main window.
+**Persistent generation:** `POST /generate` validates profile/engine, inserts a generation, then
+`services/task_queue.py` serializes `run_generation`. The worker lazily loads the engine, prepares
+voice prompts, chunks/normalizes/applies effects, writes WAV/version state, updates status and emits
+completion. Status SSE polls SQLite. Startup fails stale in-progress rows. Retry reuses a generation;
+regeneration creates a take. `POST /generate/stream` bypasses this queue, so “all synthesis is
+serialized” is not a current whole-system invariant.
 
-**Window** (`main.rs::build_dictate_window`): label `dictate`, URL `?view=dictate`, 420×64, no
-decorations, transparent, always on top, visible on all workspaces, skipped from the taskbar, not
-resizable, no shadow, created hidden at app setup. Both windows share one capability set.
+**Agent speech:** plain MCP `voicebox.speak` and REST `/speak` use the persistent generation path.
+Voice resolves explicit profile → per-client binding → global default. `agent_voice_enabled` gates
+new speech, not user delivery or stop. Rust `speak_monitor.rs` forwards backend `/events/speak` into
+hidden webviews; the pill claims completed audio and shows only when playback starts. Optional
+headless OS playback covers queued agent speech, including an attached pill that fails to fetch audio.
 
-**Placement:** horizontally centred, 4% down from the top of the current monitor (primary monitor as
-fallback), recomputed on every show. It is not draggable and its position is not persisted.
+**Narration:** `narrate=true` / `/speak/narrate` creates an ephemeral session. The first GET stream
+claim triggers synthesis and yields base64 WAV chunks. The normal dev path uses a separate narration
+process on 17494, with its own model instance; fallback waits for the main queue and holds an engine
+lock across synthesis/cancellation. Narration sessions are capped at 16 with an unclaimed TTL of
+120 seconds; no generation/history/audio file is persisted for the utterance. WebAudio waits for
+buffered playback and pending decodes to drain. **There is no narration headless player:** an
+unclaimed stream makes no sound, even with a healthy worker.
 
-**Show / hide are Rust-owned.**
-- Show: chord start (`hotkey_monitor.rs`) or the `dictate:show` event. It never calls `set_focus`.
-- Hide: on `dictate:hide`, Rust sets click-through, parks the window at (−10000, −10000), then hides
-  it. `hide()` alone was unreliable for transparent always-on-top windows on macOS.
-- Click-through toggling is skipped on Linux (it aborts if the window was never realized).
+### Three distinct agent interfaces
 
-**Content** (`app/src/App.tsx` → `DictateWindow` → `CapturePill`): a 40 px rounded pill with a dot,
-a label, five animated bars and an elapsed timer. `CapturePill` is also rendered in the main window
-by the Captures tab and the Captures settings page. States: `hidden` plus `recording`, `agent`, `transcribing`, `refining`,
-`speaking`, `completed`, `rest`, `error`. The error pill is a button that copies its message.
+| | Standalone `Mini/` | Python `/mini` | herdr voice target |
+| --- | --- | --- | --- |
+| Current caller | Null's static page | No current app/web/native consumer found | Voice dictation pill |
+| Transport | Tauri IPC + Rust ACP stdio | HTTP/SSE + Python ACP stdio | `herdr agent list/prompt` |
+| Session owner | OMP; Null keeps saved ID | OMP; Python keeps memory-only index | Existing terminal harness |
+| Current harness | OMP | OMP | Agent already present in selected pane |
+| Provider UI | Login, models, usage, backups | None | None |
+| Local security boundary | No HTTP listener | Loopback **and** bearer token | General Voice API, no general auth |
 
-**Event contract.**
+The Python API stays by ADR 0002, not as an alternate implementation to route the current Null UI
+through. Its session metadata/events disappear on backend restart; no collection listing, resume
+ID in create, close/delete route or persisted index is built. Its fallback/provider reporting has
+not gained the standalone Rust app's newer behavior.
 
-| Direction | Event | Payload / effect |
+### Backend lifecycle, storage and security
+
+- `backend/app.py::create_app` chooses main or narration role. Main mounts REST and FastMCP; worker
+  mounts health, warm and synthesize endpoints. Main startup initializes DB/queue/auth token,
+  repairs interrupted generations and schedules worker/cached-model warm-up and binary checks.
+- `main.py` is the development entry; `server.py` is the frozen sidecar with parent watchdog;
+  `narration_main.py` selects worker role before importing the app. Direct/frozen entry points
+  also initialize DB before lifespan, unlike `uvicorn backend.main:app`.
+- `database/` uses synchronous SQLAlchemy/SQLite, hand-written idempotent migrations before
+  `create_all`, seeding and version backfill. Media paths are generally relative to the data dir.
+  Neither desktop host owns Voice SQLite. Worker synthesis is non-persistent, but worker startup
+  still runs initialization/migrations: “worker never writes the database” is too broad.
+- Most Voice APIs have no authentication. Loopback default and CORS are not authorization when
+  network access is enabled. Python `/mini/*` and `/harnesses` require loopback plus a mode-0600
+  install token; MCP absolute-path transcription separately requires loopback.
+- MCP tools are `speak`, `transcribe`, `list_captures`, `list_profiles`; the stdio shim proxies the
+  HTTP MCP service. `X-Voicebox-Client-Id` selects defaults/tracks clients, not authentication.
+- `scripts/voicebox` manages the repo-local Python server and launchd KeepAlive; the Voice desktop
+  is separate. Packaged Voice can spawn/reuse a sidecar. Its speak monitor remains fixed to local
+  port 17493 even when React is configured for a remote backend.
+
+## Null Mini — deep dive (Mini/)
+
+Added 2026-10-09 by a second session (see the note at the top). This section zooms into `Mini/`; the
+Map's own Mini statements in `## Architecture` and `## Domain Model` stand. `Mini/src/*.rs`, the
+page's command/event/key sites, `tauri.conf.json`, `Info.plist`, `build.rs`, `capabilities/`, and
+both `Mini/Scripts/*` were read. Facts marked *(observed)* come from the app's own
+`~/Library/Logs/Null/mini.log` (856 lines), `settings.json` and `backups.yml`, read on 2026-10-09 —
+not produced by a run made for this section.
+
+### The twelve files in `Mini/src/`, and what each decides
+
+| Module | Owns | Decides / does not decide |
 |---|---|---|
-| Rust → pill | `dictate:start` | `{focus, action}`; `action` ∈ `push`, `toggle`, `agent` |
-| Rust → pill | `dictate:stop` | Stop recording |
-| Rust → pill | `dictate:restart` | Push-to-talk upgraded to toggle mid-hold. **No listener** |
-| Rust → pill | `voice:stop`, `voice:toggle` | Stop / mute chords. **No listener** |
-| Rust → pill | `dictate:speak-start` | Backend SSE payload as a JSON *string*: `generation_id`, `narration?`, `profile_name`, `source`, `client_id` |
-| Rust → pill | `dictate:speak-end` | JSON string: `generation_id`, `status` |
-| Pill → Rust | `dictate:show`, `dictate:hide` | Surface or tuck away the window |
-| Pill → main window | `speak:interrupt` | Stop in-app WaveSurfer playback |
-| Pill → main window | `capture:created`, `capture:updated` | Seed / refresh the captures list |
-| Pill → main window | `system:accessibility-missing` | Prompt for the permission |
+| `main.rs` | Wiring: two plugins, state init, 21 `invoke_handler` commands, five dev switches | Nothing else |
+| `panel.rs` | The window: 616 px wide, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize` | Where and whether the box is visible, not what it shows |
+| `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
+| `harness.rs` | The ACP connection: one thread, one `omp … acp` process, one conversation, a 5,000-event ring, pending approval responders | What the harness reported; never what a provider is or whether a model is good |
+| `translate.rs` | ACP JSON → box events; the model list out of session config options; the owner's `mcp.json` → `session/new`; finding the `omp` binary | Pure functions over JSON; no process, no network |
+| `backups.rs` | The fallback order: `backups.yml` beside the settings, passed as `--config` | The order, not the switching — the harness moves on and re-sends by itself |
+| `providers.rs` | `omp usage --json --redact` (15 s limit, 60 s cache) set beside the model list | What is left; never an account name |
+| `signin.rs` | `omp login` on ordinary pipes: its list, its lines, its questions in, answers out | Nothing about provider semantics and nothing about steps having run |
+| `access.rs` | Full Disk Access: a file only it unlocks, one ask, then the user's decision | That macOS asks folder by folder, not whether the user agrees |
+| `settings.rs` | `settings.json` in the app config dir; `NULL_MINI_PROFILE` suffixes the app's own file names | Only where the box was and what was last open |
+| `markdown.rs` | Markdown → the JSON tree the `layout` command returns | Part kinds, not drawing |
+| `log.rs` | One line per event, to stderr and `~/Library/Logs/Null/mini.log` | Nothing |
 
-**Agent-speech cycle in the pill.**
-- `speak-start` only *primes* the pill; the window is shown when audio actually starts, so the user
-  never sees a silent pill during synthesis.
-- Plain speak: `EventSource` on `/generate/{id}/status` → on `completed`, `new Audio(/audio/{id})`.
-  Fetching `/audio/{id}` is the ack the backend's headless-playback fallback waits for.
-- Narration: `useNarrationStream` → `EventSource` on `/speak/{id}/stream` → `narrationPlayer.ts`
-  (WebAudio, 0.15 s start lead). Dismissal waits for buffered audio to drain, not for stream end.
-- Watchdogs: 60 s of silence from either stream dismisses; a `completed` speak-end with no audio
-  dismisses after 15 s.
-- Last speak wins: a new `speak-start` tears down the previous cycle.
-- Barge-in: `dictate:start` calls `dismissSpeak()` before the mic opens. Closing the narration stream
-  is what cancels synthesis server-side; `/speak/stop` is not called.
+Exclusions the code states: Null decides that a message was typed, not how the agent works; it
+decides the fallback order, not when to fall back; it decides to show the harness's sign-in, not what
+a provider requires; it adds no approval layer — the approval mode read from
+`omp config get tools.approvalMode` is passed straight through as `--approval-mode`.
 
-**Why Rust owns the speak subscription:** hidden WebKit windows on macOS throttle long-lived network
-connections, so an `EventSource` in the hidden pill missed events. Tauri's event bus reaches hidden
-webviews reliably. `speak_monitor.rs` reconnects with backoff (0.5 s → 30 s cap) and treats 45 s
-without a frame as a dead stream (the backend pings every 15 s).
+### The same text turn, at the call sites
 
-## The voice loop, stage by stage
+1. Control+Space → `shortcut.rs` (`ShortcutState::Pressed`) → `panel::toggle` → `show` → `mini:shown`.
+2. The page focuses the field. Enter → `invoke('send', { text })`.
+3. `harness::send_text`: refuse if busy; set busy; publish `user_message`, then `status_change
+   running`; queue `Command::Send`.
+4. The harness thread (`serve` → `converse` → `Conversation::handle`) builds
+   `omp [--profile P] [--approval-mode M] [--config …/backups.yml] acp`, `initialize`s (the protocol
+   version must come back 1), then opens a session: `session/load` on the saved id when the agent
+   advertises `loadSession`, else `session/new`; MCP servers come from `~/.omp/agent/mcp.json` in
+   either case. *(observed)* the real start line is
+   `omp --approval-mode yolo --config /…/io.github.dominionism.null-mini/backups.yml acp`, followed by
+   `loaded the conversation 01a11fb9-… back`.
+5. `session/prompt` → `agent_message_chunk` / `agent_thought_chunk` → `on_update` →
+   `translate::event_from_update` → `text_delta` → `publish` → `mini:event` → the page appends.
+6. Reply ends → `stop_reason`, `reply_failed`, `status_change ready`, `message_done`, `finish`, then
+   `Command::CheckModel` re-asks a non-model session config option so a harness-side move to a backup
+   is seen and published as `model_switched`.
+7. The page re-reads the reply through the coalesced `invoke('layout', { text })`, draws it, measures
+   the box and calls `invoke('resize', { height })`.
 
-Measured baseline (this machine, MPS, Whisper `small`, LuxTTS clone) from the latency plan.
+Approvals: `RequestPermissionRequest` → `approval_request` with its options → the user's answer goes
+back as `invoke('respond', { requestId, answer })` → `respond` resolves the stored `Responder` and
+returns the session to `running`.
 
-| # | Stage | Owner | Warm cost |
-|---|---|---|---|
-| 1 | chord → focus snapshot | `tauri/hotkey_monitor.rs` (`keytap` chords → `ChordAction` → `Effect`, `focus_capture`) | — |
-| 2 | record → blob → WAV | `app/useAudioRecording` → `convertToWav` *(carried)* | unmeasured |
-| 3 | upload + decode + STT | `POST /captures` → `services/captures.create_capture` → Whisper singleton | 1.05–1.93 s |
-| 4 | refine (only if `auto_refine`) | client chains `POST /captures/{id}/refine` | ~1.3 s warm / 9.6 s cold |
-| 5 | route the transcript | `DictateWindow.onFinalText` | — |
-| 6 | deliver to the agent | `POST /voice-targets/message` → `herdr agent prompt` | 0.02–0.13 s |
-| 7 | answer synthesis | MCP `voicebox.speak` / narrate → narration lane | 2.08–2.46 s to first chunk |
-| 8 | playback | pill `useNarrationStream` + `narrationPlayer.ts` | 0.15 s start lead |
+### The page contract, in full
 
-Boundaries that matter:
+Commands the page invokes (the `invoke_handler` list in `main.rs`): `page_ready`, `quit`, `layout`,
+`hide_box`, `resize`, `send`, `interrupt`, `respond`, `models`, `set_model`, `new_conversation`,
+`events_since`, `report`, `providers`, `backups`, `set_backups`, `signin_providers`, `signin_start`,
+`signin_answer`, `signin_cancel`, `open_url`.
 
-- **Capture decides transcription, not delivery.** `POST /captures` returns `transcript_raw`,
-  `auto_refine`, `allow_auto_paste`, `submit_after_paste` in one JSON body. There is no SSE in
-  dictation. The client decides whether to refine and where the text goes.
-- **Delivery is input, not output.** `agent_voice_enabled` gates speech (`/speak` and
-  `/speak/narrate` → 409, MCP speak → `ValueError`) but not `/voice-targets/message` and not
-  `/speak/stop` — muting agents must never mute the user, and silence must always work.
-- **The reply re-enters through the API.** The backend does not wait for or read the agent's answer.
-- **Audio format:** dictation uploads WAV; WebM/Opus only when browser-side conversion throws
-  *(carried)*. Non-WAV input is decoded by librosa (ffmpeg via audioread) and transcoded to WAV.
+Events: `mini:event` carries `user_message`, `text_delta` (`{text, thinking}`), `tool_activity`,
+`status_change` (`running` / `needs_input` / `ready` / `blocked`), `approval_request`,
+`message_done`, `model_changed`, `model_switched`, `reply_failed`, `error`, each with a running `seq`
+so a reloaded page catches up through `events_since`. `mini:signin` carries the sign-in's lines,
+questions and `done`; `mini:shown` means focus and catch up; `mini:notice` carries the
+shortcut-unavailable line or the Full Disk Access line, sent from `page_ready` because the page loads
+after the app has already tried both.
 
-**Turn trace** (dev instrumentation, on by default, `VOICEBOX_TRACE=0` disables):
-- `backend/utils/timing.py`: in-memory ring of 50 traces; first write wins per `(turn_id, stage)`;
-  one JSON line per finished turn to `<data>/logs/turns.jsonl`.
-- `routes/turns.py`: `POST /turns/{id}/begin`, `POST /turns/{id}/marks`, `GET /turns/latest`,
-  `DELETE /turns`. Client side: `app/src/lib/utils/turnTrace.ts`, fire-and-forget.
-- **A dictate → hear-answer turn produces two records, not one.** The capture half uses a
-  client-generated id (sent as `turn_id` on captures, refine and deliver) and ends at delivery. The
-  speak half uses the narration session id, generated by the backend. Nothing links the two ids.
-- Worker-side stages (`model_load_*`, `prompt_*`) travel as `mark` items on the audio queue and as an
-  SSE `mark` event from the worker, so they land in the main process's store.
-- Only narration is traced on the speak side; a plain queued `speak` records nothing.
+Sizing contract (`panel.rs` comments, mirrored in the page's CSS): window 616 px wide; 76 px idle
+(44 px box + 8 above + 24 below); at most 314 (2 border + 42 row + 212 transcript + 26 notice + 32
+margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved position is kept only while
+80 px of its top edge is still on a screen.
 
-**Startup warm-up.** `app.py::_warm_startup_models` preloads Whisper and, only when `auto_refine`,
-the refinement LLM — each only if already in the HF cache (never downloads). The narration worker
-warms via `POST /narration/warm` once healthy. Gated by `capture_settings.warm_models_on_startup`.
+### On-disk state (observed)
 
-## Agent narration lane
+- `…/io.github.dominionism.null-mini/settings.json`: `position [958,322]`,
+  `model "opencode-go/deepseek-v4.1-flash"`, `session 01a11fb9-…`, `asked_full_disk true`,
+  `backups ["anthropic/claude-opus-5-5","opencode-go/deepseek-v4.1-flash"]`.
+- `…/backups.yml`: `{"retry":{"fallbackChains":{"default":[…],"openai-codex/*":[…,"openai-codex/gpt-5.6-sol"]}}}`
+  — Null's order first, then the owner's own list for that provider.
+- `…/Workspace`: the working directory of every conversation (`harness::workspace`).
+- `mini.log`: one `[mini]` line per event plus a float timestamp; the app's only trace.
 
-- `POST /speak/narrate` and MCP `voicebox.speak(narrate=true)` → `routes/speak.py::narrate_speech`.
-- `services/narration.resolve_narration_lane` returns `(engine, reason)` only when
-  `generation_settings.agent_narration` is on, the engine validates for the profile, and the profile
-  is `cloned` or `preset`. Engine resolution matches `POST /generate`: requested → `default_engine` →
-  `preset_engine` → `qwen`. Otherwise the call degrades to the queued speak (`mode="generation"`).
-- Personality rewrite, if requested, runs *before* the session is created so the LLM stays off the
-  streaming path.
-- Lane present → in-memory `NarrationSession` (cap 16, unclaimed TTL 120 s) → `GET /speak/{id}/stream`
-  (SSE: `ready`, `loading`, `waiting`, `chunk` = base64 WAV, `done`, `error`). `claim_session` makes a
-  second GET a 409.
-- With a worker, the stream relays `POST {worker}/narration/synthesize`. Without one, the same route
-  synthesizes in-process under `engine_stream_lock` after `wait_until_idle`.
-- Loudness: gain is computed once from the first chunk and reused, so levels hold across sentences.
-- In-process synthesis runs in a detached task: a client disconnect must not release the engine lock
-  while a worker thread is still inside the model, or the next narration aborts the process on MPS.
-- Nothing is persisted. Disconnect cancels at the next chunk boundary and publishes
-  `speak-end "cancelled"`.
-- `POST /speak/stop` → `narration.cancel_all()` + `playback.stop_playback()` + `speak-end cancelled`
-  with no generation id.
-- **Headless playback** (`services/playback.py`): wired only to the queued generation path in
-  `services/generation.py`. When no pill is subscribed to `/events/speak`, the setting is on and the
-  generation is agent-initiated, the backend plays the WAV through the OS. Narration never triggers
-  it, so with no pill attached a narration synthesizes to nobody.
-- **Worker process** (`services/narration_worker.py`): adopts a worker already on 17494, else spawns
-  one (`python -m backend.narration_main` in dev), waits up to 120 s for `/health`, then warms it.
-  `VOICEBOX_NARRATION_WORKER=0` disables it. Any failure leaves narration in-process.
+### Findings this deep-dive adds
 
-## Voice pairing (herdr)
-
-- `services/voice_targets.py`: plain functions shelling out to the local `herdr` CLI — `agent list`
-  (10 s timeout) and `agent prompt` (30 s). Looks in `PATH`, then `/opt/homebrew/bin`,
-  `/usr/local/bin`, `~/.local/bin`.
-- `GET /agents`: live agents with `target`, `agent`, `status`, `ready`, `cwd`, `title`, `focused`.
-  A missing herdr is a normal response (`available: false`), not an error.
-- `POST /voice-targets/message`: resolve target (request → `capture_settings.agent_target`), re-list
-  agents, verify the target is live, then prompt with the voice-turn prefix. Codes: 409 (no target,
-  target gone, or agent blocked on the user), 503 (herdr missing or unreachable), 502 (other).
-- `VOICE_TURN_INSTRUCTION = "[voice turn] reply aloud, two sentences max."` The marker is read by the
-  harness instruction files (`~/.omp`, `~/.claude`, `~/.config/opencode`, `~/.codex`), not by code
-  *(carried)* — nothing forces a spoken reply if the agent ignores it.
+- **A planned event does not exist.** `Providers.md` names a `provider_state` event as a deviation;
+  there is none — the page calls `invoke('providers')`.
+- **`ConversationDisplay.md` items 1, 8 and 9 are not started:** the look-check harness
+  (`Mini/Scripts/Look/`), the note that tells the agent about the box, and more room (which would
+  move `MAX_HEIGHT` and the page's height sums).
+- **`MiniApp.md`'s file and switch lists trail the code:** they lack `providers.rs`, `signin.rs`,
+  `backups.rs`, `markdown.rs` and the fifth switch `NULL_MINI_PROFILE`.
+- **Mini has no task-runner entry.** No `justfile` recipe, and it is outside the bun workspaces
+  (Rust crate only); `cargo test` in `Mini/` is manual and was run in neither pass.
+- **No other repo code depends on `Mini/`.** Outside it the only references are the plans, the
+  retained prototype `Scripts/prototype-omp-spike.py`, and `Memories/`.
+- **The rename does not touch it.** `Mini/` already follows ADR 0001; `Mini/src` and
+  `Mini/capabilities` are among the stated exceptions in `Context/Plans/CapitalFolders.md`.
 
 ## Domain Model
 
-Tables (16): `profiles`, `profile_samples`, `generations`, `generation_versions`, `stories`,
-`story_items`, `projects`, `effect_presets`, `audio_channels`, `channel_device_mappings`,
-`profile_channel_mappings`, `capture_settings`, `generation_settings`, `cloud_settings`,
-`mcp_client_bindings`, `captures`. Field-level detail below is *(carried)*.
-
-- **VoiceProfile** — `voice_type ∈ {cloned, preset, designed}`. `cloned` uses `profile_samples`
-  (audio + reference text). `preset` is locked to `preset_engine` + `preset_voice_id`. `designed`
-  carries `design_prompt` and has no synthesizable voice yet. Optional `personality`,
-  `effects_chain`, `default_engine`. `profiles.name` is UNIQUE.
-- **Generation** — text, language, engine, model_size, seed, instruct, status, `audio_path` (mirrors
-  the default version), `is_favorited`, `source` (`manual` | `personality_speak` | `mcp` | `rest`).
-- **GenerationVersion** — lineage: `original`, effects versions, `take-N`, `clean`; one `is_default`;
-  deleting the last is refused.
-- **Story / StoryItem** — multi-track timeline; items reference a generation and optional version.
-- **Capture** — dictation / recording / file audio + `transcript_raw` / `transcript_refined` + flags.
-- **MCPClientBinding** — per-client voice, engine and personality defaults + `last_seen_at`.
-- **Singleton rows id=1** — `capture_settings`, `generation_settings`, `cloud_settings`.
-- **`capture_settings`** holds the chords (`chord_push_to_talk_keys`, `chord_toggle_to_talk_keys`,
-  `chord_voice_stop_keys`, `chord_voice_toggle_keys`, `chord_agent_keys`), `hotkey_enabled`,
-  `headless_playback`, `default_playback_voice_id`, `agent_voice_enabled`, `agent_target`,
-  `warm_models_on_startup`, plus `stt_model`, `llm_model`, `auto_refine`, paste flags.
-- **`generation_settings`** holds `max_chunk_chars`, `crossfade_ms`, `normalize_audio`,
-  `autoplay_on_generate`, `agent_narration`.
-
-**Voice resolution** (`mcp_server/resolve.py`, shared by MCP and REST speak): explicit `profile` →
-per-client binding → `capture_settings.default_playback_voice_id` → error.
-
-**Chords** are sets of keys, not sequences, with left/right modifier fidelity. Five actions:
-push-to-talk, toggle-to-talk, agent push-to-talk, voice stop, voice toggle. Defaults *(carried)*:
-macOS right Cmd+Option (+`KeyA` agent, `KeyX` stop, `KeyM` mute, `Space` toggle); Windows right
-Ctrl+Shift equivalents.
-
-**Engines:** TTS `qwen`, `qwen_custom_voice`, `luxtts`, `chatterbox`, `chatterbox_turbo`, `tada`,
-`kokoro`; STT `whisper` (5 sizes); LLM `qwen_llm` (3 sizes).
+- **Harness versus provider:** OMP supplies agent execution/session/tools; providers supply models
+  and account access. Null does not need a new harness for each model vendor.
+- **Null conversation:** OMP transcript + saved session ID; one active turn, bounded in-memory UI
+  events. Not a Voice `Capture`, not a narration session, not a herdr pane.
+- **Null settings:** position, chosen model, session ID, one-time Full Disk Access ask, backup order.
+  Stored under the bundle's application-support directory; profile-specific settings/overlay names
+  isolate development state. OMP remains transcript/credential owner.
+- **VoiceProfile / ProfileSample:** cloned/preset/designed voice configuration and reference audio,
+  optional default engine, personality and effects. Designed profiles lack a ready synthesis path.
+- **Generation / GenerationVersion:** persistent speech request plus original/effects/take lineage;
+  source distinguishes manual, MCP, REST and personality speech. Separate from capture input.
+- **Capture:** dictation/recording/upload audio with raw/refined text and model/refinement metadata.
+- **Story / StoryItem:** timeline arrangement of generation/version clips; services own edits/export.
+- **Channels / mappings / effect presets:** output-routing configuration and reusable DSP chains.
+- **Singleton settings:** captures, generation, cloud. MCP bindings supply per-client voice defaults.
+  Voice's cloud bearer key is separate from OMP provider credentials; do not conflate the boundaries.
+- **Ephemeral runtime state:** generation queue/task registry, speak subscribers, narration sessions,
+  Python Mini sessions, Rust Mini event buffer and approval responders. None is a durable task tray.
+- `Context/Glossary.md` is still an unfilled template. These distinctions are a factual research
+  vocabulary, not newly settled glossary/ADR decisions. `Project` ORM remains without a service/API.
 
 ## Patterns
 
-- **Layering.** `routes/` thin → `services/` logic + ORM sessions → `backends/` engines behind
-  Protocols. Adding an engine touches the registry (`backends/__init__.py`) and one new module.
-  `ModelConfig` is built by registry factory functions.
-- **MCP tools adapt, routes orchestrate.** `mcp_server/tools.py` lazily imports `generate_speech` and
-  `narrate_speech` from `routes/` rather than re-implementing them.
-- **Heavy imports are lazy** (inside factories and load functions). Exception: `app.py` imports torch
-  at module scope, deliberately after the ROCm env setup.
-- **Models are process-global singletons**, lazily loaded, warmed at startup, never downloaded
-  implicitly at startup.
-- **Paths in the DB are relative to the data dir** (`config.to_storage_path` /
-  `resolve_storage_path`). An empty path must resolve to `None`; 404 guards depend on it.
-- **Migrations** *(carried)*: hand-rolled, idempotent, run before `create_all`
-  (`database/migrations.py`; no Alembic). Add a `_migrate_*` helper and call it from
-  `run_migrations()`.
-- **Naming** *(carried)*: ORM models aliased `DB`-prefixed; Pydantic models suffixed
-  `…Create/…Response/…Request`; backend classes engine-prefixed.
-- **Python style:** `backend/pyproject.toml` is authoritative — Python 3.12+, Ruff, 120 cols, double
-  quotes. `CONTRIBUTING.md`'s Black text is stale *(carried)*.
-- **TypeScript:** React 18, `@tanstack/react-router` with code-defined routes, React Query, one
-  zustand store per concern (8 stores), Biome, Tailwind 4, i18next (9 locales).
-- **Platform abstraction:** `app/src/platform/types.ts` defines `Platform` = `filesystem`, `updater`,
-  `audio`, `lifecycle`, `metadata`. `tauri/src/platform/` and `web/src/platform/` implement it.
-  Direct `@tauri-apps/api` imports in `app/` (as in `DictateWindow`) bypass it.
-- **One SPA, two windows.** `App.tsx` branches on `?view=dictate` before any main-app hooks run.
-- **Cross-window state travels by Tauri events**, not shared stores — the pill and main window are
-  separate webviews.
-- **API client:** the live client is the hand-written `app/src/lib/api/client.ts` + `types.ts`. The
-  generated tree under `lib/api/` is not imported *(carried)*.
-- **Tests:** 38 `test_*.py` files in `backend/tests/`, mixing real pytest tests with scripts needing
-  a live server, downloads or a GPU *(carried)*. One Rust test file. No frontend test files.
-- **CI** (`ci.yml`): frontend typecheck + web build only. No Python, Rust or Biome in CI.
-- **Tasks:** `justfile` is the task runner; root `package.json` scripts wrap the same things.
-- **Release** *(carried)*: `bumpversion` across 8 version files, driven by `.agents/skills/`.
+### Stack and development
+
+- **Null:** standalone Rust 2021/Tauri 2 crate in `Mini/`; ACP v3, `pulldown-cmark`, global-shortcut
+  plugin, pinned `tauri-nspanel`; macOS 13+, compile-time macOS-only. Static `Page/`, no Node/Vite build.
+- **Voice:** Bun workspace (`app`, `tauri`, `web`, `landing`), React 18/TypeScript/Vite/Tailwind,
+  TanStack Router/Query, zustand, WaveSurfer, i18next. `docs` is its own Next/Fumadocs project;
+  `landing` is an independent Next marketing site.
+- **Backend:** Python >=3.12 per `backend/pyproject.toml`, FastAPI/Pydantic/SQLAlchemy, torch/optional
+  MLX, Whisper STT, Qwen local refinement/personality LLM, Pedalboard effects. Lazy singleton engine
+  registry exposes seven TTS names: qwen, qwen_custom_voice, luxtts, chatterbox, chatterbox_turbo,
+  tada, kokoro. Engine choice is distinct from conversation-provider choice.
+- Backend pattern: thin routes → services/domain/session → engines behind Protocols. Migrations
+  are hand-run, not Alembic. Ruff targets py312, 120 columns, double quotes. Heavy engine imports
+  are mostly lazy; platform setup must precede torch import.
+- Frontend live API is hand-written `app/src/lib/api/client.ts` + `types.ts`; the generated
+  OpenAPI service tree is not used by current screens. Host-injected `Platform` provides filesystem,
+  audio, lifecycle, updater and metadata. Direct Tauri imports bypass browser portability.
+- React Query holds backend state; zustand holds UI/playback/connection concerns. Separate webviews
+  communicate via events, not shared stores. Each active host currently creates its own QueryClient.
+- Mini JSON/ACP translation is in `translate.rs`; process/session orchestration in `harness.rs`;
+  pure parsers/merges have inline Rust tests. Layout requests are serialized, **not frame-throttled**
+  as the display plan proposed. HTML is never produced from model content.
+
+### Available commands, not run in this research
+
+| Surface | Commands |
+| --- | --- |
+| Null | `cargo build`, `cargo test`, `cargo tauri build` from `Mini/` |
+| Null install | `Mini/Scripts/install` builds/signs/replaces the app and login agent; mutating, not a check |
+| Voice desktop dev | `just dev` starts backend if needed; `bun run dev` expects it separately |
+| Voice server/web | `bun run dev:server`, `bun run dev:web`, `just dev-web` |
+| Voice build | `bun run build`, `bun run build:web` |
+| Frontend checks | `bun run typecheck`, `bun run check`, `bun run ci` |
+| Backend checks | `just test`, `just check-python` or venv pytest/Ruff |
+
+CI currently runs frontend typecheck and web build only, not Mini/Rust/Python behavior. Voice has no
+frontend behavioral suite and only a manual system-audio Rust integration test. Python tests mix
+isolated tests with live-server/model/download checks. Mini's ignored integration tests execute OMP;
+its smoke/self-test switches can send real prompts. `NULL_MINI_PROFILE` isolates settings and OMP
+profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.json`**.
+
+### Operational constraints
+
+- Installed Null uses a separate LaunchAgent and optional local signing identity. The install script
+  preserves keychain search state but proceeds unsigned if the local signing keychain is absent.
+  Full Disk Access is a macOS grant to the app/harness, not a replacement for harness approvals.
+  Current personal-machine signing is not a distributable notarized release flow.
+- Voice startup warm-up never downloads uncached models. Ordinary inference/capture paths are not
+  universally cache-gated; direct captures can initiate loading/downloading.
+- Preserve the measured speech findings in `VoiceLoopLatency.md`: PyTorch Whisper small was the
+  working baseline; MLX hallucinated/ran much slower on this Mac, same-size CTranslate2 gave no gain,
+  and CPU LuxTTS under-generated. Do not retry these directions just because old plan sections
+  still recommend them. Those are prior measurements, not a fresh benchmark here.
+- Voice turn traces exist, but capture/delivery and speech use separate IDs; a complete joined
+  end-to-end trace must not be inferred from older “one record per turn” plan wording.
 
 ## Relevant ADRs
 
-`Context/ADR/` exists and is empty; `Context/Glossary.md` is an unfilled template. Decisions live in
-code comments and the four plans:
+- **0001, capitalized folders:** PascalCase throughout, except externally fixed tool names, public
+  identifiers/URL components and hidden folders. Applies immediately to new folders. Existing main
+  paths remain lowercase until the separate cleanup branch lands.
+- **0002, Null Mini is its own app:** independent window, shortcut and harness connection. Voice's
+  Python harness and `/mini` routes remain for prospective voice use. Its fn+Space wording predates
+  the later Control+Space choice.
+- Provider credential ownership and provider-agnostic presentation are settled in `Providers.md`,
+  but their proposed ADRs/glossary entries are not written. Research does not create new decisions.
 
-- No Alembic (`database/migrations.py`).
-- Generation serialized on one queue (`services/task_queue.py`).
-- Narration runs in a separate process — two threads sharing one torch/MPS model abort the process;
-  two processes are safe (`Context/Plans/AgentVoiceLimits.md` §1).
-- Narration shares the work engine; the CPU-lane design was abandoned
-  (`Context/Plans/RealtimeAgentNarration.md`, "Open decision").
-- The pill is the only playback surface for agent speech; Rust owns its visibility.
-- Startup never downloads a model.
-- Whisper stays on PyTorch CPU `small` on this machine: MLX measured 13× slower and hallucinated,
-  CTranslate2 was no faster (`Context/Plans/VoiceLoopLatency.md`).
-- Plans: `RealtimeAgentNarration` (implemented), `AgentVoiceLimits` (limits register),
-  `VoicePairing` (partly built), `VoiceLoopLatency` (trace shipped; B1-vs-B3 and the acceptance bar
-  are user-owned decisions).
+## Open Questions and Current Gaps
 
-## Open Questions
+### Product completion versus built code
 
-**New this pass**
+- Core Null typing/tools/model switching/hiding/dragging have owner-reported proof in `MiniApp.md`.
+  Actual logout/login behavior and some restart checks remain open. Older per-item/Validation
+  paragraphs lag the later hands-on record; do not treat them as evidence that those interactions
+  were never used. Do not discard the user's reported login issue based on machine-history inference.
+- `/login` has owner-reported success. `/backup`, `/usage`, latest layout/selection/sideways-scroll
+  feel and real account-limit behavior are not fully owner-proven. Existing fallback proof used
+  stand-in providers; no real quota exhaustion is established.
+- No first-run installation/sign-in guidance, `/logout`, active-sign-in timeout, content policy,
+  checked-in visual harness or public Null/provider setup documentation is complete. The input is
+  already masked; `Providers.md` item 9's remaining secret-residue proof must not be mistaken for
+  absence of the mask.
+- Full terminal parity is an objective, not a theorem: the original ACP spike reported a skills
+  count difference, and lone harness slash commands are blocked by Null's unknown-command rule.
+- No background task tray, workspace picker, continuous voice conversation, automatic speaking of
+  every Null reply, cross-harness handoff or pet renderer is built. Voice requires a profile first;
+  today's inventory is empty. Later voice transport/echo cancellation/engine choices remain open.
 
-- **Packaged builds cannot start the narration worker.** `narration_worker._spawn_command` re-runs
-  the frozen executable with `--role narration`, but `server.py` defines no `--role` argument and
-  uses `parse_args()`, and never sets `VOICEBOX_ROLE`. Read from code, not run: the child should exit
-  on the unknown flag and narration should fall back to in-process, waiting behind the queue.
-- **`dictate:restart` has no listener.** Rust coalesces a push-to-talk → toggle upgrade into one
-  restart event; nothing in `app/` handles it.
-- **README Provenance says the full commit history is preserved; the repo has one commit.**
-- **The updater still points upstream** (`jamiepine/voicebox` releases, upstream public key). A
-  packaged Null build would offer upstream Voicebox updates. Not tested.
-- **MCP `voicebox.speak` description is stale:** it promises a "CPU narration lane" needing "a Kokoro
-  preset profile, or an English cloned profile", and says speech is saved to "Captures / History".
-  The implementation shares the work engine and accepts any cloned or preset profile.
-- **A voice turn is two unlinked trace records** (see Turn trace). An end-to-end number still needs a
-  join by wall clock.
+### Concrete implementation boundaries to consider for future work
 
-**Still true (re-verified)**
+- Both Tauri products have `csp: null`. Mini constructs safe text DOM today; this is not the planned
+  second-layer browser policy. Full Disk Access and broad harness tools make that trust boundary
+  consequential. No exploit was exercised in this research.
+- Packaged narration supervisor invokes `--role narration`, but `backend/server.py` accepts no
+  `--role`. Dev worker health does not prove packaged worker startup.
+- Stop/mute/restart chord events (`voice:stop`, `voice:toggle`, `dictate:restart`) are emitted but
+  have no frontend listeners. `apiClient.stopSpeaking` has no caller. Settings mute itself works.
+- Narration without a stream claimant is silent; `scripts/voicebox demo` does not claim its stream.
+  MCP/route descriptions still promise the abandoned CPU-specific lane and overstate no-wait behavior.
+- `/generate/stream` bypasses the persistent queue. `generation_settings` is not the source of
+  `/generate` chunk/crossfade/normalization values; request fields/defaults are used.
+- `serverStore` invalidates `app/src/lib/queryClient.ts`, but actual desktop/browser hosts use other
+  QueryClient instances. Read from code: switching server can retain the displayed server cache;
+  this was not exercised live.
+- Voice's remote-server setting does not move Rust's local-only speak subscription. Browser Captures
+  export directly imports Tauri plugins ([INFERENCE]: those buttons fail outside Tauri).
+  Same-origin hard navigation to `/settings/captures` or `/settings/generation` hits API JSON.
+- Mini's bounded event history has no gap marker; process restarts rely on OMP replay. Python Mini
+  lacks a durable resume index entirely. Do not use either as proof of background-task persistence.
+- Upstream Voicebox updater/branding remains in the Voice host. Root README describes Voicebox, not
+  current Null; its preserved-history statement is not evidence of imported upstream history.
+- Cleanup remains unmerged. Its explicit handoff deltas still need promotion into
+  `CapitalFolders.md`; no cleanup/rebase/switch/service mutation was done during this research.
 
-- **The stop and mute chords are half-wired.** Rust emits `voice:stop` / `voice:toggle`; no frontend
-  listener exists, and `apiClient.stopSpeaking()` has no caller. The backend endpoint and the
-  Settings toggle work; the chord → endpoint link does not.
-- **Agent delivery has no paste fallback.** The agent branch shows a destructive toast and returns.
-- **`generation_settings` is not consulted by `POST /generate`**, which uses request-body values.
-- **`create_capture` has no model-cache pre-check**; only the UI readiness gate prevents an inline
-  download during a dictation.
-- **Narration is silent with no pill attached** (headless playback covers only the queued path).
-- **`Project` ORM model** is declared and exported with no routes or services.
-- **Web deployment route collision:** backend `GET /settings/captures` and `/settings/generation`
-  shadow the SPA routes of the same path on a hard navigation (behaviour reported in the latency
-  plan; both routes confirmed to exist).
-- `VoicePairing` items not built: voice mode / end-of-utterance detection (item 10), reading the
-  agent's reply without its cooperation (item 11), non-herdr transports (item 12). `herdr agent read`
-  is not implemented.
+### Observed runtime, 2026-10-09
 
-**Carried, not re-verified**
+- Installed `/Applications/Null.app/Contents/MacOS/null-mini` run with
+  `NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 NULL_MINI_PROFILE=null-research-20261009`
+  exited successfully in 0.41 s: `started`, `panel ready`, shortcut disabled, `shown; frontmost app:
+  Ghostty`, `page ready`. This proves installed startup and page IPC, not live conversation, visual
+  layout acceptance, global shortcut behavior or independence with every configured MCP server down.
+  It appended normal operational log lines; no isolated settings/profile artifacts were found.
+- `bash scripts/voicebox status`: server and narration worker up, Voice development app down,
+  server login agent installed and loaded. This is the script's process view, not a GUI audit.
+- `/health` on 17493 and 17494: healthy, model not loaded, PyTorch, MPS available.
+- `GET /profiles`: `[]`; no existing profile is available for cloned-voice speech in this data dir.
+- `GET /harnesses` without bearer token: 401. `GET /mini/sessions`: 405, POST allowed, consistent
+  with no collection-list route. No authenticated session or conversation content was fetched.
 
-- `tada`: an unrecognized `model_size` silently loads the 1B repo.
-- Whether the `original` version is intentionally deletable while another exists.
-- `docs/PROJECT_STATUS.md` (2026-07-02) is a stale roadmap snapshot.
-- Web build depends on bun workspace hoisting for `@tauri-apps/*`.
-- STT never uses MPS (`allow_mps` defaults to false in `get_torch_device`).
+### Not traced or not proved
 
-## Stale / dead code
-
-Re-verified this pass:
-- `apiClient.stopSpeaking()` has no caller.
-- Two `useAutoUpdater` files exist (`.ts` and `.tsx`).
-- `components/AudioTab/`, `components/AudioStudio/` and `components/ServerSettings/` still exist
-  alongside their replacements.
-- `mcp_server/server.py::mount_into` is exported but never called; `create_app` wires the MCP app
-  itself.
-- Root `requirements.txt` sits beside the real `backend/requirements*.txt`.
-
-*(carried)*:
-- `useAutoUpdater.tsx` (toast UI) is unreachable because Vite resolves `.ts` first.
-- The generated API tree is imported nowhere and drifts from the hand client.
-- `ServerSettings/`: only `ModelManagement.tsx` is imported.
-- `app/src/main.tsx` + `app/index.html` + `app/vite.config.ts` are a stale shell without
-  `PlatformProvider`.
-
-## Not traced
-
-Read only as file names, route lists or outlines:
-
-- **Backend:** stories/timeline, effects, export/import, history, profiles internals, model
-  management and download progress, CUDA/ROCm binary services, cloud sync (`voicebox.sh`), refinement
-  and personality prompts, each engine backend's internals, `utils/chunked_tts.py`, PyInstaller build.
-- **Rust:** `clipboard.rs`, `focus_capture.rs`, `synthetic_keys.rs`, `keyboard_layout.rs`,
-  `audio_capture/*`, `audio_output.rs`, and the body of `start_server`.
-- **Frontend:** every main-window screen (Generate, Stories, Voices, Captures, Effects, Models,
-  Settings pages), the stores, `useCaptureRecordingSession` beyond its state transitions,
-  `useAudioRecording`, `narrationPlayer.ts` beyond its constants.
-- **Other:** `landing/`, `docs/` (66 content files), Docker files, release workflows,
-  `scripts/loop-bench`, `scripts/voicebox`.
+Engine internals, all profile/import/export/DSP/timeline/cloud edge cases, GPU packaging variants,
+updater/signature security, every Windows/Linux native path and all inherited release workflows were
+surveyed only by role or entry point, not exhaustively audited. No real approval interaction, provider
+fallback, audio quality/latency, echo cancellation, remote deployment or login/logout was exercised.
+The reference-product research and provider legal/policy sources were not revalidated externally.
+This map is preparation for the next task, not a claim of exhaustive correctness or user walkthrough.
