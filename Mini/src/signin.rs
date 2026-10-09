@@ -19,7 +19,7 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::log::log;
-use crate::{harness, panel};
+use crate::{harness, panel, providers};
 
 /// One entry of the harness's own list of providers.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -246,7 +246,7 @@ pub fn start(
 }
 
 /// Run a command that should end by itself, and give back what it printed.
-fn run_briefly(mut command: Command, limit: Duration) -> Result<String, String> {
+pub(crate) fn run_briefly(mut command: Command, limit: Duration) -> Result<String, String> {
     let mut child = command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(|e| e.to_string())?;
     let mut stdout = child.stdout.take().ok_or("no output")?;
     let reader = std::thread::spawn(move || {
@@ -333,6 +333,8 @@ pub fn signin_start(app: AppHandle, number: u32) -> Result<(), String> {
                 // The harness process that is running was started before this
                 // sign-in; a fresh one sees the new provider.
                 harness::restart(&over);
+                // And what each provider has left has to be read again.
+                providers::forget(&over);
             }
             let _ = over.emit_to(panel::LABEL, "mini:signin", json!({ "kind": "done", "ok": ok }));
         },

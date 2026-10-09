@@ -23,6 +23,7 @@ mod access;
 mod harness;
 mod log;
 mod panel;
+mod providers;
 mod settings;
 mod shortcut;
 mod signin;
@@ -80,6 +81,7 @@ fn main() {
             harness::new_conversation,
             harness::events_since,
             harness::report,
+            providers::providers,
             signin::signin_providers,
             signin::signin_start,
             signin::signin_answer,
@@ -95,6 +97,7 @@ fn main() {
             settings::init(handle);
             harness::init(handle);
             signin::init(handle);
+            providers::init(handle);
             if let Some(text) = std::env::var_os("NULL_MINI_SMOKE") {
                 harness::smoke(handle, text.to_string_lossy().into_owned());
                 return Ok(());
