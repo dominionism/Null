@@ -51,10 +51,15 @@ fn page_ready(app: tauri::AppHandle) {
     }
 }
 
-/// `/quit` in the box. The app has no Dock icon or menu to quit from.
+/// `/quit` or Ctrl+C in the box. The app has no Dock icon or menu to quit from.
+///
+/// Quitting closes the conversation as well: the next start opens a new one, as
+/// a terminal program does. A restart the user did not ask for, at login or after
+/// an update, still comes back to the conversation that was open.
 #[tauri::command]
 fn quit(app: tauri::AppHandle) {
-    log!("quit from the box");
+    log!("quit from the box; the conversation is closed");
+    settings::update(&app, |settings| settings.session = None);
     app.exit(0);
 }
 

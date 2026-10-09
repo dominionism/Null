@@ -2,8 +2,10 @@
 <!-- Null's box: the whole page.
 
      Enter sends what you typed to your agent and the reply streams in below.
-     /model opens the model list, /new starts a new conversation, /quit quits
-     the app, Ctrl+C stops a reply, Esc hides the box.
+     /model opens the model list, /login signs in to a provider, /new starts a
+     new conversation, /quit quits the app and closes the conversation, Ctrl+C
+     stops a reply or, with nothing running, does what /quit does, Esc hides the
+     box.
 
      Nothing is shown but the arrow and the text box until there is something
      to say. The arrow is the status: it pulses while the agent works and turns
@@ -1021,9 +1023,13 @@
           if (signin) cancelSignin();
           else if (picker) closePicker();
           else invoke('hide_box');
-        } else if (event.key === 'c' && event.ctrlKey && busy) {
+        } else if (event.key === 'c' && event.ctrlKey) {
+          // As in a terminal program: stop what is running; with nothing running,
+          // quit. Quitting closes the conversation, so the next start is a fresh one.
           event.preventDefault();
-          invoke('interrupt').catch(() => {});
+          if (signin) cancelSignin();
+          else if (busy) invoke('interrupt').catch(() => {});
+          else invoke('quit');
         }
       });
 
