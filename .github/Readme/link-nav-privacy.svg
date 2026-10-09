@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="30" viewBox="0 0 80 30" role="img" aria-label="Privacy">
+  <title>Privacy</title>
+  <style>text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }</style>
+  <rect x="0.5" y="0.5" width="79" height="29" rx="8" fill="#161B22" stroke="#21262D"/>
+  <text x="14" y="19.0" font-size="12.5" fill="#58A6FF" xml:space="preserve">Privacy</text>
+</svg>

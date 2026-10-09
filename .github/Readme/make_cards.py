@@ -151,6 +151,99 @@ class Card:
 CARDS = {}
 
 
+# ── Link chips ────────────────────────────────────────────────────────────
+# A link inside a card cannot be clicked: an SVG loaded as an image is inert, and GitHub strips an
+# inline <svg> out of markdown. So each link is its own small window-styled image wrapped in <a>:
+# clickable, and with no text there is no underline for GitHub to draw.
+CHIP_H, CHIP_PAD, CHIP_FS = 30, 14, 12.5
+CHIP_CW = CHIP_FS * 0.6
+CHIP_FONT = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
+
+CHIPS = {
+    "oh-my-pi": ("Oh-my-pi", "https://github.com/can1357/oh-my-pi", True),
+    "rust": ("Rust toolchain", "https://rustup.rs/", True),
+    "tauri": ("Tauri macOS prerequisites", "https://v2.tauri.app/start/prerequisites/#macos", True),
+    "voicebox": ("Voicebox", "https://github.com/jamiepine/voicebox", True),
+    "adr-0002": ("ADR 0002", "Context/ADR/0002-NullMiniIsItsOwnApp.md", False),
+    "adr-0001": ("ADR 0001", "Context/ADR/0001-CapitalizedFolderNames.md", False),
+    "bun": ("Bun", "https://bun.sh", True),
+    "just": ("just", "https://github.com/casey/just", True),
+    "research": ("Research map", "Context/Research/Research.md", False),
+    "cleanup-plan": ("Cleanup plan", "Context/Plans/CapitalFolders.md", False),
+    "page-html": ("Page/index.html", "Mini/Page/index.html", False),
+    "harness-rs": ("harness.rs", "Mini/src/harness.rs", False),
+    "translate-rs": ("translate.rs", "Mini/src/translate.rs", False),
+    "markdown-rs": ("markdown.rs", "Mini/src/markdown.rs", False),
+    "panel-rs": ("panel.rs", "Mini/src/panel.rs", False),
+    "settings-rs": ("settings.rs", "Mini/src/settings.rs", False),
+    "miniapp": ("App design", "Context/Plans/MiniApp.md", False),
+    "providers": ("Providers", "Context/Plans/Providers.md", False),
+    "display": ("Conversation display", "Context/Plans/ConversationDisplay.md", False),
+    "phases": ("Future phases", "Context/Plans/NullMini.md", False),
+    "adrs": ("Decisions", "Context/ADR/", False),
+    "license": ("MIT", "LICENSE", False),
+    "responsible": ("Responsible use", "RESPONSIBLE_USE.md", False),
+    "security": ("Security", "SECURITY.md", False),
+    "contributing": ("Contributing", "CONTRIBUTING.md", False),
+    "nav-get-started": ("Get started", "#get-started", False),
+    "nav-use-null": ("Use Null", "#use-null", False),
+    "nav-privacy": ("Privacy", "#privacy-and-permissions", False),
+    "nav-architecture": ("Architecture", "#under-the-hood", False),
+    "nav-development": ("Development", "#development", False),
+}
+
+# The header's navigation, chipped like everything else so nothing on the page is underlined.
+NAV = ["nav-get-started", "nav-use-null", "nav-privacy", "nav-architecture", "nav-development"]
+
+# Which chips sit under which card, in the README's order.
+LINK_ROWS = [
+    ["oh-my-pi"],
+    ["rust", "tauri"],
+    ["page-html", "harness-rs", "translate-rs", "markdown-rs", "panel-rs", "settings-rs"],
+    ["voicebox", "adr-0002"],
+    ["bun", "just", "research"],
+    ["cleanup-plan", "adr-0001"],
+    ["miniapp", "providers", "display", "phases", "adrs", "research"],
+    ["license", "responsible", "security", "contributing"],
+]
+
+
+def chip(slug):
+    """One clickable chip, and the markdown that links it."""
+    label, url, external = CHIPS[slug]
+    arrow = 16 if external else 0
+    w = round(CHIP_PAD * 2 + len(label) * CHIP_CW + arrow)
+    mark = (
+        f'  <text x="{w - CHIP_PAD}" y="{CHIP_H / 2 + 4}" font-size="11" fill="{MUTED}" text-anchor="end" xml:space="preserve">↗</text>\n'
+        if external
+        else ""
+    )
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{CHIP_H}" viewBox="0 0 {w} {CHIP_H}" '
+        f'role="img" aria-label="{escape(label)}">\n'
+        f"  <title>{escape(label)}</title>\n"
+        f"  <style>text {{ font-family: {CHIP_FONT}; }}</style>\n"
+        f'  <rect x="0.5" y="0.5" width="{w - 1}" height="{CHIP_H - 1}" rx="8" fill="#161B22" stroke="#21262D"/>\n'
+        f'  <text x="{CHIP_PAD}" y="{CHIP_H / 2 + 4}" font-size="{CHIP_FS}" fill="#58A6FF" xml:space="preserve">{escape(label)}</text>\n'
+        f"{mark}"
+        f"</svg>\n"
+    )
+    ET.fromstring(svg)
+    with open(os.path.join(OUT, f"link-{slug}.svg"), "w") as handle:
+        handle.write(svg)
+    alt = f"{label} (opens {url})" if external else label
+    return f'  <a href="{url}"><img src=".github/Readme/link-{slug}.svg" height="{CHIP_H}" alt="{alt}" /></a>'
+
+
+def link_rows():
+    """The markdown blocks for the chips, to paste under their cards."""
+    blocks = []
+    for slugs in LINK_ROWS:
+        body = "\n  &nbsp;\n".join(chip(slug) for slug in slugs)
+        blocks.append(f'<p align="center">\n{body}\n</p>')
+    return blocks
+
+
 def add(name, title, build, key_cols=KEY_COLS):
     card = Card(key_cols)
     build(card)
@@ -459,3 +552,10 @@ for name, (title, svg) in CARDS.items():
         handle.write(svg)
     h = re.search(r'height="(\d+)"', svg)
     print(f"wrote {name}.svg  ({W}x{h[1] if h else '?'}, {len(svg) // 1024} KB)")
+
+nav = "\n  &nbsp;\n".join(chip(slug) for slug in NAV)
+print(f'<p align="center">\n{nav}\n</p>')
+
+for block in link_rows():
+    print()
+    print(block)

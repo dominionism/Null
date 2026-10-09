@@ -8,15 +8,19 @@
 </p>
 
 <p align="center">
-  <code>macOS 13+</code> &nbsp; <code>Oh-my-pi</code> &nbsp; <code>Rust + Tauri</code> &nbsp; <a href="LICENSE">MIT</a>
+  <code>macOS 13+</code> &nbsp; <code>Oh-my-pi</code> &nbsp; <code>Rust + Tauri</code> &nbsp; <code>MIT</code>
 </p>
 
 <p align="center">
-  <a href="#get-started">Get started</a> &nbsp; / &nbsp;
-  <a href="#use-null">Use Null</a> &nbsp; / &nbsp;
-  <a href="#privacy-and-permissions">Privacy</a> &nbsp; / &nbsp;
-  <a href="#under-the-hood">Architecture</a> &nbsp; / &nbsp;
-  <a href="#development">Development</a>
+  <a href="#get-started"><img src=".github/Readme/link-nav-get-started.svg" height="30" alt="Get started" /></a>
+  &nbsp;
+  <a href="#use-null"><img src=".github/Readme/link-nav-use-null.svg" height="30" alt="Use Null" /></a>
+  &nbsp;
+  <a href="#privacy-and-permissions"><img src=".github/Readme/link-nav-privacy.svg" height="30" alt="Privacy" /></a>
+  &nbsp;
+  <a href="#under-the-hood"><img src=".github/Readme/link-nav-architecture.svg" height="30" alt="Architecture" /></a>
+  &nbsp;
+  <a href="#development"><img src=".github/Readme/link-nav-development.svg" height="30" alt="Development" /></a>
 </p>
 
 <a id="small-surface-real-agent"></a>
@@ -30,14 +34,20 @@
   <img src=".github/Readme/step-harness.svg" width="100%" alt="1. Bring your harness: install Oh-my-pi, whose sign-ins, subscriptions and keys Null does not manage; Null looks on PATH and in known install folders, and does not install it." />
 </p>
 
-<p align="center"><sub><a href="https://github.com/can1357/oh-my-pi">Oh-my-pi</a></sub></p>
+<p align="center">
+  <a href="https://github.com/can1357/oh-my-pi"><img src=".github/Readme/link-oh-my-pi.svg" height="30" alt="Oh-my-pi (opens https://github.com/can1357/oh-my-pi)" /></a>
+</p>
 
 <a id="step-2-build-and-install"></a>
 <p align="center">
   <img src=".github/Readme/step-build.svg" width="100%" alt="2. Build and install: macOS 13+, the Rust toolchain, Xcode Command Line Tools and Tauri CLI 2; xcode-select --install, cargo install tauri-cli, git clone, then Mini/Scripts/install, which prints that Null.app is installed and Control+Space opens the box." />
 </p>
 
-<p align="center"><sub><a href="https://rustup.rs/">Rust toolchain</a> &nbsp;·&nbsp; <a href="https://v2.tauri.app/start/prerequisites/#macos">Tauri macOS prerequisites</a></sub></p>
+<p align="center">
+  <a href="https://rustup.rs/"><img src=".github/Readme/link-rust.svg" height="30" alt="Rust toolchain (opens https://rustup.rs/)" /></a>
+  &nbsp;
+  <a href="https://v2.tauri.app/start/prerequisites/#macos"><img src=".github/Readme/link-tauri.svg" height="30" alt="Tauri macOS prerequisites (opens https://v2.tauri.app/start/prerequisites/#macos)" /></a>
+</p>
 
 <a id="step-3-open-the-box"></a>
 <p align="center">
@@ -89,7 +99,19 @@
   <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, providers.rs, signin.rs and backups.rs, markdown.rs, and settings.rs, access.rs and log.rs, each with what it owns." />
 </p>
 
-<p align="center"><sub><a href="Mini/Page/index.html">Page/index.html</a> &nbsp;·&nbsp; <a href="Mini/src/harness.rs">harness.rs</a> &nbsp;·&nbsp; <a href="Mini/src/translate.rs">translate.rs</a> &nbsp;·&nbsp; <a href="Mini/src/markdown.rs">markdown.rs</a> &nbsp;·&nbsp; <a href="Mini/src/panel.rs">panel.rs</a> &nbsp;·&nbsp; <a href="Mini/src/settings.rs">settings.rs</a></sub></p>
+<p align="center">
+  <a href="Mini/Page/index.html"><img src=".github/Readme/link-page-html.svg" height="30" alt="Page/index.html" /></a>
+  &nbsp;
+  <a href="Mini/src/harness.rs"><img src=".github/Readme/link-harness-rs.svg" height="30" alt="harness.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/translate.rs"><img src=".github/Readme/link-translate-rs.svg" height="30" alt="translate.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/markdown.rs"><img src=".github/Readme/link-markdown-rs.svg" height="30" alt="markdown.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/panel.rs"><img src=".github/Readme/link-panel-rs.svg" height="30" alt="panel.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/settings.rs"><img src=".github/Readme/link-settings-rs.svg" height="30" alt="settings.rs" /></a>
+</p>
 
 <a id="development"></a>
 <p align="center">
@@ -106,14 +128,24 @@
   <img src=".github/Readme/voice.svg" width="100%" alt="Optional voice tools: Voicebox is a separate tool the box can use for voice, not part of its text path; your text path never calls the Voice API, and inference runs locally." />
 </p>
 
-<p align="center"><sub><a href="https://github.com/jamiepine/voicebox">Voicebox</a> &nbsp;·&nbsp; <a href="Context/ADR/0002-NullMiniIsItsOwnApp.md">ADR 0002</a></sub></p>
+<p align="center">
+  <a href="https://github.com/jamiepine/voicebox"><img src=".github/Readme/link-voicebox.svg" height="30" alt="Voicebox (opens https://github.com/jamiepine/voicebox)" /></a>
+  &nbsp;
+  <a href="Context/ADR/0002-NullMiniIsItsOwnApp.md"><img src=".github/Readme/link-adr-0002.svg" height="30" alt="ADR 0002" /></a>
+</p>
 
 <a id="run-or-develop-the-voice-stack"></a>
 <p align="center">
   <img src=".github/Readme/voice-run.svg" width="100%" alt="Run or develop the Voice stack: just setup, just dev, bun run dev:server, just test and the typecheck, with the API on 127.0.0.1:17493, narration on 17494, the MCP tools, and the warning that most endpoints have no authentication." />
 </p>
 
-<p align="center"><sub><a href="https://bun.sh">Bun</a> &nbsp;·&nbsp; <a href="https://github.com/casey/just">just</a> &nbsp;·&nbsp; <a href="Context/Research/Research.md">research map</a></sub></p>
+<p align="center">
+  <a href="https://bun.sh"><img src=".github/Readme/link-bun.svg" height="30" alt="Bun (opens https://bun.sh)" /></a>
+  &nbsp;
+  <a href="https://github.com/casey/just"><img src=".github/Readme/link-just.svg" height="30" alt="just (opens https://github.com/casey/just)" /></a>
+  &nbsp;
+  <a href="Context/Research/Research.md"><img src=".github/Readme/link-research.svg" height="30" alt="Research map" /></a>
+</p>
 
 <a id="status-and-direction"></a>
 <p align="center">
@@ -125,18 +157,42 @@
   <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout and ongoing cleanup: Mini/, the Voice directories app, tauri, web, backend, scripts and data, the inherited docs and landing sites, Context/, and CHANGELOG.md." />
 </p>
 
-<p align="center"><sub><a href="Context/Plans/CapitalFolders.md">cleanup plan</a> &nbsp;·&nbsp; <a href="Context/ADR/0001-CapitalizedFolderNames.md">ADR 0001</a></sub></p>
+<p align="center">
+  <a href="Context/Plans/CapitalFolders.md"><img src=".github/Readme/link-cleanup-plan.svg" height="30" alt="Cleanup plan" /></a>
+  &nbsp;
+  <a href="Context/ADR/0001-CapitalizedFolderNames.md"><img src=".github/Readme/link-adr-0001.svg" height="30" alt="ADR 0001" /></a>
+</p>
 
 <a id="read-the-reasoning"></a>
 <p align="center">
   <img src=".github/Readme/reasoning.svg" width="100%" alt="Read the reasoning: the app design, providers, conversation display and future-phase plans, the decisions that constrain changes, and the codebase map including what was never traced." />
 </p>
 
-<p align="center"><sub><a href="Context/Plans/MiniApp.md">App design</a> &nbsp;·&nbsp; <a href="Context/Plans/Providers.md">Providers</a> &nbsp;·&nbsp; <a href="Context/Plans/ConversationDisplay.md">Conversation display</a> &nbsp;·&nbsp; <a href="Context/Plans/NullMini.md">Future phases</a> &nbsp;·&nbsp; <a href="Context/ADR/">Decisions</a> &nbsp;·&nbsp; <a href="Context/Research/Research.md">Codebase research</a></sub></p>
+<p align="center">
+  <a href="Context/Plans/MiniApp.md"><img src=".github/Readme/link-miniapp.svg" height="30" alt="App design" /></a>
+  &nbsp;
+  <a href="Context/Plans/Providers.md"><img src=".github/Readme/link-providers.svg" height="30" alt="Providers" /></a>
+  &nbsp;
+  <a href="Context/Plans/ConversationDisplay.md"><img src=".github/Readme/link-display.svg" height="30" alt="Conversation display" /></a>
+  &nbsp;
+  <a href="Context/Plans/NullMini.md"><img src=".github/Readme/link-phases.svg" height="30" alt="Future phases" /></a>
+  &nbsp;
+  <a href="Context/ADR/"><img src=".github/Readme/link-adrs.svg" height="30" alt="Decisions" /></a>
+  &nbsp;
+  <a href="Context/Research/Research.md"><img src=".github/Readme/link-research.svg" height="30" alt="Research map" /></a>
+</p>
 
 <a id="license"></a>
 <p align="center">
   <img src=".github/Readme/license.svg" width="100%" alt="License: MIT, clone only voices you own or have permission to use, and the responsible-use, security and contribution files." />
 </p>
 
-<p align="center"><sub><a href="LICENSE">MIT</a> &nbsp;·&nbsp; <a href="RESPONSIBLE_USE.md">Responsible use</a> &nbsp;·&nbsp; <a href="SECURITY.md">Security</a> &nbsp;·&nbsp; <a href="CONTRIBUTING.md">Contributing</a></sub></p>
+<p align="center">
+  <a href="LICENSE"><img src=".github/Readme/link-license.svg" height="30" alt="MIT" /></a>
+  &nbsp;
+  <a href="RESPONSIBLE_USE.md"><img src=".github/Readme/link-responsible.svg" height="30" alt="Responsible use" /></a>
+  &nbsp;
+  <a href="SECURITY.md"><img src=".github/Readme/link-security.svg" height="30" alt="Security" /></a>
+  &nbsp;
+  <a href="CONTRIBUTING.md"><img src=".github/Readme/link-contributing.svg" height="30" alt="Contributing" /></a>
+</p>
