@@ -30,8 +30,8 @@ pub const LABEL: &str = "mini";
 const WIDTH: f64 = 616.0;
 /// The idle box (44 px) plus 8 px above and 24 px below.
 const HEIGHT: f64 = 76.0;
-/// The tallest the box gets (2 border + 42 row + 344 transcript + 26 notice = 414) plus 32.
-const MAX_HEIGHT: f64 = 446.0;
+/// The tallest the box gets (2 border + 42 row + 212 transcript + 26 notice = 282) plus 32.
+const MAX_HEIGHT: f64 = 314.0;
 
 /// A screen's top-left corner and size, in physical pixels.
 type Screen = (i32, i32, u32, u32);

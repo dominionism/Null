@@ -22,7 +22,9 @@
          24px below (the .box margin). FRAME in the script is top + bottom (32);
          WIDTH on the Rust side is the 584px box plus both sides (616). Every height
          here is a fixed number of pixels so MAX_HEIGHT there can be exact:
-         2 border + 42 row + 344 transcript + 26 notice + 32 margins = 446. */
+         2 border + 42 row + 212 transcript + 26 notice + 32 margins = 314.
+         The transcript and the model list stop at 212px (ten lines of transcript)
+         and scroll past that, so the box stays compact however long the chat gets. */
       :root {
         --accent: 255, 255, 255;
         --amber: 255, 212, 121;
@@ -216,7 +218,7 @@
         background-clip: padding-box;
       }
       #out {
-        max-height: 344px;
+        max-height: 212px;
         padding: 10px 14px 12px 18px; /* 18 + the "› " of a prompt line = where the field's text starts */
         font: 12.5px/19px var(--mono);
         color: var(--soft);
@@ -282,7 +284,7 @@
       }
 
       #pick {
-        max-height: 300px;
+        max-height: 212px;
         padding: 6px;
         scroll-padding: 6px; /* the chosen row keeps clear of the edge when keys scroll to it */
         font: 12.5px/19px var(--mono);
