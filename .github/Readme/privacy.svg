@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 289" width="860" height="289" fill="none" role="img" aria-label="Privacy and permissions. No listener: Null has no HTTP port and no database: it starts OMP as a child process and talks over stdio Credentials: Your /login answers go to the local omp login process, never to Null&#x27;s settings or log Shortcut: Control+Space is registered by macOS with no Accessibility or Input Monitoring permission Full Disk Access: A separate choice: macOS attributes the agent&#x27;s file access to Null, and the grant is broad file access, not a sandbox Signing: Permission grants follow the code signature, so an unsigned rebuild can ask again">
-  <title>Privacy and permissions. No listener: Null has no HTTP port and no database: it starts OMP as a child process and talks over stdio Credentials: Your /login answers go to the local omp login process, never to Null&#x27;s settings or log Shortcut: Control+Space is registered by macOS with no Accessibility or Input Monitoring permission Full Disk Access: A separate choice: macOS attributes the agent&#x27;s file access to Null, and the grant is broad file access, not a sandbox Signing: Permission grants follow the code signature, so an unsigned rebuild can ask again</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 365" width="860" height="365" fill="none" role="img" aria-label="Privacy and permissions. Not offline: Local interface does not mean offline agent: OMP may send prompts and tool context to your chosen provider, and tools and MCP servers may make their own network requests No listener: Null has no HTTP listener and no database of its own; it starts OMP as a child process and talks over stdio Credentials: Your /login answers go to the local omp login process, are masked in the UI and are never written to Null&#x27;s settings or log. OMP handles authentication; no Null account exists Shortcut: Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice Full Disk Access: A separate choice, asked once with an explanation: macOS attributes the agent&#x27;s file access to Null. It is broader file access, not a sandbox, and it does not replace OMP&#x27;s approval rules. The box opens without it">
+  <title>Privacy and permissions. Not offline: Local interface does not mean offline agent: OMP may send prompts and tool context to your chosen provider, and tools and MCP servers may make their own network requests No listener: Null has no HTTP listener and no database of its own; it starts OMP as a child process and talks over stdio Credentials: Your /login answers go to the local omp login process, are masked in the UI and are never written to Null&#x27;s settings or log. OMP handles authentication; no Null account exists Shortcut: Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice Full Disk Access: A separate choice, asked once with an explanation: macOS attributes the agent&#x27;s file access to Null. It is broader file access, not a sandbox, and it does not replace OMP&#x27;s approval rules. The box opens without it</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -11,29 +11,33 @@
     @keyframes hold { 0%, 99.9% { opacity: 1; } 100% { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
   </style>
-  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="288" rx="12"/></clipPath>
+  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="364" rx="12"/></clipPath>
   <g clip-path="url(#win)">
-  <rect width="860" height="289" fill="#0D1117"/>
+  <rect width="860" height="365" fill="#0D1117"/>
   <rect width="860" height="30" fill="#161B22"/>
   <path d="M0 29.5H860" stroke="#21262D"/>
   <circle cx="20" cy="15.0" r="5.5" fill="#FF5F57"/>
   <circle cx="38" cy="15.0" r="5.5" fill="#FEBC2E"/>
   <circle cx="56" cy="15.0" r="5.5" fill="#28C840"/>
   <text x="430.0" y="19.0" font-size="13" font-weight="600" fill="#E6EDF3" text-anchor="middle">Privacy and permissions</text>
-  <text x="24" y="83.0" font-size="12.5" font-weight="700" fill="#3FB950">No listener</text>
-  <text x="170.25" y="83.0" font-size="12.5" fill="#C9D1D9">Null has no HTTP port and no database: it starts OMP as a child process and talks</text>
-  <text x="170.25" y="102.0" font-size="12.5" fill="#C9D1D9">over stdio</text>
-  <text x="24" y="128.0" font-size="12.5" font-weight="700" fill="#3FB950">Credentials</text>
-  <text x="170.25" y="128.0" font-size="12.5" fill="#C9D1D9">Your /login answers go to the local omp login process, never to Null&#x27;s settings</text>
-  <text x="170.25" y="147.0" font-size="12.5" fill="#C9D1D9">or log</text>
-  <text x="24" y="173.0" font-size="12.5" font-weight="700" fill="#3FB950">Shortcut</text>
-  <text x="170.25" y="173.0" font-size="12.5" fill="#C9D1D9">Control+Space is registered by macOS with no Accessibility or Input Monitoring</text>
-  <text x="170.25" y="192.0" font-size="12.5" fill="#C9D1D9">permission</text>
-  <text x="24" y="218.0" font-size="12.5" font-weight="700" fill="#3FB950">Full Disk Access</text>
-  <text x="170.25" y="218.0" font-size="12.5" fill="#C9D1D9">A separate choice: macOS attributes the agent&#x27;s file access to Null, and the</text>
-  <text x="170.25" y="237.0" font-size="12.5" fill="#C9D1D9">grant is broad file access, not a sandbox</text>
-  <text x="24" y="263.0" font-size="12.5" font-weight="700" fill="#3FB950">Signing</text>
-  <text x="170.25" y="263.0" font-size="12.5" fill="#C9D1D9">Permission grants follow the code signature, so an unsigned rebuild can ask again</text>
+  <text x="24" y="83.0" font-size="12.5" font-weight="700" fill="#3FB950">Not offline</text>
+  <text x="170.25" y="83.0" font-size="12.5" fill="#C9D1D9">Local interface does not mean offline agent: OMP may send prompts and tool</text>
+  <text x="170.25" y="102.0" font-size="12.5" fill="#C9D1D9">context to your chosen provider, and tools and MCP servers may make their own</text>
+  <text x="170.25" y="121.0" font-size="12.5" fill="#C9D1D9">network requests</text>
+  <text x="24" y="147.0" font-size="12.5" font-weight="700" fill="#3FB950">No listener</text>
+  <text x="170.25" y="147.0" font-size="12.5" fill="#C9D1D9">Null has no HTTP listener and no database of its own; it starts OMP as a child</text>
+  <text x="170.25" y="166.0" font-size="12.5" fill="#C9D1D9">process and talks over stdio</text>
+  <text x="24" y="192.0" font-size="12.5" font-weight="700" fill="#3FB950">Credentials</text>
+  <text x="170.25" y="192.0" font-size="12.5" fill="#C9D1D9">Your /login answers go to the local omp login process, are masked in the UI and</text>
+  <text x="170.25" y="211.0" font-size="12.5" fill="#C9D1D9">are never written to Null&#x27;s settings or log. OMP handles authentication; no Null</text>
+  <text x="170.25" y="230.0" font-size="12.5" fill="#C9D1D9">account exists</text>
+  <text x="24" y="256.0" font-size="12.5" font-weight="700" fill="#3FB950">Shortcut</text>
+  <text x="170.25" y="256.0" font-size="12.5" fill="#C9D1D9">Control+Space needs no Accessibility or Input Monitoring permission. If</text>
+  <text x="170.25" y="275.0" font-size="12.5" fill="#C9D1D9">registration fails, the box opens with a notice</text>
+  <text x="24" y="301.0" font-size="12.5" font-weight="700" fill="#3FB950">Full Disk Access</text>
+  <text x="170.25" y="301.0" font-size="12.5" fill="#C9D1D9">A separate choice, asked once with an explanation: macOS attributes the agent&#x27;s</text>
+  <text x="170.25" y="320.0" font-size="12.5" fill="#C9D1D9">file access to Null. It is broader file access, not a sandbox, and it does not</text>
+  <text x="170.25" y="339.0" font-size="12.5" fill="#C9D1D9">replace OMP&#x27;s approval rules. The box opens without it</text>
   </g>
-  <rect x="0.5" y="0.5" width="859" height="288" rx="12" stroke="#21262D"/>
+  <rect x="0.5" y="0.5" width="859" height="364" rx="12" stroke="#21262D"/>
 </svg>
