@@ -72,6 +72,23 @@ pub fn stop_reason(protocol: &str) -> &'static str {
     }
 }
 
+/// Whether a reply that ended in the ordinary way is really the harness passing on
+/// a provider's refusal. The harness never reports a used-up limit, a bad sign-in
+/// or a refused model as an error: the provider's words come back as the reply's
+/// text. What sets such a reply apart is that it counts no tokens.
+pub fn reply_failed(response: &Value) -> bool {
+    response.get("stopReason") == Some(&json!("end_turn")) && response.get("usage").is_none_or(Value::is_null)
+}
+
+/// A setting of the session other than its model, with the value it has now.
+pub fn other_option(options: &Value) -> Option<(String, Value)> {
+    let others = || {
+        options.as_array().into_iter().flatten().filter(|option| option.get("id") != Some(&json!("model")) && option.get("category") != Some(&json!("model")))
+    };
+    let known = |option: &Value| Some((option.get("id")?.as_str()?.to_string(), option.get("currentValue").filter(|value| !value.is_null())?.clone()));
+    others().find(|option| option.get("id") == Some(&json!("thinking"))).and_then(known).or_else(|| others().find_map(known))
+}
+
 /// Pull the model list and the current model out of a session's config options.
 pub fn models_from_config_options(options: &Value) -> (Vec<ModelChoice>, Option<String>) {
     let Some(option) = options.as_array().and_then(|options| {
@@ -206,6 +223,30 @@ mod tests {
     fn an_update_the_box_has_no_use_for_is_dropped() {
         let usage = json!({ "sessionUpdate": "usage_update", "used": 10, "size": 100 });
         assert_eq!(event_from_update(&usage, &mut HashMap::new()), None);
+    }
+
+    #[test]
+    fn a_reply_that_counts_no_tokens_is_a_refusal_passed_on() {
+        // As recorded from the harness on 2026-10-08: a working reply, then a provider's refusal.
+        assert!(!reply_failed(&json!({ "stopReason": "end_turn", "usage": { "inputTokens": 10, "outputTokens": 1, "totalTokens": 11 } })));
+        assert!(reply_failed(&json!({ "stopReason": "end_turn" })));
+        assert!(reply_failed(&json!({ "stopReason": "end_turn", "usage": null })));
+        // A reply the user stopped counts nothing either, and is not a failure.
+        assert!(!reply_failed(&json!({ "stopReason": "cancelled" })));
+    }
+
+    #[test]
+    fn a_setting_other_than_the_model_is_found_to_ask_with() {
+        let options = json!([
+            { "id": "mode", "currentValue": "default" },
+            { "id": "model", "currentValue": "ollama/llama3.2:latest" },
+            { "id": "thinking", "currentValue": "off" }
+        ]);
+        assert_eq!(other_option(&options), Some(("thinking".to_string(), json!("off"))));
+        let options = json!([{ "id": "model", "currentValue": "a/b" }, { "id": "mode" }, { "id": "mode2", "currentValue": "default" }]);
+        assert_eq!(other_option(&options), Some(("mode2".to_string(), json!("default"))));
+        assert_eq!(other_option(&json!([{ "id": "model", "currentValue": "a/b" }])), None);
+        assert_eq!(other_option(&Value::Null), None);
     }
 
     #[test]

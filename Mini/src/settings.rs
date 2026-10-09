@@ -19,12 +19,26 @@ pub struct Settings {
     pub session: Option<String>,
     /// Whether Null has already sent the user to switch on Full Disk Access. It asks once.
     pub asked_full_disk: bool,
+    /// The models to carry on with when the one in use stops answering, in the order to try them.
+    pub backups: Vec<String>,
 }
 
 pub struct Store(Mutex<Settings>);
 
 fn path(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|dir| dir.join("settings.json"))
+    app.path().app_config_dir().ok().map(|dir| dir.join(file_name("settings", "json")))
+}
+
+/// The name of one of the app's own files. A run under a harness profile
+/// (`NULL_MINI_PROFILE`, for scripted checks) keeps files of its own, so that
+/// a check never changes what the installed app remembers.
+pub fn file_name(stem: &str, extension: &str) -> String {
+    let profile: String = std::env::var("NULL_MINI_PROFILE").unwrap_or_default().chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')).collect();
+    if profile.is_empty() {
+        format!("{stem}.{extension}")
+    } else {
+        format!("{stem}.{profile}.{extension}")
+    }
 }
 
 /// Read the settings file, or start from nothing when it is missing or unreadable.
@@ -77,7 +91,7 @@ mod tests {
     #[test]
     fn settings_survive_a_round_trip() {
         let settings =
-            Settings { position: Some((40, -12)), model: Some("a/b".into()), session: Some("s1".into()), asked_full_disk: true };
+            Settings { position: Some((40, -12)), model: Some("a/b".into()), session: Some("s1".into()), asked_full_disk: true, backups: vec!["c/d".into()] };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);
     }

@@ -4,8 +4,12 @@
 > research and Phase 2, items 10 to 14, which were written for a mini inside the Voice desktop) and
 > on `Context/Plans/MiniApp.md` (the app as built). This plan replaces those Phase 2 items.
 >
-> Status: **`/login` is built and installed (items 1, 3 and 5); the first real sign-in, by the owner,
-> is its remaining proof. Not started: the limit state, `/usage`, first run, and the rest.**
+> Status: **`/login` is built, installed and proven by the owner's sign-in to Anthropic (items 1, 3
+> and 5). The limit spike is done (item 2): a failure reaches Null as reply text, never as an error,
+> and the harness can move to another model by itself, which is now the design (decision 4). That
+> is built and installed (item 7): `/backup` sets the order, a switch and a failed reply are said
+> in the box, and the owner's order is Claude Opus 5.5, then DeepSeek V4.1 Flash. No real limit
+> has been seen yet. Not started: `/usage`, first run, and the rest.**
 
 ## Goal
 
@@ -92,6 +96,9 @@ then let's go with that." Each recommendation was looked at again against the de
    this way relies on Oh-my-pi's standing with Anthropic.
 3. **A Mac without Oh-my-pi.** Null says how to install it, in one line with the command. It does
    not download or run an installer.
+4. **Who switches when a provider runs out.** Oh-my-pi does (item 7). Its own fallback moves to
+   the next model and sends the message again; Null supplies the order and says that it happened.
+   Settled after item 2 showed the harness doing this over the protocol.
 
 ## Work items
 
@@ -149,8 +156,9 @@ then let's go with that." Each recommendation was looked at again against the de
      same as "no models" on a Mac that runs a local model; item 6 has to tell the two apart.
 
 2. **Spike: what a used-up limit and a missing sign-in look like**
-   - What: under the probe profile, point one provider at a local stand-in that answers 429 and then
-     401, through a config overlay (`omp --config`) or the provider's base-URL variable. Send one
+   - What: under the probe profile, point one provider at a local stand-in that answers 429, then
+     401, then a refusal of the model (item 12), through a config overlay (`omp --config`) or the
+     provider's base-URL variable. Send one
      prompt over the protocol each time and record the error Null receives and what
      `omp usage --json` says at that moment.
    - Why: item 7 needs a rule that tells "limit reached" from any other failure. No limit has ever
@@ -160,7 +168,62 @@ then let's go with that." Each recommendation was looked at again against the de
      it by: the prompt hanging or succeeding. Fallback: take the shapes from a real limit when one
      happens, and until then treat only the usage report's "limit reached" as the signal.
    - Source: inferred.
-   - Status: Not started
+   - Status: Complete (2026-10-08), against a stand-in only. No real limit has yet been seen
+   - **Decision: there is no error to read, so item 7's rule cannot be written against one.**
+     Oh-my-pi never answered a failed prompt with a protocol error. Every failure came back as an
+     ordinary reply: the provider's refusal as the reply's text, the prompt ending `end_turn`.
+     Today the box shows that text as if the model had said it.
+   - **How it was run:** the probe profile was given a `models.yml` naming three stand-in
+     providers, one for each way of talking that the owner's providers use (`anthropic-messages`,
+     `openai-completions`, and `openai-codex-responses`, which the ChatGPT sign-in uses), each
+     with a `baseUrl` on this Mac and a key that is not a key. A small local server answered
+     according to the model asked for. Each case was one prompt over the protocol, with the
+     harness started as Null starts it (`omp --profile null-probe --approval-mode yolo acp`).
+     28 runs. The answers the server gave are close copies, not recordings, of the real ones.
+   - **What reaches Null:**
+
+     | The provider answers | What the harness does | What Null receives |
+     |---|---|---|
+     | A working reply | | The text, `end_turn`, and a `usage` count in the prompt's result |
+     | ChatGPT's usage limit (429, `usage_limit_reached`, resets in 90 minutes) | 6 tries in 8 s | "You have hit your ChatGPT usage limit (plus plan). Try again in ~90 min." as reply text, `end_turn`, no `usage` |
+     | An Anthropic limit with a long wait (429, `retry-after` 90 minutes) | 1 try | `429 {"type":"error","error":{"type":"rate_limit_error",…}} retry-after-ms=5400000` as reply text |
+     | An OpenAI-style quota used up (429, `insufficient_quota`) | 6 tries in 16 s | "429 You exceeded your current quota…" as reply text |
+     | A short rate limit (429, `retry-after` 2 s) | Tries again and again, telling Null nothing | Nothing at all while it tries. ChatGPT-style: 159 s of silence, then "ChatGPT rate limit exceeded. retry-after-ms=2000" as reply text. OpenAI-style: 280 s, then the same kind of text. Anthropic-style: still silent when stopped after 9 minutes; the stop took effect at once |
+     | A bad sign-in (401) | 1 try | The provider's words as reply text, with the status in front for two of the three kinds |
+     | A refused model (403, 404, ChatGPT's 400) | 1 try | The provider's words as reply text. For a 400 the harness adds `raw-http-request=` and the path of a file in its own logs (the file holds no key) |
+
+   - **The one difference between a failure and a reply:** the prompt's result carries `usage`
+     for a reply and not for a failure. True of all 14 failures and all 10 replies here; nothing
+     promises it in another version.
+   - **The harness can carry on by itself, and the message is not lost.** With a fallback named in
+     its settings (`retry.fallbackChains`, for example `"openai-codex/*": ["anthropic/…"]`), the
+     used-up ChatGPT-style model gave way after the same 8 s: the harness moved to the fallback,
+     sent the same message again and the answer came back as a normal reply. It tells Null with a
+     `config_option_update` naming the new model. It did this for every kind of failure tried
+     (limit, bad sign-in, refused model), went down a list of two in order, and stayed on the
+     fallback for the next message without trying the used-up model again. With every fallback
+     used up too, the reply text is the last model's refusal and the conversation is left on that
+     last model. The settings were passed for the run with `--config <file>`, which works in
+     front of `acp`, so Null can hand the harness settings of its own without touching the
+     owner's.
+   - **Null today:** takes that model change in silence. `harness.rs::on_update` updates its own
+     record of the model and tells the page nothing.
+   - **The owner's settings today:** `retry.fallbackChains` is
+     `"openai-codex/*": ["openai-codex/gpt-5.6-sol"]`, a fallback inside the same provider.
+     Retries are on (10, waiting up to five minutes between them).
+   - **The usage report:** empty for the stand-ins (`"reports": []`). A provider signed in by key
+     alone has no report, so "limit reached" can come from the report only for the accounts it
+     knows (openai-codex and opencode-go on 2026-10-08).
+   - **Not established:** a real limit on a real sign-in. Everything here used keys; with a
+     sign-in Oh-my-pi may also move between accounts, and it has settings that were not tried
+     (`retry.usageAwareFallback`, `retry.waitForUsageReset`). Whether the conversation's earlier
+     turns carry over to a fallback of another kind was not checked either: each run was one
+     message.
+   - **To run it again:** `models.yml` goes in the profile's folder
+     (`~/.omp/profiles/null-probe/agent/`): under `providers:`, a name, `baseUrl`, `api`, `apiKey`
+     and a `models:` list of `{ id, name, contextWindow, maxTokens }`. The session then offers
+     them as `<name>/<id>`. The file was taken out of the profile afterwards and the server
+     stopped; neither is in the repo.
 
 3. **Run the harness under a chosen profile**
    - What: a development switch, `NULL_MINI_PROFILE=<name>`, that makes the app start
@@ -186,7 +249,29 @@ then let's go with that." Each recommendation was looked at again against the de
      (ollama, key-only ones). Know it by: unit tests on today's two captured reports and a
      hand-made "limit reached" one; anything unreadable becomes "unknown", never a failure.
    - Source: verified locally (shape captured 2026-10-08).
-   - Status: Not started
+   - Status: In progress — the report is read and served by a `providers` command, which
+     `/model` and `/backup` now ask in order to dim a provider with nothing left (item 7)
+   - **Built (2026-10-09):** `Mini/src/providers.rs`. It runs `omp usage --json --redact` off the
+     main thread with a 15 second limit, and reads each provider's limits (label, share used,
+     reset time, the harness's own status word, and whether the limit covers the whole provider)
+     and whether nothing is left. It sets that beside the providers of the model list, in the
+     model list's order; a provider with models and no report (a local model, a key alone) is
+     there as unreported. A reading is kept for 60 seconds and dropped after a sign-in. Nothing
+     that names an account is kept.
+   - **How "nothing left" is decided:** the harness says so (`metadata.limitReached`, which
+     openai-codex's report has and opencode-go's has not), or a limit that covers the whole
+     provider is fully used. A limit on one tier of models does not count. With several accounts
+     on one provider, the one with room is the one shown.
+   - **Deviation:** no `provider_state` event. The page can ask when it opens `/model` or
+     `/usage`, after a sign-in and after a failed reply; the event is added only if items 7 or 8
+     find they must be told and cannot ask.
+   - **Proven without a person:** 8 unit tests (the report captured on 2026-10-08 with what names
+     the account taken out; an empty one; hand-made ones for a limit reached, a tier limit, two
+     accounts and unreadable shapes; the join with the model list), and a live check
+     (`cargo test -- --ignored`) in which this code ran the harness's report under the probe
+     profile and read it as no providers. The app still starts and loads its page.
+   - **Not proven:** a reading of the real sign-ins by this code. The installed app asks for it
+     whenever `/model` or `/backup` opens, but that has not yet been watched.
 
 5. **`/login` in the box**
    - What: a fourth command of the box, blue like the others. It starts the harness's own sign-in
@@ -208,7 +293,8 @@ then let's go with that." Each recommendation was looked at again against the de
    - Risk: a sign-in left waiting for ever. Know it by: a time limit and the cancel path, both in
      the scripted checks.
    - Source: specified from user + item 1.
-   - Status: In progress — built and installed; no real sign-in has been done through it yet
+   - Status: In progress — built, installed and proven by the owner's sign-in to Anthropic;
+     `/logout` and a time limit on a waiting sign-in are not built
    - **Built (2026-10-08):** `Mini/src/signin.rs` runs `omp login` on ordinary pipes: it reads the
      harness's list, answers the harness's "Enter number" itself with the entry the user picked,
      then passes every line and question to the page (`mini:signin`) and the user's answers back.
@@ -223,8 +309,17 @@ then let's go with that." Each recommendation was looked at again against the de
      probe profile, chose DeepSeek, gave a dummy key and was refused with "Login failed", the key
      appearing nowhere in what came back; and every stage of the page drawn in the app's web
      engine with stand-in data.
-   - **Not yet proven:** a sign-in that succeeds, and so what the harness prints then, whether
-     the fresh harness process shows the new provider, and whether the old process is really gone.
+   - **Proven by the owner (2026-10-08):** a real sign-in to Anthropic through `/login`. The owner
+     reported that the Claude models then appeared under `/model` and that they answer. A first
+     attempt had ended without success after 12 seconds (the log: "not signed in"), most likely
+     cancelled before the browser step was done.
+   - **Learned from it:** being listed is not being usable. Claude Mythos appeared in the list and
+     would not answer, while the other Claude models did. The harness lists a provider's whole
+     catalogue, and what an account may use is the provider's to say. By design rule 1 the box
+     does not try to know; what it owes the user is the provider's refusal shown plainly.
+   - **Still not checked:** what the harness prints on success, and whether the harness process
+     that was running before the sign-in is really gone afterwards. Neither has been looked at in
+     the log.
    - **Not built:** `/logout`; a time limit on a sign-in left waiting (Esc cancels it).
 
 6. **First run**
@@ -238,17 +333,110 @@ then let's go with that." Each recommendation was looked at again against the de
    - Status: Not started
 
 7. **Limit reached: carry on with another provider**
-   - What: when a reply fails by item 2's rule, or the provider's report says its limit is reached,
-     the box says one line ("openai-codex limit reached, resets 3:40 pm") and opens the model list
-     with used-up providers dimmed and the others first. Choosing a model moves the conversation,
-     which already works, and sends the failed message again; Esc leaves things as they are. One
-     new event between app and page, `limit_reached`, carrying the provider and the reset time.
-   - Why: the problem the project exists to solve.
-   - Depends on: 2, 4.
-   - Risk: an ordinary failure read as a limit. Know it by: the rule tested against item 2's
-     recorded shapes; anything that does not match stays a plain error.
-   - Source: specified from user + `NullMini.md` item 13.
-   - Status: Not started
+   - **Decided (owner, 2026-10-08, on item 2's findings): Oh-my-pi does the switching.** Null does
+     not work out that a limit was reached and does not send the message again. It hands the
+     harness the owner's fallback order and says what happened. This replaces the first design,
+     in which Null spotted the limit, opened the model list and re-sent.
+   - What:
+     - A file of Null's own, in its support folder, holding the fallback order in the form the
+       harness reads (`retry.fallbackChains`: model names only, no credential), passed with
+       `--config` every time Null starts the harness. The owner's own Oh-my-pi settings are not
+       touched.
+     - A way to set that order from the box. Not designed yet: a typed command, or an order Null
+       proposes from the signed-in providers. Until one is set Null passes nothing and the
+       harness's own settings apply.
+     - When the harness changes the model during a reply, the box says one line naming the model
+       it left and the one it is on now. `harness.rs::on_update` already hears the change and
+       today keeps it to itself.
+     - When a reply comes back as a failure (item 2: no `usage` in the prompt's result), the box
+       shows the harness's words as an error, not as the model's reply, and opens the model list
+       with used-up providers dimmed (item 4). Choosing a model moves the conversation; Esc
+       leaves things as they are. This is what happens with no fallback set, or with every
+       fallback used up.
+     - While the harness retries in silence, one line after some seconds saying it is still
+       waiting on the provider. Ctrl+C stops it, as now.
+   - Why: the problem the project exists to solve. The harness already moves to another model and
+     sends the message again by itself (item 2), so by design rule 1 Null does not build a
+     second way to do it.
+   - Depends on: 2 (done), 4.
+   - Risk: the harness falls back on any failure, a refused model or a bad sign-in included, so a
+     switch must always be said and never silent. The "no `usage`" sign is an accident of this
+     version of Oh-my-pi. Know it by: scripted checks under the probe profile against a stand-in
+     (item 2 says how to make one): a fallback that answers, a list all used up, a short rate
+     limit. A real sign-in's limit is still unseen; the first one will show whether it behaves as
+     the stand-in did.
+   - Open: whether Null also shortens the harness's silent retries (10, with waits of up to five
+     minutes) through the same file; whether the failed message is sent again after the owner
+     picks from the model list (today it is typed again, or brought back with the up arrow);
+     whether earlier turns carry over when the fallback is another kind of provider.
+   - Source: specified from user + item 2 (verified on this Mac against a stand-in).
+   - Status: In progress — built and installed (2026-10-09). The owner has not yet tried
+     `/backup`, and no real limit has been seen
+   - **The owner's choice (2026-10-09):** "I really like the model command where I get to pick the
+     order myself", and for the order itself Claude Opus 5.5, then DeepSeek V4.1 Flash. That order
+     is set in the installed app (`anthropic/claude-opus-5-5`, `opencode-go/deepseek-v4.1-flash`).
+     It is the owner's setting, not something built in: Null names no model of its own.
+   - **Built:**
+     - `/backup` (and `/backup <words>`), blue like the other commands. It opens the model list
+       with the chosen models first, numbered in the order they will be tried. Enter adds the
+       model under the cursor to the end or takes it out; Esc saves and says the order in one
+       line.
+     - `Mini/src/backups.rs` keeps the order in the app's settings and writes it to `backups.yml`
+       beside them each time the harness starts:
+       `{"retry":{"fallbackChains":{"default":[…]}}}`, passed with `--config`. Setting a new
+       order lets the running harness go, so the next message starts one that has read it.
+     - A switch is said: `harness.rs` publishes `model_switched` with the model left and the
+       model now in use, and the box prints "X did not answer. now on Y".
+     - A failed reply is said: when a reply ends in the ordinary way and counts no tokens, the
+       app publishes `reply_failed`; the box turns the provider's words red and adds "no answer
+       from the provider. /model picks another model".
+     - After 20 seconds with nothing from the harness and no tool running, the box says "still
+       waiting on the provider. ctrl+c stops it" until something arrives.
+     - `/model` and `/backup` ask the app what each provider has left (item 4) once the list is
+       open, and dim a provider with nothing left.
+   - **What the harness does with the list** (stand-in, probe profile, 2026-10-09):
+     - `default` is the list it turns to for any model that has no list of its own.
+     - It skips the model that just failed, so a model may be in its own list.
+     - It goes down the list of the model the reply started on, and does not look up the lists
+       of the backups it passes through. Two models naming each other do not loop.
+     - A model or provider it does not know is skipped; the harness still starts.
+     - The file is added to the owner's own Oh-my-pi settings, not put in their place. A list
+       the owner has for one model or one provider is tried first, then `default`.
+     - It does not always tell Null that it moved: after a failure answered at once, the reply
+       came from the backup with no notice at all. So Null asks after every reply, by setting
+       the conversation's thinking level to the value it already has; the answer carries the
+       model in use.
+   - **Deviations:**
+     - A failed reply does not open the model list. The list takes the transcript's place, and
+       would cover the provider's words, which are the reason.
+     - The token count at the end of a reply is an unstable part of the protocol; the app turns
+       it on in the protocol library (`unstable_end_turn_token_usage`). Without it every reply
+       looked like a failure.
+     - A scripted check under `NULL_MINI_PROFILE` now keeps its own settings and backup files
+       (`settings.<profile>.json`), so that a check no longer changes what the installed app
+       remembers. `NULL_MINI_BACKUPS` (model ids with commas) names an order for one run.
+   - **Proven without a person:** 41 unit tests. The app itself, under the probe profile against
+     the stand-in: a backup that answers; a ChatGPT-style limit with the first backup used up
+     too; every backup used up; a working model; a refused model with no backup. The real page,
+     typed into by the self-test: the switch line, and the red words with their note. The nine
+     new states of the box drawn in the app's web engine and looked at. One one-word message to
+     each of the owner's three providers (2026-10-09): a working reply counts tokens on all
+     three, so none is taken for a failure, and asking which model is in use changes nothing.
+   - **Not proven:** a real limit on a real sign-in; `/backup` under the owner's hands; the
+     dimming and the waiting line in the installed app (drawn, and their parts tested, but not
+     seen live).
+   - **Decided (owner, 2026-10-09): "make Null's order go first."** The owner's own Oh-my-pi
+     settings send every ChatGPT model to `gpt-5.6-sol`, and the harness tries a list for one
+     model or one provider before `default`, so a ChatGPT limit would have cost one more round
+     of tries on the same provider before Opus was reached. Now, each time it starts the
+     harness, Null reads the lists the owner has (`omp config get retry.fallbackChains --json`)
+     and gives each one for a model or a provider again in its own file: Null's order, then
+     whatever the owner's list adds to it. A list under the same name in Null's file takes the
+     place of the owner's for that run. The owner's settings themselves are not changed, and
+     lists for roles other than `default` are left alone.
+   - **Proven for that** (stand-in, probe profile): with a list of the harness's own for the
+     ChatGPT-style provider, the used-up model went straight to Null's backup; with Null's
+     backup used up too, the harness's own entry was tried after it.
 
 8. **`/usage`, and what is left in the model list**
    - What: `/usage` lists each signed-in provider with what is left and when it resets. The model
@@ -295,11 +483,32 @@ then let's go with that." Each recommendation was looked at again against the de
     - Source: verified locally (the three tools) + `NullMini.md`.
     - Status: Not started
 
+12. **A provider's refusal, said plainly**
+    - What: when a provider will not serve the chosen model (as with Claude Mythos on the owner's
+      account), the box says one line with the model and the provider's own reason, and does not
+      treat it as a limit. Null keeps no list of which models an account may use (design rule 1).
+      First find what reaches Null today: the box prints any failure as "error: " plus the
+      harness's message, and what it printed for Mythos was not recorded.
+    - Why: being listed is not being usable (item 5, "Learned from it").
+    - Depends on: 2, whose stand-in also answers with a refusal of the model, so that shape is
+      recorded beside the limit and the bad sign-in.
+    - Risk: a refusal read as a limit, or a limit as a refusal. Know it by: the rule tested
+      against item 2's recorded shapes, as in item 7.
+    - Source: inferred from the owner's report (item 5) + codebase (`Mini/Page/index.html`, the
+      `error` case).
+    - **After item 2 (2026-10-08):** the provider's own words do reach Null, as the text of a
+      reply that carries no `usage`. Item 7 shows any such reply as an error, which covers this.
+      With a fallback set the harness moves on from a refused model as it does from a limit, and
+      item 7's line says so. Null cannot tell a refusal from a limit except by reading the
+      provider's words, which design rule 1 rules out, so it shows them and does not sort them.
+    - Status: Folded into item 7 (2026-10-08)
+
 ## Verification
 
-- Unit tests: reading the usage report (item 4), the limit rule against recorded errors (item 7).
-- Scripted, under the probe profile (item 3): a first run with nothing signed in; a reply that hits
-  the stand-in's 429; `/login` cancelled; nothing of a dummy key left in the log or settings.
+- Unit tests: reading the usage report (item 4), telling a failed reply from a working one (item 7).
+- Scripted, under the probe profile (item 3): a first run with nothing signed in; against a
+  stand-in, a fallback that answers, a list all used up and a short rate limit (item 7); `/login`
+  cancelled; nothing of a dummy key left in the log or settings.
 - By hand, the owner: `/login` to a provider not yet signed in (Anthropic is the obvious one), then
   `/model` to it; `/usage`; a switch after a limit, real or stand-in.
 
@@ -309,8 +518,9 @@ then let's go with that." Each recommendation was looked at again against the de
   them so.
 - The order holds. Items 1 and 2 are spikes and decide how 5, 7 and 9 are built; item 4 depends on
   nothing and can be built beside them.
-- Still fuzzy, on purpose: by which of three routes the harness's questions reach the screen
-  (item 1 decides), and the limit rule (item 2 decides). None is specified past what is known.
+- No longer fuzzy: the harness's questions reach the screen as plain lines (item 1), and there
+  is no limit rule, because the harness does the switching (item 2, decision 4). Still fuzzy, on
+  purpose: how the fallback order is set from the box (item 7).
 - One dependency carries the whole plan: Oh-my-pi. Its sign-in, its usage report and its model list
   are read as they are today, and any of them can change with a new version. The report is read
   tolerantly (item 4), and a second harness stays one table row away (item 11).

@@ -20,9 +20,12 @@
 compile_error!("Null is macOS-only for now");
 
 mod access;
+mod backups;
 mod harness;
 mod log;
+mod markdown;
 mod panel;
+mod providers;
 mod settings;
 mod shortcut;
 mod signin;
@@ -56,6 +59,12 @@ fn page_ready(app: tauri::AppHandle) {
 /// Quitting closes the conversation as well: the next start opens a new one, as
 /// a terminal program does. A restart the user did not ask for, at login or after
 /// an update, still comes back to the conversation that was open.
+/// A reply's Markdown as the parts the box draws.
+#[tauri::command(async)]
+fn layout(text: String) -> serde_json::Value {
+    markdown::tree(&text)
+}
+
 #[tauri::command]
 fn quit(app: tauri::AppHandle) {
     log!("quit from the box; the conversation is closed");
@@ -80,6 +89,10 @@ fn main() {
             harness::new_conversation,
             harness::events_since,
             harness::report,
+            layout,
+            providers::providers,
+            backups::backups,
+            backups::set_backups,
             signin::signin_providers,
             signin::signin_start,
             signin::signin_answer,
@@ -95,6 +108,7 @@ fn main() {
             settings::init(handle);
             harness::init(handle);
             signin::init(handle);
+            providers::init(handle);
             if let Some(text) = std::env::var_os("NULL_MINI_SMOKE") {
                 harness::smoke(handle, text.to_string_lossy().into_owned());
                 return Ok(());

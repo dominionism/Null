@@ -2,8 +2,9 @@
 <!-- Null's box: the whole page.
 
      Enter sends what you typed to your agent and the reply streams in below.
-     /model opens the model list, /login signs in to a provider, /new starts a
-     new conversation, /quit quits the app and closes the conversation, Ctrl+C
+     /model opens the model list, /backup sets the models to carry on with when
+     the one in use stops answering, /login signs in to a provider, /new starts
+     a new conversation, /quit quits the app and closes the conversation, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
 
@@ -25,8 +26,9 @@
          WIDTH on the Rust side is the 584px box plus both sides (616). Every height
          here is a fixed number of pixels so MAX_HEIGHT there can be exact:
          2 border + 42 row + 212 transcript + 26 notice + 32 margins = 314.
-         The transcript and the model list stop at 212px (ten lines of transcript)
-         and scroll past that, so the box stays compact however long the chat gets. */
+         The transcript and the model list stop at 212px (about ten lines of
+         transcript) and scroll past that, so the box stays compact however long the
+         chat gets. */
       :root {
         --accent: 255, 255, 255;
         --amber: 255, 212, 121;
@@ -222,34 +224,202 @@
         background: rgba(255, 255, 255, 0.2);
         background-clip: padding-box;
       }
+      /* One reading edge. Everything in the transcript starts 33px in, which is
+         where the typed text starts in the field above (14px + the 19px gutter),
+         and nothing starts before it: no box with an edge of its own to the left,
+         no chip around a word, no line down the left side. The one thing in the
+         gutter is the null sign beside the owner's message, under the field's arrow. */
       #out {
+        position: relative;
         max-height: 212px;
-        padding: 10px 14px 12px 18px; /* 18 + the "› " of a prompt line = where the field's text starts */
+        padding: 12px 12px 14px 14px;
         font: 12.5px/19px var(--mono);
         color: var(--soft);
         cursor: auto;
         user-select: text;
         -webkit-user-select: text;
       }
+      /* There is more below than the box shows. */
+      #out.more {
+        -webkit-mask-image: linear-gradient(#000 calc(100% - 26px), transparent);
+        mask-image: linear-gradient(#000 calc(100% - 26px), transparent);
+      }
       #out > div {
-        padding-left: 2ch;
+        margin-left: 19px;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }
       #out > .you {
-        margin-top: 10px;
-        padding-left: 0;
+        display: grid;
+        grid-template-columns: 19px minmax(0, 1fr);
+        margin: 16px 0 0;
         color: rgb(var(--accent));
       }
       #out > .you:first-child {
         margin-top: 0;
       }
-      .tool,
-      .note {
+      #out > .you + .reply {
+        margin-top: 3px;
+      }
+      /* The null sign, the sign of the app's name. Drawn, so that it is the same
+         shape in any typeface, and not the arrow: that is the field's. */
+      .you .mark {
+        height: 19px;
         color: var(--dim);
       }
+      .you .mark svg {
+        display: block;
+        margin-top: 4px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.3;
+        stroke-linecap: round;
+      }
       .note {
+        color: var(--dim);
         font-style: italic;
+      }
+
+      /* What the agent did to get its answer: one quiet line, which opens on a
+         click. While it works only its current step shows. A step that failed
+         stays in view. */
+      .steps {
+        margin-top: 3px;
+        margin-bottom: 9px;
+        color: var(--faint);
+        font-size: 11px;
+        letter-spacing: 0.02em;
+      }
+      .steps .sum {
+        display: none;
+        cursor: pointer;
+      }
+      .steps.folded .sum {
+        display: block;
+      }
+      .steps.running .each > div:not(:last-child):not(.failed),
+      .steps.folded:not(.open) .each > div:not(.failed) {
+        display: none;
+      }
+      .steps .failed {
+        color: var(--red);
+      }
+
+      /* A reply, drawn as its parts. Until its layout has come back from the app
+         it is plain text, so that no word waits to be seen. */
+      .reply.drawn {
+        white-space: normal;
+        overflow-wrap: break-word;
+      }
+      .reply.drawn > :last-child {
+        margin-bottom: 0;
+      }
+      .reply p,
+      .reply pre,
+      .reply table {
+        margin: 0;
+      }
+      .reply p,
+      .reply .list,
+      .reply .quote {
+        margin-bottom: 9px;
+      }
+      .reply .h {
+        margin-bottom: 5px;
+        color: #fff;
+        font: 600 13px/19px var(--mono);
+      }
+      .reply .h.minor {
+        font-size: 12.5px;
+      }
+      .reply strong {
+        color: #fff;
+        font-weight: 600;
+      }
+      /* A word of code is brighter and has nothing around it: a chip would push
+         its word in from the edge whenever it began a line. */
+      .reply code {
+        color: #fff;
+        font: inherit;
+      }
+      /* A list's marks stand on the edge; its words hang beside them. */
+      .reply .item {
+        display: grid;
+        grid-template-columns: var(--marks, 3ch) minmax(0, 1fr);
+      }
+      .reply .item + .item {
+        margin-top: 2px;
+      }
+      .reply .item > .n {
+        color: var(--faint);
+      }
+      .reply .item > .body > p,
+      .reply .item > .body > .list {
+        margin-bottom: 4px;
+      }
+      .reply .item > .body > :last-child,
+      .reply .quote > :last-child {
+        margin-bottom: 0;
+      }
+      .reply .quote {
+        color: var(--dim);
+      }
+      .reply .rule {
+        height: 1px;
+        margin: 9px 0;
+        background: var(--line);
+      }
+      /* Code, diagrams and tables are never wrapped, and have nothing around
+         them: brighter type and space set them off. One too wide for the box is
+         moved sideways, with its cut end faded to say there is more. */
+      .reply .scrolls {
+        margin: 2px 0 11px;
+        overflow-x: auto;
+      }
+      .reply .scrolls::-webkit-scrollbar {
+        height: 0;
+      }
+      .reply .scrolls.wide:not(.end) {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
+      }
+      .reply pre {
+        color: #fff;
+        font: 12px/18px var(--mono);
+        white-space: pre;
+      }
+      .reply pre.drawing {
+        color: var(--text);
+        line-height: 1.24;
+      }
+      /* A line-drawing character draws its line down the middle of its own width.
+         A drawing whose lines all begin with one is moved left by half a
+         character, so that the frame it draws stands on the reading edge. */
+      .reply pre .art {
+        display: inline-block;
+        margin-left: calc(0.5px - 0.5ch);
+      }
+      .reply table {
+        border-collapse: collapse;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .reply th {
+        padding: 0 16px 3px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--faint);
+        font: 600 10px/16px var(--mono);
+        letter-spacing: 0.08em;
+        text-align: left;
+        text-transform: uppercase;
+      }
+      .reply td {
+        padding: 3px 16px 3px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .reply th:last-child,
+      .reply td:last-child {
+        padding-right: 0;
       }
       /* What the harness says while it signs someone in, and the pages it points to. */
       .step {
@@ -260,16 +430,13 @@
         text-decoration: underline;
         cursor: pointer;
       }
-      .tool.failed,
       .error {
         color: var(--red);
       }
+      /* The agent's question stands on the edge like everything else. */
       #out > .ask {
-        margin: 6px 0 6px 2ch;
-        padding: 7px 10px 9px;
-        border: 1px solid rgba(var(--amber), 0.26);
-        border-radius: 9px;
-        background: rgba(var(--amber), 0.07);
+        margin-top: 6px;
+        margin-bottom: 6px;
         color: rgb(var(--amber));
       }
       /* The choices sit side by side under the question. */
@@ -333,6 +500,18 @@
       .option .id {
         color: var(--dim);
       }
+      /* A model whose provider has nothing left for now. */
+      .option.spent {
+        opacity: 0.4;
+      }
+      /* The provider's own words, when it answered in place of the model. */
+      .reply.failed,
+      .reply.failed .h,
+      .reply.failed strong,
+      .reply.failed code,
+      .reply.failed pre {
+        color: var(--red);
+      }
 
       @media (prefers-reduced-motion: reduce) {
         *,
@@ -374,11 +553,15 @@
       let lastSeq = 0; // the number of the last event shown
       let busy = false;
       let lastPrompt = '';
-      let replyLine = null; // the element the current answer streams into
+      let reply = null; // { element, text, drawn, busy, again }: the answer that is streaming in
+      let steps = null; // { element, sum, each }: the tool steps of the reply in progress
+      let anchor = null; // the owner's latest message: held at the top once the reply outgrows the box
+      let following = true; // false once the owner has scrolled for themselves
       let pendingAsk = null; // { requestId, options, element }
-      let picker = null; // { models, current, shown, index } while the model list is open
+      let picker = null; // { models, current, shown, index, backups, spent } while the model list is open
+      const running = new Set(); // the tool calls under way
       let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
-      const toolLines = new Map();
+      const toolLines = new Map(); // call id → { row, block }
 
       // ── Display ────────────────────────────────────────────────────────
 
@@ -396,15 +579,238 @@
         });
       };
 
-      const line = (className, text) => {
-        const element = document.createElement('div');
-        element.className = className;
-        element.textContent = text;
+      // Where the view rests. It follows a reply only until the owner's message
+      // has reached the top, and holds it there: a long answer is then shown from
+      // its beginning, with the rest below. Once the owner scrolls, it stays put.
+      const place = () => {
+        const end = out.scrollHeight - out.clientHeight;
+        if (following) {
+          const top = anchor && anchor.isConnected ? anchor.offsetTop - 12 : end;
+          out.scrollTop = Math.min(top, end);
+        }
+        out.classList.toggle('more', out.scrollTop < end - 2);
+      };
+
+      // The owner reading for themselves: the view stops following. Moving a wide
+      // block sideways is not that.
+      out.addEventListener(
+        'wheel',
+        (event) => {
+          if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) following = false;
+        },
+        { passive: true },
+      );
+      out.addEventListener('scroll', () => out.classList.toggle('more', out.scrollTop < out.scrollHeight - out.clientHeight - 2));
+
+      const add = (element) => {
         out.style.display = 'block';
         out.appendChild(element);
-        out.scrollTop = out.scrollHeight;
+        place();
         fit();
         return element;
+      };
+
+      const el = (tag, className, ...children) => {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        element.append(...children);
+        return element;
+      };
+
+      const line = (className, text) => {
+        // Outside a reply, what the box says has to be seen: the view goes to it.
+        if (!busy) {
+          anchor = null;
+          following = true;
+        }
+        return add(el('div', className, text));
+      };
+
+      const SVG = 'http://www.w3.org/2000/svg';
+      const nullSign = () => {
+        const sign = document.createElementNS(SVG, 'svg');
+        sign.setAttribute('viewBox', '0 0 10 11');
+        sign.setAttribute('width', '10');
+        sign.setAttribute('height', '11');
+        const ring = document.createElementNS(SVG, 'circle');
+        ring.setAttribute('cx', '5');
+        ring.setAttribute('cy', '5.5');
+        ring.setAttribute('r', '3.4');
+        const stroke = document.createElementNS(SVG, 'path');
+        stroke.setAttribute('d', 'M8.3 1.3L1.7 9.7');
+        sign.append(ring, stroke);
+        return sign;
+      };
+
+      // ── A reply, drawn as its parts ────────────────────────────────────
+      //
+      // The app reads the reply's Markdown into a tree (src/markdown.rs). Every
+      // element here is made by the page and given text: nothing a model writes
+      // is ever put on the page as HTML.
+
+      const inlines = (parent, parts) => {
+        for (const part of parts || []) parent.append(inline(part));
+        return parent;
+      };
+
+      const inline = (part) => {
+        switch (part.kind) {
+          case 'strong':
+            return inlines(el('strong'), part.inlines);
+          case 'emphasis':
+            return inlines(el('em'), part.inlines);
+          case 'strike':
+            return inlines(el('s'), part.inlines);
+          case 'code':
+            return el('code', '', part.text);
+          case 'break':
+            return el('br');
+          case 'link': {
+            const web = /^https?:\/\//.test(part.url);
+            const link = inlines(el('span', web ? 'link' : ''), part.inlines);
+            if (web) link.addEventListener('click', () => invoke('open_url', { url: part.url }).catch(() => {}));
+            return link;
+          }
+          default:
+            return document.createTextNode(part.text || '');
+        }
+      };
+
+      const DRAWN = /[\u2500-\u257f]/; // the line-drawing characters
+      const block = (part) => {
+        switch (part.kind) {
+          case 'heading':
+            return inlines(el('div', part.level > 2 ? 'h minor' : 'h'), part.inlines);
+          case 'list': {
+            const list = el('div', 'list');
+            const widest = String(part.start + part.items.length - 1).length;
+            list.style.setProperty('--marks', `${part.ordered ? widest + 2 : 2}ch`);
+            part.items.forEach((item, index) => {
+              const mark = item.checked === true ? '✓' : item.checked === false ? '○' : part.ordered ? `${part.start + index}.` : '•';
+              list.append(el('div', 'item', el('span', 'n', mark), el('div', 'body', ...item.blocks.map(block))));
+            });
+            return list;
+          }
+          case 'code': {
+            const lines = part.text.split('\n').filter(Boolean);
+            const drawing = DRAWN.test(part.text);
+            const framed = drawing && lines.every((text) => /^[\u2500-\u257f ]/.test(text)) && lines.some((text) => DRAWN.test(text[0]));
+            return el('pre', drawing ? 'scrolls drawing' : 'scrolls', framed ? el('span', 'art', part.text) : part.text);
+          }
+          case 'quote':
+            return el('div', 'quote', ...part.blocks.map(block));
+          case 'table': {
+            const cell = (tag, parts, index) => {
+              const made = inlines(el(tag), parts);
+              if (part.align[index]) made.style.textAlign = part.align[index];
+              return made;
+            };
+            const head = el('tr', '', ...part.head.map((parts, index) => cell('th', parts, index)));
+            const rows = part.rows.map((row) => el('tr', '', ...row.map((parts, index) => cell('td', parts, index))));
+            return el('div', 'scrolls', el('table', '', el('thead', '', head), el('tbody', '', ...rows)));
+          }
+          case 'rule':
+            return el('div', 'rule');
+          default:
+            return inlines(el('p'), part.inlines);
+        }
+      };
+
+      // A block a little too wide for the box is set in smaller type, no smaller
+      // than 10px, before it has to be moved sideways.
+      const fitBlocks = (root) => {
+        for (const box of root.querySelectorAll('.scrolls')) {
+          if (!box.clientWidth) continue; // not on screen now; done again when it is
+          if (box.tagName === 'PRE') {
+            box.style.fontSize = '';
+            let size = 12;
+            while (box.scrollWidth > box.clientWidth && size > 10) {
+              size -= 0.5;
+              box.style.fontSize = `${size}px`;
+            }
+          }
+          const atEnd = () => box.scrollLeft + box.clientWidth >= box.scrollWidth - 1;
+          box.classList.toggle('wide', box.scrollWidth > box.clientWidth + 1);
+          box.classList.toggle('end', atEnd());
+          box.onscroll = () => box.classList.toggle('end', atEnd());
+        }
+      };
+
+      const drawReply = (target, blocks) => {
+        target.drawn = true;
+        target.element.classList.add('drawn');
+        target.element.replaceChildren(...blocks.map(block));
+        fitBlocks(target.element);
+        place();
+        fit();
+      };
+
+      // Ask the app for the layout of what has arrived. One asking at a time: text
+      // that arrives meanwhile is laid out by the next, so the last word is drawn.
+      const layoutSoon = (target) => {
+        if (target.busy) {
+          target.again = true;
+          return;
+        }
+        target.busy = true;
+        invoke('layout', { text: target.text })
+          .then((blocks) => {
+            if (Array.isArray(blocks)) drawReply(target, blocks);
+          })
+          .catch(() => {}) // the plain text is already there
+          .finally(() => {
+            target.busy = false;
+            if (target.again) {
+              target.again = false;
+              layoutSoon(target);
+            }
+          });
+      };
+
+      // ── Tool steps ─────────────────────────────────────────────────────
+
+      const summarise = (stepsBlock) => {
+        const rows = [...stepsBlock.each.children];
+        if (stepsBlock.element.classList.contains('running') || rows.length < 2) return;
+        const failed = rows.filter((row) => row.classList.contains('failed')).length;
+        stepsBlock.element.classList.add('folded');
+        stepsBlock.sum.textContent = failed ? `${rows.length} steps, ${failed} failed` : `✓ ${rows.length} steps`;
+      };
+
+      // The steps so far are over: the answer has begun, or the reply has ended.
+      const foldSteps = () => {
+        if (!steps) return;
+        const done = steps;
+        steps = null;
+        done.element.classList.remove('running');
+        summarise(done);
+        place();
+        fit();
+      };
+
+      const step = (event) => {
+        let known = toolLines.get(event.call_id);
+        if (!known) {
+          if (!steps) {
+            const sum = el('div', 'sum');
+            const each = el('div', 'each');
+            const element = el('div', 'steps running', sum, each);
+            sum.addEventListener('click', () => {
+              element.classList.toggle('open');
+              place();
+              fit();
+            });
+            steps = { element, sum, each };
+            add(element);
+          }
+          known = { row: steps.each.appendChild(el('div')), block: steps };
+          toolLines.set(event.call_id, known);
+        }
+        known.row.className = event.status === 'failed' ? 'failed' : '';
+        known.row.textContent = `${toolMark[event.status] || '…'} ${event.title}`;
+        summarise(known.block);
+        place();
+        fit();
       };
 
       // '' when idle, 'working' while the agent works, 'asking' while it waits for an answer.
@@ -415,11 +821,11 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/login', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/login', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
-          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || COMMANDS.some((name) => name.startsWith(text)));
+          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || text.startsWith('/backup ') || COMMANDS.some((name) => name.startsWith(text)));
         input.classList.toggle('command', command);
       };
 
@@ -438,40 +844,69 @@
         fit();
       };
 
+      const unnotice = () => {
+        clearTimeout(noticeTimer);
+        noticeLine.style.display = 'none';
+        fit();
+      };
+
+      // The harness tries a provider that is slow to answer again and again, and
+      // says nothing while it does. After a while the box says that it is waiting.
+      const QUIET = 20000;
+      let quietTimer = null;
+      let waitingSaid = false;
+      const watchQuiet = () => {
+        clearTimeout(quietTimer);
+        if (waitingSaid) {
+          waitingSaid = false;
+          unnotice();
+        }
+        if (!busy) return;
+        quietTimer = setTimeout(() => {
+          if (!busy || running.size || pendingAsk) return;
+          waitingSaid = true;
+          notice('still waiting on the provider. ctrl+c stops it', true);
+        }, QUIET);
+      };
+
       const toolMark = { pending: '…', in_progress: '…', completed: '✓', failed: '✗' };
 
       // ── Events from the app ────────────────────────────────────────────
 
       const show = (event) => {
         switch (event.type) {
-          case 'user_message':
-            replyLine = null;
-            line('you', `› ${event.text}`);
+          case 'user_message': {
+            reply = null;
+            foldSteps();
+            following = true;
+            anchor = add(el('div', 'you', el('span', 'mark', nullSign()), el('div', 'text', event.text)));
+            place();
             break;
+          }
           case 'text_delta':
             if (event.thinking) {
               mark('working');
               break;
             }
-            if (!replyLine) replyLine = line('reply', '');
-            replyLine.textContent += event.text;
-            out.scrollTop = out.scrollHeight;
+            if (!reply) {
+              foldSteps();
+              reply = { element: add(el('div', 'reply')), text: '', drawn: false, busy: false, again: false };
+            }
+            reply.text += event.text;
+            if (!reply.drawn) reply.element.textContent = reply.text;
+            layoutSoon(reply);
+            place();
             fit();
             break;
-          case 'tool_activity': {
-            replyLine = null;
-            let element = toolLines.get(event.call_id);
-            if (!element) {
-              element = line('tool', '');
-              toolLines.set(event.call_id, element);
-            }
-            element.className = event.status === 'failed' ? 'tool failed' : 'tool';
-            element.textContent = `${toolMark[event.status] || '…'} ${event.title}`;
+          case 'tool_activity':
+            reply = null;
+            step(event);
+            if (event.status === 'completed' || event.status === 'failed') running.delete(event.call_id);
+            else running.add(event.call_id);
             mark('working');
             break;
-          }
           case 'approval_request': {
-            replyLine = null;
+            reply = null;
             const element = line('ask', `Your agent asks: ${event.title}`);
             event.options.forEach((option, index) => {
               const button = document.createElement('button');
@@ -492,17 +927,30 @@
             }
             break;
           case 'model_changed':
-            replyLine = null;
+            reply = null;
             line('note', `now on ${event.model}`);
             break;
+          case 'model_switched':
+            // The harness moved to a backup by itself. A switch is never silent.
+            reply = null;
+            line('note', event.from ? `${event.from} did not answer. now on ${event.to}` : `now on ${event.to}`);
+            break;
+          case 'reply_failed':
+            // What came back is the provider's refusal, not the model's answer.
+            if (reply) reply.element.classList.add('failed');
+            reply = null;
+            line('note', 'no answer from the provider. /model picks another model');
+            break;
           case 'message_done':
-            replyLine = null;
+            reply = null;
+            foldSteps();
             if (event.stop_reason === 'cancelled') line('note', 'stopped');
             if (event.stop_reason === 'truncated') line('note', 'the reply was cut short');
             if (event.stop_reason === 'refused') line('note', 'the model refused');
             break;
           case 'error':
-            replyLine = null;
+            reply = null;
+            foldSteps();
             line('error', `error: ${event.message}${event.details ? `\n${event.details}` : ''}`);
             break;
         }
@@ -510,8 +958,10 @@
         if (event.type === 'message_done' || event.type === 'error') {
           busy = false;
           pendingAsk = null;
+          running.clear();
           mark('');
         }
+        watchQuiet();
       };
 
       // ── Talking to the app ─────────────────────────────────────────────
@@ -541,6 +991,7 @@
           const snapshot = await invoke('events_since', { after: lastSeq });
           snapshot.events.forEach(apply);
           busy = snapshot.busy;
+          watchQuiet();
           if (!busy && !picker) mark('');
         } catch (error) {
           line('error', `could not reach the app: ${error}`);
@@ -553,27 +1004,36 @@
 
       // ── Choosing a model ───────────────────────────────────────────────
 
+      // The same list serves /model and /backup. For /backup the models chosen
+      // so far come first, numbered in the order they will be tried.
       const drawPicker = () => {
         const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
-        picker.shown = picker.models.filter((model) => {
+        const matching = picker.models.filter((model) => {
           const haystack = `${model.id} ${model.label}`.toLowerCase();
           return words.every((word) => haystack.includes(word));
         });
+        const order = picker.backups || [];
+        const place = (model) => order.indexOf(model.id);
+        const chosen = matching.filter((model) => place(model) >= 0).sort((a, b) => place(a) - place(b));
+        picker.shown = chosen.concat(matching.filter((model) => place(model) < 0));
         picker.index = Math.min(picker.index, Math.max(picker.shown.length - 1, 0));
         pick.textContent = '';
         let provider = null;
         picker.shown.forEach((model, index) => {
-          if (model.provider !== provider) {
-            provider = model.provider;
+          const group = place(model) >= 0 ? 'backups, in order' : model.provider || 'models';
+          const spent = picker.spent.has(model.id.split('/')[0]);
+          if (group !== provider) {
+            provider = group;
             const heading = document.createElement('div');
             heading.className = 'provider';
-            heading.textContent = provider || 'models';
+            heading.textContent = spent && place(model) < 0 ? `${group} · nothing left for now` : group;
             pick.appendChild(heading);
           }
           const row = document.createElement('div');
-          row.className = index === picker.index ? 'option selected' : 'option';
+          row.className = `option${index === picker.index ? ' selected' : ''}${spent ? ' spent' : ''}`;
           const name = document.createElement('span');
-          name.textContent = `${model.id === picker.current ? '● ' : '  '}${model.label} `;
+          const lead = picker.backups ? (place(model) >= 0 ? `${place(model) + 1} ` : '  ') : model.id === picker.current ? '● ' : '  ';
+          name.textContent = `${lead}${model.label} `;
           const id = document.createElement('span');
           id.className = 'id';
           id.textContent = model.id;
@@ -593,26 +1053,44 @@
       };
 
       const closePicker = () => {
+        const { backups, saved } = picker;
         picker = null;
+        if (backups && backups.join() !== saved.join()) saveBackups(backups);
         pick.style.display = 'none';
         pick.textContent = '';
-        if (out.textContent) out.style.display = 'block';
+        if (out.textContent) {
+          out.style.display = 'block';
+          fitBlocks(out);
+          place();
+        }
         input.value = '';
         tint();
         mark('');
         fit();
       };
 
-      const openPicker = async (filter = '') => {
+      const saveBackups = async (ids) => {
+        try {
+          const order = await invoke('set_backups', { ids });
+          line('note', order.length ? `backups: ${order.join(', then ')}` : 'no backups');
+        } catch (error) {
+          line('error', `could not set the backups: ${error}`);
+        }
+      };
+
+      // `backups` is true for /backup: the list then sets the backup order.
+      const openPicker = async (filter = '', backups = false) => {
         if (picker) return;
         if (busy) {
-          notice('stop the reply with ctrl+c before switching models');
+          notice(`stop the reply with ctrl+c before ${backups ? 'changing the backups' : 'switching models'}`);
           return;
         }
         mark('working');
         let listed;
+        let order = null;
         try {
           listed = await invoke('models');
+          if (backups) order = await invoke('backups');
         } catch (error) {
           line('error', `could not list models: ${error}`);
           mark('');
@@ -624,17 +1102,36 @@
           return;
         }
         const at = listed.models.findIndex((model) => model.id === listed.current);
-        picker = { models: listed.models, current: listed.current, shown: [], index: filter ? 0 : Math.max(at, 0) };
+        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order, spent: new Set() };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
         tint();
         mark('');
+        if (order) notice('enter adds or removes a backup. esc is done');
         drawPicker();
+        // Which providers have nothing left, once the harness has said. The list does not wait for it.
+        const opened = picker;
+        invoke('providers')
+          .then((states) => {
+            if (picker !== opened) return;
+            picker.spent = new Set(states.filter((state) => state.limit_reached === true).map((state) => state.provider));
+            if (picker.spent.size) drawPicker();
+          })
+          .catch(() => {});
       };
 
       const chooseModel = async (model) => {
         if (!model) return;
+        if (picker && picker.backups) {
+          // Add it to the end of the order, or take it out. The list stays open.
+          const order = picker.backups;
+          picker.backups = order.includes(model.id) ? order.filter((id) => id !== model.id) : order.concat(model.id);
+          input.value = '';
+          picker.index = 0;
+          drawPicker();
+          return;
+        }
         const current = picker && picker.current;
         closePicker();
         if (model.id === current) return;
@@ -769,7 +1266,7 @@
           link.addEventListener('click', () => invoke('open_url', { url: part }).catch(() => {}));
           element.appendChild(link);
         });
-        out.scrollTop = out.scrollHeight;
+        place();
         fit();
       };
 
@@ -809,6 +1306,10 @@
           openPicker(text.slice(6).trim());
           return;
         }
+        if (text === '/backup' || text.startsWith('/backup ')) {
+          openPicker(text.slice(7).trim(), true);
+          return;
+        }
         if (text === '/login') {
           openSignin();
           return;
@@ -827,6 +1328,9 @@
           out.textContent = '';
           out.style.display = 'none';
           toolLines.clear();
+          reply = null;
+          steps = null;
+          anchor = null;
           fit();
           return;
         }
@@ -836,7 +1340,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /login, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /login, /new and /quit`);
           return;
         }
         if (busy) {
@@ -846,6 +1350,7 @@
         busy = true;
         lastPrompt = text;
         mark('working');
+        watchQuiet();
         try {
           await invoke('send', { text }); // the reply arrives as events
         } catch (error) {
@@ -1046,9 +1551,7 @@
           notice(message.payload, true);
           return;
         }
-        clearTimeout(noticeTimer);
-        noticeLine.style.display = 'none';
-        fit();
+        unnotice();
       });
 
       catchUp();
