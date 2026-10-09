@@ -7,13 +7,18 @@
 >
 > Status: **A working path exists end to end (2026-10-08): fn+Space → type → OMP answers, through
 > the prototype box.** Proven through the live server; the on-screen part awaits the user's hands-on
-> check. Items 4–6 are partly built, items 7–9 remain. Voice is deferred by the user until the text
-> mini is proven.
+> check. Items 4–6 are partly built; items 7–9 are superseded by `MiniApp.md`. Voice is deferred by
+> the user until the text mini is proven.
 
 > **Direction change (2026-10-08):** Null Mini becomes its own app in `Mini/`, separate from the Voice
 > desktop and its server (`Context/ADR/0002-NullMiniIsItsOwnApp.md`). Architecture decision 4 and
-> items 5–9 were written for a mini inside the desktop app; they must be re-planned for `Mini/`
-> before that build starts. Folder names follow `Context/ADR/0001-CapitalizedFolderNames.md`.
+> items 5–9 were written for a mini inside the desktop app. That build was re-planned in
+> `Context/Plans/MiniApp.md`, the active plan for Phase 1; the statuses under items 5–9 say what
+> became of each. Folder names follow `Context/ADR/0001-CapitalizedFolderNames.md`.
+>
+> **Name and shortcut (2026-10-08):** the user named the app **Null** ("Just call it Null") and moved
+> its shortcut to Control+Space, which needs no permission. "Null Mini", "the mini" and "fn+Space"
+> below are this plan's original words for that app and its shortcut.
 
 ## Goal
 
@@ -389,6 +394,9 @@ follows; what is done and what remains is recorded under each.
      remembers), `GET /mini/sessions`, a session title.
    - **Noticed:** in development the data directory is inside this repo, so the default
      workspace is too, and OMP may read this repo's project instructions from there.
+   - **After ADR 0002:** the Null app in `Mini/` does not use these endpoints; it keeps its own
+     settings file. What remains here is not needed by that app. Whether the Voice server needs it
+     is a question for the voice-mode re-plan.
 
 6. **Lock the new endpoints down**
    - What: a per-install secret generated on first run (data dir, mode 0600), required as a bearer
@@ -410,6 +418,9 @@ follows; what is done and what remains is recorded under each.
    - **Remaining:** the Tauri host handing the secret to the webviews. The prototype reads the
      development data directory at a path fixed when it was compiled, which will not work in a
      packaged build. No dev bypass was built; none has been needed.
+   - **After ADR 0002:** the Null app has no network endpoint and needs no secret. The only window
+     that used this lock was the prototype, which `MiniApp.md` item 9 removes. Nothing else needs
+     the secret handed to a window today.
 
 7. **The `mini` window and its shortcut (Rust)**
    - What: `build_mini_window` beside `build_dictate_window` in `main.rs` (label `mini`, URL
@@ -423,7 +434,8 @@ follows; what is done and what remains is recorded under each.
    - Risk: focus and Spaces behaviour differ between dev and a packaged build. Know it by: running
      item 2's checklist again on a built app.
    - Source: inferred from codebase + spike 2.
-   - Status: Not started
+   - Status: Superseded by `MiniApp.md` item 2: the window and the shortcut live in `Mini/`, not in
+     the desktop app.
 
 8. **The mini's text UI — a compact CLI**
    - What: `app/src/components/Mini/` — `MiniWindow` (mounted from `App.tsx` on `?view=mini`, the
@@ -437,7 +449,8 @@ follows; what is done and what remains is recorded under each.
    - Risk: the window must grow with the reply without covering the user's work. Know it by: a
      height cap with scroll.
    - Source: specified from user + codebase (`DictateWindow`, `CapturePill`).
-   - Status: Not started — the prototype box stands in for it
+   - Status: Superseded by `MiniApp.md` item 6: one static page in `Mini/Page/`, not React
+     components in `app/`. The look and behaviour recorded below carried over.
    - **Prototype (2026-10-08):** `tauri/prototype-mini-spike.html` now sends on Enter and shows
      the streamed reply, one line per tool action, approval buttons, and errors. Ctrl+C stops a
      reply, `/new` starts a new conversation, up-arrow recalls the last prompt, and the window
@@ -467,7 +480,9 @@ follows; what is done and what remains is recorded under each.
    - Depends on: item 5.
    - Risk: an already dense settings area. Know it by: one row per harness, three facts each.
    - Source: inferred from codebase (`ServerTab/MCPPage.tsx`).
-   - Status: Not started
+   - Status: Superseded for now. `MiniApp.md` decided on typed commands in the box and no settings
+     page. The box reports a harness it cannot find as an error when a message is sent; whether the
+     harness is signed in is shown nowhere.
 
 ### Phase 2 — Other people's harnesses, keys and sign-in
 
