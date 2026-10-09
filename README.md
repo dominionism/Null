@@ -23,6 +23,10 @@
 
 ## Small surface. Real agent.
 
+<p align="center">
+  <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Your tools, not just chat; your providers in one conversation; readable without getting bigger." />
+</p>
+
 Press <kbd>Control</kbd> + <kbd>Space</kbd> from the app you are in. Type a question or an instruction.
 Your agent answers and works in a floating box, without activating Null over your current app.
 No Dock icon, no menu-bar icon, no extra window chrome. Put it away when you are done.
@@ -39,6 +43,10 @@ workspace selection and the optional pet are planned, not part of the box yet.
 The banner above is an illustration, not a recording of an agent session.
 
 ## Get started
+
+<p align="center">
+  <img src=".github/Readme/get-started.svg" width="100%" alt="Get started: macOS 13+, Rust, Xcode Command Line Tools and Tauri CLI 2; git clone, then Mini/Scripts/install reports that Null.app is installed and Control+Space opens the box." />
+</p>
 
 ### 1. Bring your harness
 
@@ -96,6 +104,10 @@ OMP's own sign-ins and conversation history are not removed.
 
 ## Use Null
 
+<p align="center">
+  <img src=".github/Readme/use-null.svg" width="100%" alt="Use Null: Control+Space shows or hides the box, Enter sends or chooses, Esc closes or hides, Ctrl+C stops the reply or quits when idle, the up arrow recalls the last prompt, dragging moves the box." />
+</p>
+
 | Action | Key |
 | --- | --- |
 | Show or hide the box | <kbd>Control</kbd> + <kbd>Space</kbd> |
@@ -110,6 +122,10 @@ The arrow pulses while the agent works and turns amber when it asks for an answe
 grows to about ten lines, then scrolls. Hiding the box does not stop a reply.
 
 ### A few commands. No settings window.
+
+<p align="center">
+  <img src=".github/Readme/commands.svg" width="100%" alt="The six box commands and what each does: /model, /login, /usage, /backup, /new and /quit." />
+</p>
 
 | Command | What it does |
 | --- | --- |
@@ -142,6 +158,10 @@ it with the up arrow or type it again.
 </details>
 
 ## Privacy and permissions
+
+<p align="center">
+  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy: Null has no listener or database, /login answers stay with the harness, the shortcut needs no Accessibility permission, and Full Disk Access is a separate choice." />
+</p>
 
 **Local interface does not mean offline agent.** Null has no HTTP listener or database of its own.
 It starts OMP as a child process and talks over stdio. OMP may send prompts and tool-provided context
@@ -197,6 +217,10 @@ log reply text, so do not use sensitive prompts in those checks.
 
 ## Under the hood
 
+<p align="center">
+  <img src=".github/Readme/under-the-hood.svg" width="100%" alt="Under the hood: one native Tauri app plus the OMP process it launches; ls Mini/src lists its twelve modules." />
+</p>
+
 The box is one native Tauri app plus the OMP process it launches. The page is a static HTML file:
 no web server, bundler or Node runtime. Rust owns the non-activating panel, the shortcut and the ACP
 connection; OMP owns agent execution, providers and conversation history.
@@ -232,6 +256,10 @@ rendering is one boundary, not a substitute for that missing defense.
 </details>
 
 ## Development
+
+<p align="center">
+  <img src=".github/Readme/development.svg" width="100%" alt="Development: cd Mini && cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle." />
+</p>
 
 ```sh
 cd Mini
@@ -272,6 +300,10 @@ even under a separate profile. The startup-only command above sends no prompt.
 </details>
 
 ## Optional voice tools
+
+<p align="center">
+  <img src=".github/Readme/voice.svg" width="100%" alt="Optional voice tools: Voicebox is a separate tool, OMP can call its MCP server, the API is on 127.0.0.1:17493 with narration on 17494, and most endpoints are unauthenticated." />
+</p>
 
 Null is the main application. [Voicebox](https://github.com/jamiepine/voicebox) is a separate tool
 it can use for voice capabilities: local voice cloning and synthesis, Whisper transcription,
@@ -315,6 +347,10 @@ and `/harnesses` routes require both loopback and an install token. They do not 
 
 ## Status and direction
 
+<p align="center">
+  <img src=".github/Readme/status.svg" width="100%" alt="Status and direction: what is available in the box, and what is planned or incomplete." />
+</p>
+
 | Available in the box | Planned or incomplete |
 | --- | --- |
 | Text conversation and agent tools | Background tasks, activity tray and workspace selection |
@@ -351,6 +387,10 @@ before making that switch. `Memories/` holds local handoffs and is not tracked i
 
 ### Read the reasoning
 
+<p align="center">
+  <img src=".github/Readme/reasoning.svg" width="100%" alt="Read the reasoning: the app design, providers, conversation display and future-phase plans, the ADRs, and the codebase research map." />
+</p>
+
 [App design](Context/Plans/MiniApp.md) ·
 [Providers](Context/Plans/Providers.md) ·
 [Conversation display](Context/Plans/ConversationDisplay.md) ·
@@ -359,6 +399,10 @@ before making that switch. `Memories/` holds local handoffs and is not tracked i
 [Codebase research](Context/Research/Research.md)
 
 ## License
+
+<p align="center">
+  <img src=".github/Readme/license.svg" width="100%" alt="MIT, and clone only voices you own or have permission to use; the responsible-use, security and contribution files." />
+</p>
 
 [MIT](LICENSE).
 
