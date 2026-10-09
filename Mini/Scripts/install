@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build Null, put it in /Applications, make it start at login, and start it.
+# Build Null, sign it, put it in /Applications, make it start at login, and start it.
 #
 #   Mini/Scripts/install
 set -eu
@@ -9,8 +9,58 @@ app="Null.app"
 installed="/Applications/$app"
 agent="$HOME/Library/LaunchAgents/io.github.dominionism.null-mini.plist"
 
+# macOS ties the permissions it gives an app (Full Disk Access, its questions
+# about folders) to who signed it. Unsigned, that is the exact build, so every
+# rebuild starts the questions again; signed with one certificate, the answers
+# hold. The certificate is kept in a keychain file of its own on this Mac, beside
+# the password that opens it. Without that keychain the app is installed unsigned.
+identity="Null Local Signing"
+keychain="$HOME/Library/Application Support/Null Signing/signing.keychain-db"
+newline='
+'
+
+# Put the keychain search list back as it was, and lock the signing keychain.
+restore_keychains() {
+	old=$IFS
+	IFS=$newline
+	set -f
+	# shellcheck disable=SC2086 # one keychain per line
+	security list-keychains -d user -s $searched
+	set +f
+	IFS=$old
+	security lock-keychain "$keychain" 2>/dev/null || true
+}
+
+# codesign only looks in keychains on the search list, so the signing keychain is
+# on it while this runs and off it again afterwards, whatever happens.
+sign() {
+	searched=$(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"[[:space:]]*$//')
+	if [ -z "$searched" ]; then
+		echo "The keychain search list is empty, so it could not be put back; not signing." >&2
+		return 1
+	fi
+	trap restore_keychains EXIT
+	old=$IFS
+	IFS=$newline
+	set -f
+	# shellcheck disable=SC2086 # one keychain per line
+	security list-keychains -d user -s $searched "$keychain"
+	set +f
+	IFS=$old
+	security unlock-keychain -p "$(cat "$(dirname "$keychain")/password")" "$keychain"
+	codesign --force --sign "$identity" --keychain "$keychain" "$1"
+	restore_keychains
+	trap - EXIT
+}
+
 cd "$here"
 cargo tauri build
+
+if [ -f "$keychain" ]; then
+	sign "target/release/bundle/macos/$app"
+else
+	echo "No signing keychain at $keychain; installing unsigned."
+fi
 
 # Stop the copy that is running, if any, before replacing it.
 launchctl bootout "gui/$(id -u)" "$agent" 2>/dev/null || true
