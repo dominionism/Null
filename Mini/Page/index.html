@@ -31,6 +31,7 @@
         --dim: #9a9aa6;
         --faint: #777783;
         --red: #ff8078;
+        --command: #8ab8ff;
         --line: rgba(255, 255, 255, 0.09);
         --sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
@@ -168,6 +169,10 @@
            picks that up cannot be typed in. */
         user-select: text;
         -webkit-user-select: text;
+      }
+      /* One of the box's own commands (/model, /new, /quit), as it is typed. */
+      input.command {
+        color: var(--command);
       }
       /* Never seen: measures where the typed text ends, so the unused part of the
          field can be used to move the box. */
@@ -388,6 +393,17 @@
         caret.className = state ? `caret ${state}` : 'caret';
       };
 
+      // The box's own commands take their own colour as they are typed, so it is
+      // plain they will be carried out here. Anything else that starts with "/"
+      // stays white: it goes to the agent as typed.
+      const COMMANDS = ['/model', '/new', '/quit'];
+      const tint = () => {
+        const text = input.value;
+        const command =
+          !picker && text.startsWith('/') && (text.startsWith('/model ') || COMMANDS.some((name) => name.startsWith(text)));
+        input.classList.toggle('command', command);
+      };
+
       // Words appear only for something the user has to know, and then go away.
       let noticeTimer = null;
       const notice = (text, stay = false) => {
@@ -563,6 +579,7 @@
         pick.textContent = '';
         if (out.textContent) out.style.display = 'block';
         input.value = '';
+        tint();
         mark('');
         fit();
       };
@@ -592,6 +609,7 @@
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
+        tint();
         mark('');
         drawPicker();
       };
@@ -750,6 +768,7 @@
       // ── Keys ───────────────────────────────────────────────────────────
 
       input.addEventListener('input', () => {
+        tint();
         if (picker) {
           picker.index = 0;
           drawPicker();
@@ -772,9 +791,11 @@
           const text = input.value.trim();
           if (!text) return;
           input.value = '';
+          tint();
           send(text);
         } else if (event.key === 'ArrowUp' && !input.value && lastPrompt) {
           input.value = lastPrompt;
+          tint();
           event.preventDefault();
         } else if (pendingAsk && !input.value && /^[1-9]$/.test(event.key)) {
           const option = pendingAsk.options[Number(event.key) - 1];
