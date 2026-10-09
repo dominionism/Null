@@ -254,9 +254,10 @@ follows; what is done and what remains is recorded under each.
    - Source: researched (tauri-nspanel) + codebase (`build_dictate_window`, keytap is listen-only).
    - Status: Complete (2026-10-08)
    - **Prototype:** `tauri/src-tauri/src/prototype_mini_spike.rs` and
-     `tauri/prototype-mini-spike.html`, active only when the app is started with
-     `NULL_MINI_SPIKE=1`. Run: `NULL_MINI_SPIKE=1 bun run dev` from the repo root. Kept in the repo
-     until item 7 replaces it (user's decision, 2026-10-08).
+     `tauri/prototype-mini-spike.html`, active only when the app was started with
+     `NULL_MINI_SPIKE=1` (`NULL_MINI_SPIKE=1 bun run dev` from the repo root). It was kept in the
+     repo until something replaced it (user's decision, 2026-10-08), and removed the same day once
+     the app in `Mini/` had (`MiniApp.md` item 9).
    - **Established so far (2026-10-08):** `tauri-nspanel` v2 compiles and links against this repo's
      Tauri 2.9.5. On launch the window converts to a non-activating panel without crashing, and the
      consuming key tap is created.

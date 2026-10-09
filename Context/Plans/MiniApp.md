@@ -9,9 +9,8 @@
 >
 > Status: **Built and installed. Null is in `/Applications`, starts at login and opens on
 > Control+Space with no permission. Most of item 8's hands-on checks have passed, and the app is now
-> signed so that macOS remembers what it has been allowed. Open: Full Disk Access (the user's
-> switch), the user's look at two display changes, and the log-out check. Item 9 (remove the
-> prototype) follows.**
+> signed so that macOS remembers what it has been allowed, has Full Disk Access, and the prototype
+> is gone from the Voice desktop (item 9). Still open in item 8: the log-out check.**
 
 ## Goal
 
@@ -212,7 +211,9 @@ Mini/
      buffer of 5,000. The app also emits `mini:shown` and `mini:notice` (words the box must show;
      it replaced `mini:permission`).
    - **Deviation:** the chosen model and the open conversation are saved by the app
-     (`settings.json`), so a restart of the app comes back to the same conversation.
+     (`settings.json`), so a restart of the app comes back to the same conversation. Since
+     2026-10-08 that holds only for a restart the user did not ask for (login, an update):
+     `/quit` and Ctrl+C clear the saved conversation, at the user's request.
 
 6. **The page**
    - What: copy `tauri/prototype-mini-spike.html` to `Mini/Page/index.html` and replace only its
@@ -285,7 +286,7 @@ Mini/
    - **Passed by hand (2026-10-08, the user's report):** Control+Space opens and closes the box; it
      opens over a full-screen app and no space is typed underneath; the box drags and reopens
      where it was left; it grows as a reply comes in; a question is answered and complex tasks are
-     carried out; Ctrl+C stops a reply; `/model` changes provider and model.
+     carried out; Ctrl+C stops a reply; `/model` changes provider and model; `/new` starts over.
    - **Found in the trial:**
      - macOS asked seven permission questions in 17 seconds during one task (Documents, Desktop,
        Downloads, Photos, Media Library, iCloud Drive, data from other apps). macOS holds Null
@@ -302,8 +303,8 @@ Mini/
        refused it opens the list in System Settings and keeps the box up with one line saying
        what to switch on, until the user puts the box away. Proven on the installed app: the list
        opened and macOS recorded Null in it. The user switched it on; Null had to be restarted for
-       it to take effect, and its own check then reported Full Disk Access on. Not yet tried: a
-       task that reaches into those folders, to confirm macOS stays quiet.
+       it to take effect, and its own check then reported Full Disk Access on. The user then ran
+       a task and reported: "It works. No permission prompts."
      - The user asked for the box's own commands in another colour and for a lower height limit.
        Both are installed and pass the scripted checks; the user has not yet seen them: `/model`,
        `/new` and `/quit` turn blue as they are typed, and the transcript and the model list stop
@@ -320,7 +321,7 @@ Mini/
    - **How the look was checked:** the page was drawn in an off-screen WKWebView, the app's own
      web engine, with a stand-in for `window.__TAURI__`, and the pictures were read and measured.
      Those scripts were session scratch and are not in the repo.
-   - **Not yet tried:** `/new`; position and model surviving a restart of the app; running after
+   - **Not yet tried:** position and model surviving a restart of the app; running after
      logging out and in. The user reported that it "doesn't run when I log out", but the Mac shows
      no log-out since 2026-10-05 and the app has run without a break since it was installed, so
      this check is still open.
@@ -338,8 +339,14 @@ Mini/
    - Why: one mini, not two. The two no longer share a shortcut (the prototype opens on fn+Space,
      Null on Control+Space), but the prototype is still built into the Voice desktop.
    - Depends on: 8.
-   - Status: Not started
-   - **State (2026-10-08):** the prototype's development app is stopped; its code is still in place.
+   - Status: Complete (2026-10-08)
+   - **Done:** the two prototype files are deleted, and the five files the prototype had edited
+     (`Cargo.toml`, `Cargo.lock`, `capabilities/default.json`, `gen/schemas/capabilities.json`,
+     `src/main.rs`) are back to their content before it. `tauri/`, `app/` and `web/` are now
+     identical to the first commit (`90a885c`), and the Voice desktop still passes `cargo check`.
+   - **Kept:** the backend's harness layer, `/mini` routes and lock (ADR 0002), and
+     `scripts/prototype-omp-spike.py`, which item 4 points to for the protocol's messages.
+   - **Left on disk, outside git:** the prototype's log, `data/logs/mini-spike.log`.
 
 ## Verification
 
@@ -376,7 +383,7 @@ Mini/
 
 | Question | Decision |
 |---|---|
-| Quitting and settings | Typed commands in the box only (`/quit`), like `/model` and `/new`. No menu-bar icon |
+| Quitting and settings | Typed commands in the box only (`/quit`), like `/model` and `/new`. No menu-bar icon. Since 2026-10-08 Ctrl+C with nothing running does what `/quit` does, and quitting closes the conversation: the next start opens a new one (the user: "ctrl + c should just close the Null terminal and wipe the current session"). While a reply runs Ctrl+C still only stops it |
 | Where a conversation works | A folder of its own under the app's support directory |
 | Name and identifier | "Null". First "Null Mini"; changed by the user on seeing it installed. The identifier stays `io.github.dominionism.null-mini` |
 | Shortcut | Control+Space, registered as an ordinary macOS shortcut so that no permission is needed. Replaces fn+Space |
