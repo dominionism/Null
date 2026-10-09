@@ -828,6 +828,15 @@
           fit();
           return;
         }
+        // A lone slash-word that is not one of the box's commands is a slip, or a
+        // command the box does not have. Sent on, the agent takes it for a message
+        // and sets off trying to work out what was meant. Hand it back instead.
+        if (/^\/[\w:-]+$/.test(text)) {
+          input.value = text;
+          tint();
+          notice(`no such command: ${text}. the box has /model, /login, /new and /quit`);
+          return;
+        }
         if (busy) {
           notice('still working. ctrl+c stops it');
           return;
