@@ -824,8 +824,17 @@
         fit();
       });
 
-      // Something the app needs the user to know, such as its shortcut being unavailable.
-      listen('mini:notice', (message) => notice(message.payload, true));
+      // Something the app needs the user to know, such as its shortcut being
+      // unavailable. No words takes the line away again.
+      listen('mini:notice', (message) => {
+        if (message.payload) {
+          notice(message.payload, true);
+          return;
+        }
+        clearTimeout(noticeTimer);
+        noticeLine.style.display = 'none';
+        fit();
+      });
 
       catchUp();
       fit();

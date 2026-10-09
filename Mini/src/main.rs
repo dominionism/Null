@@ -17,6 +17,7 @@
 #[cfg(not(target_os = "macos"))]
 compile_error!("Null is macOS-only for now");
 
+mod access;
 mod harness;
 mod log;
 mod panel;
@@ -40,6 +41,10 @@ fn page_ready(app: tauri::AppHandle) {
     // The page loads after the app has tried to register the shortcut.
     if shortcut::unavailable() {
         let _ = app.emit_to(panel::LABEL, "mini:notice", shortcut::UNAVAILABLE_NOTICE);
+    }
+    // Likewise after it has sent the user to switch on Full Disk Access.
+    if access::asking() {
+        let _ = app.emit_to(panel::LABEL, "mini:notice", access::NOTICE);
     }
 }
 
@@ -86,6 +91,10 @@ fn main() {
                 panel::show(handle);
             } else {
                 shortcut::start(handle);
+                // Not on a scripted start-up check, which must leave the user's settings alone.
+                if std::env::var_os("NULL_MINI_EXIT_WHEN_READY").is_none() {
+                    access::check(handle);
+                }
             }
             Ok(())
         })

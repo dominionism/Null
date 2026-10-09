@@ -18,7 +18,7 @@ use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 
 use crate::log::log;
-use crate::settings;
+use crate::{access, settings};
 
 pub const LABEL: &str = "mini";
 
@@ -90,7 +90,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::Focused(false) = event {
-            hide(&handle, "clicked away");
+            // While Null is asking for Full Disk Access the box stays up over
+            // System Settings, where the user has gone to answer.
+            if !access::asking() {
+                hide(&handle, "clicked away");
+            }
         }
     });
 
@@ -158,6 +162,10 @@ pub fn hide(app: &AppHandle, why: &'static str) {
         }
         panel.order_out(None);
         log!("hidden ({why})");
+        // Putting the box away ends the asking, and takes its words with it.
+        if access::stop_asking() {
+            let _ = handle.emit_to(LABEL, "mini:notice", ());
+        }
     });
 }
 
