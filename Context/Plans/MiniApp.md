@@ -214,6 +214,9 @@ Mini/
      (`settings.json`), so a restart of the app comes back to the same conversation. Since
      2026-10-08 that holds only for a restart the user did not ask for (login, an update):
      `/quit` and Ctrl+C clear the saved conversation, at the user's request.
+   - **Seen in the log (2026-10-08):** twice, "quit from the box; the conversation is closed" was
+     followed at the next message by "opened the conversation" with a new id. A later restart
+     with no quit in between loaded the same conversation back.
 
 6. **The page**
    - What: copy `tauri/prototype-mini-spike.html` to `Mini/Page/index.html` and replace only its
