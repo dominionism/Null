@@ -223,8 +223,17 @@ then let's go with that." Each recommendation was looked at again against the de
      probe profile, chose DeepSeek, gave a dummy key and was refused with "Login failed", the key
      appearing nowhere in what came back; and every stage of the page drawn in the app's web
      engine with stand-in data.
-   - **Not yet proven:** a sign-in that succeeds, and so what the harness prints then, whether
-     the fresh harness process shows the new provider, and whether the old process is really gone.
+   - **Proven by the owner (2026-10-08):** a real sign-in to Anthropic through `/login`. The owner
+     reported that the Claude models then appeared under `/model` and that they answer. A first
+     attempt had ended without success after 12 seconds (the log: "not signed in"), most likely
+     cancelled before the browser step was done.
+   - **Learned from it:** being listed is not being usable. Claude Mythos appeared in the list and
+     would not answer, while the other Claude models did. The harness lists a provider's whole
+     catalogue, and what an account may use is the provider's to say. By design rule 1 the box
+     does not try to know; what it owes the user is the provider's refusal shown plainly.
+   - **Still not checked:** what the harness prints on success, and whether the harness process
+     that was running before the sign-in is really gone afterwards. Neither has been looked at in
+     the log.
    - **Not built:** `/logout`; a time limit on a sign-in left waiting (Esc cancels it).
 
 6. **First run**
