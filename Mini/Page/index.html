@@ -334,6 +334,10 @@
       .option .id {
         color: var(--dim);
       }
+      /* A model whose provider has nothing left for now. */
+      .option.spent {
+        opacity: 0.4;
+      }
       /* The provider's own words, when it answered in place of the model. */
       .reply.failed {
         color: var(--red);
@@ -381,7 +385,7 @@
       let lastPrompt = '';
       let replyLine = null; // the element the current answer streams into
       let pendingAsk = null; // { requestId, options, element }
-      let picker = null; // { models, current, shown, index, backups } while the model list is open
+      let picker = null; // { models, current, shown, index, backups, spent } while the model list is open
       const running = new Set(); // the tool calls under way
       let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
       const toolLines = new Map();
@@ -617,15 +621,16 @@
         let provider = null;
         picker.shown.forEach((model, index) => {
           const group = place(model) >= 0 ? 'backups, in order' : model.provider || 'models';
+          const spent = picker.spent.has(model.id.split('/')[0]);
           if (group !== provider) {
             provider = group;
             const heading = document.createElement('div');
             heading.className = 'provider';
-            heading.textContent = group;
+            heading.textContent = spent && place(model) < 0 ? `${group} · nothing left for now` : group;
             pick.appendChild(heading);
           }
           const row = document.createElement('div');
-          row.className = index === picker.index ? 'option selected' : 'option';
+          row.className = `option${index === picker.index ? ' selected' : ''}${spent ? ' spent' : ''}`;
           const name = document.createElement('span');
           const lead = picker.backups ? (place(model) >= 0 ? `${place(model) + 1} ` : '  ') : model.id === picker.current ? '● ' : '  ';
           name.textContent = `${lead}${model.label} `;
@@ -693,7 +698,7 @@
           return;
         }
         const at = listed.models.findIndex((model) => model.id === listed.current);
-        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order };
+        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order, spent: new Set() };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
@@ -701,6 +706,15 @@
         mark('');
         if (order) notice('enter adds or removes a backup. esc is done');
         drawPicker();
+        // Which providers have nothing left, once the harness has said. The list does not wait for it.
+        const opened = picker;
+        invoke('providers')
+          .then((states) => {
+            if (picker !== opened) return;
+            picker.spent = new Set(states.filter((state) => state.limit_reached === true).map((state) => state.provider));
+            if (picker.spent.size) drawPicker();
+          })
+          .catch(() => {});
       };
 
       const chooseModel = async (model) => {
