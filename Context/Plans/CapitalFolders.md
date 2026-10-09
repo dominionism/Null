@@ -45,10 +45,11 @@ the Voice server or the Voice desktop on the way.
      new. Correct the paths named in `MiniApp.md` and `NullMini.md` (`tauri/src-tauri/` becomes
      `Tauri/SrcTauri/`, `backend/` becomes `Backend/`).
    - Depends on: the user's go (open decision 1).
-   - Risk: `Mini/` is new and already follows the rule, so it will not conflict. Nothing under
-     `tauri/` or `backend/` has changed on `null-mini` since `171960b`. Removing the prototype
-     (`MiniApp.md` item 9) will: done before the rebase, those edits meet the renames and are
-     resolved by hand; done after the switch, they are made on the new paths.
+   - Risk: `Mini/` is new and already follows the rule, so it will not conflict. The prototype has
+     since been removed on `null-mini` (`MiniApp.md` item 9): two files deleted and five put back
+     to their first-commit content. The branch renamed those same files, so the rebase will meet
+     them: the two deleted files have to stay deleted, by hand, and the other five carry no
+     prototype lines.
    - Status: Not started
 
 4. **Switch the working copy**

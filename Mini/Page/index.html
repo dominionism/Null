@@ -2,8 +2,10 @@
 <!-- Null's box: the whole page.
 
      Enter sends what you typed to your agent and the reply streams in below.
-     /model opens the model list, /new starts a new conversation, /quit quits
-     the app, Ctrl+C stops a reply, Esc hides the box.
+     /model opens the model list, /login signs in to a provider, /new starts a
+     new conversation, /quit quits the app and closes the conversation, Ctrl+C
+     stops a reply or, with nothing running, does what /quit does, Esc hides the
+     box.
 
      Nothing is shown but the arrow and the text box until there is something
      to say. The arrow is the status: it pulses while the agent works and turns
@@ -175,7 +177,7 @@
         user-select: text;
         -webkit-user-select: text;
       }
-      /* One of the box's own commands (/model, /new, /quit), as it is typed. */
+      /* One of the box's own commands (/model, /login, /new, /quit), as it is typed. */
       input.command {
         color: var(--command);
       }
@@ -248,6 +250,15 @@
       }
       .note {
         font-style: italic;
+      }
+      /* What the harness says while it signs someone in, and the pages it points to. */
+      .step {
+        color: var(--dim);
+      }
+      .link {
+        color: var(--command);
+        text-decoration: underline;
+        cursor: pointer;
       }
       .tool.failed,
       .error {
@@ -366,6 +377,7 @@
       let replyLine = null; // the element the current answer streams into
       let pendingAsk = null; // { requestId, options, element }
       let picker = null; // { models, current, shown, index } while the model list is open
+      let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
       const toolLines = new Map();
 
       // ── Display ────────────────────────────────────────────────────────
@@ -403,11 +415,11 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/new', '/quit'];
+      const COMMANDS = ['/model', '/login', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
-          !picker && text.startsWith('/') && (text.startsWith('/model ') || COMMANDS.some((name) => name.startsWith(text)));
+          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || COMMANDS.some((name) => name.startsWith(text)));
         input.classList.toggle('command', command);
       };
 
@@ -635,9 +647,170 @@
         mark('');
       };
 
+      // ── Signing in to a provider ───────────────────────────────────────
+      //
+      // The harness knows how each provider signs in. /login shows the harness's
+      // own list, then its own steps as it gives them, and passes back what the
+      // user types. That may be a key, so the field hides it, and nothing typed
+      // during a sign-in is ever drawn in the box.
+
+      const drawSignin = () => {
+        const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+        signin.shown = signin.providers.filter((provider) => words.every((word) => provider.label.toLowerCase().includes(word)));
+        signin.index = Math.min(signin.index, Math.max(signin.shown.length - 1, 0));
+        pick.textContent = '';
+        const heading = document.createElement('div');
+        heading.className = 'provider';
+        heading.textContent = signin.shown.length ? 'sign in to' : 'no provider matches';
+        pick.appendChild(heading);
+        signin.shown.forEach((provider, index) => {
+          const row = document.createElement('div');
+          row.className = index === signin.index ? 'option selected' : 'option';
+          row.textContent = provider.label;
+          row.addEventListener('click', () => chooseProvider(provider));
+          pick.appendChild(row);
+          if (index === signin.index && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+        });
+        fit();
+      };
+
+      const endSignin = () => {
+        signin = null;
+        input.type = 'text';
+        input.value = '';
+        tint();
+        pick.style.display = 'none';
+        pick.textContent = '';
+        if (out.textContent) out.style.display = 'block';
+        mark(busy ? 'working' : '');
+        fit();
+      };
+
+      const cancelSignin = () => {
+        if (signin.stage === 'choose') {
+          endSignin();
+          return;
+        }
+        signin.cancelled = true;
+        invoke('signin_cancel').catch(() => {}); // the app then reports the sign-in over
+      };
+
+      const openSignin = async () => {
+        if (signin || picker) return;
+        mark('working');
+        let providers;
+        try {
+          providers = await invoke('signin_providers');
+        } catch (error) {
+          line('error', `could not start a sign-in: ${error}`);
+          mark('');
+          return;
+        }
+        signin = { stage: 'choose', providers, shown: [], index: 0, before: null, cancelled: false };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        input.value = '';
+        tint();
+        mark('');
+        drawSignin();
+      };
+
+      // The providers whose models the box can reach now, or null when that cannot be told.
+      const reachable = async () => {
+        try {
+          const listed = await invoke('models');
+          return new Set(listed.models.map((model) => model.provider).filter(Boolean));
+        } catch (error) {
+          return null;
+        }
+      };
+
+      const chooseProvider = async (provider) => {
+        if (!provider || !signin || signin.stage !== 'choose') return;
+        signin.stage = 'steps';
+        pick.style.display = 'none';
+        pick.textContent = '';
+        input.value = '';
+        input.type = 'password';
+        line('note', `signing in to ${provider.label}. esc cancels`);
+        mark('working');
+        const before = await reachable();
+        if (!signin) return; // cancelled meanwhile
+        signin.before = before;
+        try {
+          await invoke('signin_start', { number: provider.number });
+        } catch (error) {
+          line('error', String(error));
+          endSignin();
+        }
+      };
+
+      const shortAddress = (address) => {
+        try {
+          const { host, pathname } = new URL(address);
+          const shown = host + pathname;
+          return shown.length > 56 ? `${shown.slice(0, 55)}…` : shown;
+        } catch (error) {
+          return address;
+        }
+      };
+
+      // A line from the harness. A web address in it opens that page when clicked.
+      const stepLine = (text) => {
+        const element = line('step', '');
+        text.split(/(https?:\/\/\S+)/).forEach((part) => {
+          if (!/^https?:\/\//.test(part)) {
+            element.appendChild(document.createTextNode(part));
+            return;
+          }
+          const link = document.createElement('span');
+          link.className = 'link';
+          link.textContent = shortAddress(part);
+          link.addEventListener('click', () => invoke('open_url', { url: part }).catch(() => {}));
+          element.appendChild(link);
+        });
+        out.scrollTop = out.scrollHeight;
+        fit();
+      };
+
+      listen('mini:signin', async (message) => {
+        if (!signin) return;
+        const said = message.payload;
+        if (said.kind === 'line') {
+          stepLine(said.text);
+          mark('working');
+          return;
+        }
+        if (said.kind === 'ask') {
+          stepLine(said.text);
+          mark('asking'); // the harness is waiting for what the user types
+          input.focus();
+          return;
+        }
+        // Over. When it failed, the harness has already said why.
+        const { before, cancelled } = signin;
+        endSignin();
+        if (cancelled) {
+          line('note', 'sign-in cancelled');
+        } else if (said.ok) {
+          // Check the result, not the steps: is the provider's model list there now?
+          mark('working');
+          const after = await reachable();
+          mark(busy ? 'working' : '');
+          const added = before && after ? [...after].filter((provider) => !before.has(provider)) : [];
+          if (added.length) line('note', `signed in. new under /model: ${added.join(', ')}`);
+          else if (before && after) line('note', 'the sign-in finished, but no new provider appeared under /model');
+          else line('note', 'the sign-in finished');
+        }
+      });
+
       const send = async (text) => {
         if (text === '/model' || text.startsWith('/model ')) {
           openPicker(text.slice(6).trim());
+          return;
+        }
+        if (text === '/login') {
+          openSignin();
           return;
         }
         if (text === '/quit') {
@@ -655,6 +828,15 @@
           out.style.display = 'none';
           toolLines.clear();
           fit();
+          return;
+        }
+        // A lone slash-word that is not one of the box's commands is a slip, or a
+        // command the box does not have. Sent on, the agent takes it for a message
+        // and sets off trying to work out what was meant. Hand it back instead.
+        if (/^\/[\w:-]+$/.test(text)) {
+          input.value = text;
+          tint();
+          notice(`no such command: ${text}. the box has /model, /login, /new and /quit`);
           return;
         }
         if (busy) {
@@ -776,6 +958,10 @@
 
       input.addEventListener('input', () => {
         tint();
+        if (signin && signin.stage === 'choose') {
+          signin.index = 0;
+          drawSignin();
+        }
         if (picker) {
           picker.index = 0;
           drawPicker();
@@ -783,6 +969,25 @@
       });
 
       input.addEventListener('keydown', (event) => {
+        if (signin) {
+          if (signin.stage === 'choose') {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              const step = event.key === 'ArrowDown' ? 1 : -1;
+              signin.index = Math.max(0, Math.min(signin.shown.length - 1, signin.index + step));
+              drawSignin();
+            } else if (event.key === 'Enter' && !event.isComposing) {
+              chooseProvider(signin.shown[signin.index]);
+            }
+          } else if (event.key === 'Enter' && !event.isComposing && input.value) {
+            // What the harness asked for. It is handed over and not kept or shown.
+            const text = input.value;
+            input.value = '';
+            mark('working');
+            invoke('signin_answer', { text }).catch((error) => line('error', String(error)));
+          }
+          return;
+        }
         if (picker) {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
@@ -815,17 +1020,22 @@
 
       window.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
-          if (picker) closePicker();
+          if (signin) cancelSignin();
+          else if (picker) closePicker();
           else invoke('hide_box');
-        } else if (event.key === 'c' && event.ctrlKey && busy) {
+        } else if (event.key === 'c' && event.ctrlKey) {
+          // As in a terminal program: stop what is running; with nothing running,
+          // quit. Quitting closes the conversation, so the next start is a fresh one.
           event.preventDefault();
-          invoke('interrupt').catch(() => {});
+          if (signin) cancelSignin();
+          else if (busy) invoke('interrupt').catch(() => {});
+          else invoke('quit');
         }
       });
 
       listen('mini:shown', () => {
         input.focus();
-        if (!picker) catchUp(); // anything that arrived while hidden
+        if (!picker && !signin) catchUp(); // anything that arrived while hidden
         fit();
       });
 
