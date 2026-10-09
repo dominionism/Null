@@ -3,8 +3,9 @@
 
      Enter sends what you typed to your agent and the reply streams in below.
      /model opens the model list, /backup sets the models to carry on with when
-     the one in use stops answering, /login signs in to a provider, /new starts
-     a new conversation, /quit quits the app and closes the conversation, Ctrl+C
+     the one in use stops answering, /usage shows what each provider has left,
+     /login signs in to a provider, /new starts a new conversation, /quit quits
+     the app and closes the conversation, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
 
@@ -504,6 +505,25 @@
       .option.spent {
         opacity: 0.4;
       }
+      /* /usage: one row a limit, in columns: its name, how much is used, when it
+         starts over. The words are the harness's own. */
+      .left {
+        display: grid;
+        grid-template-columns: 19ch 11ch minmax(0, 1fr);
+        padding: 2px 12px;
+        white-space: pre;
+      }
+      .left > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .left.spent,
+      .left.none {
+        color: var(--dim);
+      }
+      .left.none {
+        display: block;
+      }
       /* The provider's own words, when it answered in place of the model. */
       .reply.failed,
       .reply.failed .h,
@@ -558,7 +578,7 @@
       let anchor = null; // the owner's latest message: held at the top once the reply outgrows the box
       let following = true; // false once the owner has scrolled for themselves
       let pendingAsk = null; // { requestId, options, element }
-      let picker = null; // { models, current, shown, index, backups, spent } while the model list is open
+      let picker = null; // { models, current, shown, index, backups, spent, left } while a list is open
       const running = new Set(); // the tool calls under way
       let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
       const toolLines = new Map(); // call id → { row, block }
@@ -603,7 +623,7 @@
       out.addEventListener('scroll', () => out.classList.toggle('more', out.scrollTop < out.scrollHeight - out.clientHeight - 2));
 
       const add = (element) => {
-        out.style.display = 'block';
+        if (!picker) out.style.display = 'block'; // behind an open list until the list is put away
         out.appendChild(element);
         place();
         fit();
@@ -821,7 +841,7 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/backup', '/login', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
@@ -1026,7 +1046,8 @@
             provider = group;
             const heading = document.createElement('div');
             heading.className = 'provider';
-            heading.textContent = spent && place(model) < 0 ? `${group} · nothing left for now` : group;
+            const left = place(model) < 0 && picker.left.get(model.id.split('/')[0]);
+            heading.textContent = left ? `${group} · ${left}` : group;
             pick.appendChild(heading);
           }
           const row = document.createElement('div');
@@ -1065,7 +1086,75 @@
         }
         input.value = '';
         tint();
-        mark('');
+        mark(busy ? 'working' : '');
+        fit();
+      };
+
+      // ── What is left ───────────────────────────────────────────────────
+      //
+      // The harness knows how much of each provider's limits is used and when they
+      // start over. The box shows that in the harness's own words for each limit,
+      // and only when asked: under /usage, and beside the names in the model list.
+
+      const percent = (share) => `${Math.round(share * 100)}%`;
+
+      // When a limit starts over, said briefly: the time if it is soon, the day
+      // if it is this week, the date after that.
+      const resets = (at) => {
+        if (!at) return '';
+        const when = new Date(at);
+        const hours = (when - Date.now()) / 3600000;
+        if (hours <= 0) return '';
+        const time = when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+        if (hours < 20) return `resets ${time}`;
+        if (hours < 144) return `resets ${when.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+        return `resets ${when.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+      };
+
+      // What is left on a provider, in a few words: its tightest limit.
+      const leftOn = (state) => {
+        const whole = state.limits.filter((limit) => limit.whole_provider && limit.used !== null);
+        if (state.limit_reached) {
+          const gone = whole.filter((limit) => limit.status === 'exhausted' && limit.resets_at).sort((a, b) => b.resets_at - a.resets_at)[0];
+          const back = gone ? resets(gone.resets_at) : '';
+          return back ? `nothing left, ${back}` : 'nothing left for now';
+        }
+        if (!whole.length) return '';
+        const tightest = whole.reduce((a, b) => (b.used > a.used ? b : a));
+        return `${percent(Math.max(0, 1 - tightest.used))} left`;
+      };
+
+      const openUsage = async () => {
+        if (picker || signin) return;
+        mark('working');
+        let states;
+        try {
+          states = await invoke('providers', { fresh: true });
+        } catch (error) {
+          line('error', `could not read what is left: ${error}`);
+          mark(busy ? 'working' : '');
+          return;
+        }
+        mark(busy ? 'working' : '');
+        picker = { usage: true, models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        pick.textContent = '';
+        input.value = '';
+        tint();
+        for (const state of states) {
+          pick.append(el('div', 'provider', state.provider));
+          if (!state.reported || !state.limits.length) {
+            pick.append(el('div', 'left none', '  no usage report'));
+            continue;
+          }
+          for (const limit of state.limits) {
+            const gone = limit.status === 'exhausted';
+            const used = gone ? 'used up' : limit.used === null ? '' : `${percent(limit.used)} used`;
+            pick.append(el('div', gone ? 'left spent' : 'left', el('span', '', `  ${limit.label}`), el('span', '', used), el('span', '', resets(limit.resets_at))));
+          }
+        }
+        if (!states.length) pick.append(el('div', 'provider', 'no provider is signed in'));
         fit();
       };
 
@@ -1102,7 +1191,7 @@
           return;
         }
         const at = listed.models.findIndex((model) => model.id === listed.current);
-        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order, spent: new Set() };
+        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order, spent: new Set(), left: new Map() };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
@@ -1116,7 +1205,8 @@
           .then((states) => {
             if (picker !== opened) return;
             picker.spent = new Set(states.filter((state) => state.limit_reached === true).map((state) => state.provider));
-            if (picker.spent.size) drawPicker();
+            picker.left = new Map(states.map((state) => [state.provider, leftOn(state)]).filter(([, words]) => words));
+            if (picker.spent.size || picker.left.size) drawPicker();
           })
           .catch(() => {});
       };
@@ -1310,6 +1400,10 @@
           openPicker(text.slice(7).trim(), true);
           return;
         }
+        if (text === '/usage') {
+          openUsage();
+          return;
+        }
         if (text === '/login') {
           openSignin();
           return;
@@ -1340,7 +1434,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /backup, /login, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /new and /quit`);
           return;
         }
         if (busy) {
@@ -1467,7 +1561,7 @@
           signin.index = 0;
           drawSignin();
         }
-        if (picker) {
+        if (picker && !picker.usage) {
           picker.index = 0;
           drawPicker();
         }
@@ -1491,6 +1585,11 @@
             mark('working');
             invoke('signin_answer', { text }).catch((error) => line('error', String(error)));
           }
+          return;
+        }
+        if (picker && picker.usage) {
+          // Nothing to choose here: Enter, like Esc, puts the list away.
+          if (event.key === 'Enter' && !event.isComposing) closePicker();
           return;
         }
         if (picker) {
