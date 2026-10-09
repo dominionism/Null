@@ -36,7 +36,7 @@ use crate::{panel, settings};
 
 /// The harness this app drives. One for now; the name is also its CLI.
 const HARNESS: &str = "omp";
-const HARNESS_NAME: &str = "Oh-my-pi";
+pub const HARNESS_NAME: &str = "Oh-my-pi";
 
 /// Events kept for a page that reloads or reopens. A long reply is a few hundred.
 const MAX_EVENTS: usize = 5000;
@@ -51,6 +51,8 @@ enum Command {
     Send { text: String },
     Interrupt,
     NewConversation,
+    /// Let the harness process go, so that the next order starts a fresh one.
+    Restart,
     Models { reply: oneshot::Sender<Result<ModelList, String>> },
     SetModel { id: String, reply: oneshot::Sender<Result<(), String>> },
 }
@@ -206,7 +208,7 @@ fn refuse(app: &AppHandle, shared: &Arc<Mutex<Shared>>, command: Command, reason
         Command::SetModel { reply, .. } => {
             let _ = reply.send(Err(reason.to_string()));
         }
-        Command::Interrupt | Command::NewConversation => {}
+        Command::Interrupt | Command::NewConversation | Command::Restart => {}
     }
 }
 
@@ -217,11 +219,15 @@ async fn serve(
     first: Command,
     orders: &mut mpsc::UnboundedReceiver<Command>,
 ) -> Result<(), String> {
-    let Some(binary) = translate::find_installed(HARNESS, None) else {
+    if matches!(first, Command::Restart) {
+        return Ok(()); // nothing is running; the next order starts a fresh process anyway
+    }
+    let Some(binary) = installed() else {
         refuse(app, shared, first, &format!("{HARNESS_NAME} is not installed"));
         return Ok(());
     };
     let mut argv = vec![binary.display().to_string()];
+    argv.extend(extra_args());
     argv.extend(launch_args(&binary));
     argv.push("acp".into());
     log!("starting the harness: {}", argv.join(" "));
@@ -257,9 +263,24 @@ async fn serve(
     }
 }
 
+/// Where the harness is installed, or None when it is not.
+pub fn installed() -> Option<PathBuf> {
+    translate::find_installed(HARNESS, None)
+}
+
+/// Arguments every run of the harness gets. `NULL_MINI_PROFILE` names an isolated
+/// harness profile, so that sign-in and first-run behaviour can be checked
+/// without touching the user's real sign-ins.
+pub fn extra_args() -> Vec<String> {
+    match std::env::var("NULL_MINI_PROFILE") {
+        Ok(profile) if !profile.is_empty() => vec!["--profile".into(), profile],
+        _ => Vec::new(),
+    }
+}
+
 /// Carry the approval mode the user set for the terminal into the protocol, which ignores it.
 fn launch_args(binary: &Path) -> Vec<String> {
-    let output = std::process::Command::new(binary).args(["config", "get", "tools.approvalMode"]).output();
+    let output = std::process::Command::new(binary).args(extra_args()).args(["config", "get", "tools.approvalMode"]).output();
     let mode = output.ok().map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string()).unwrap_or_default();
     if matches!(mode.as_str(), "always-ask" | "write" | "yolo") {
         vec!["--approval-mode".into(), mode]
@@ -345,6 +366,10 @@ async fn converse(
                 }
             }
         };
+        if matches!(command, Command::Restart) {
+            log!("letting the harness process go; the next order starts a fresh one");
+            return Ok(());
+        }
         conversation.handle(command).await?;
     }
 }
@@ -394,6 +419,7 @@ impl Conversation<'_> {
                     }
                 }
             }
+            Command::Restart => {} // taken by the loop that calls this
             Command::NewConversation => {
                 {
                     let mut shared = lock(self.shared);
@@ -587,6 +613,12 @@ fn on_permission(
 
 fn order(harness: &Harness, command: Command) -> Result<(), String> {
     harness.commands.unbounded_send(command).map_err(|_| "the harness thread has stopped".to_string())
+}
+
+/// Let the running harness process go. The next order starts a fresh one and
+/// loads the conversation back; a fresh process sees a provider just signed in to.
+pub fn restart(app: &AppHandle) {
+    let _ = order(&app.state::<Harness>(), Command::Restart);
 }
 
 /// Send a message. The reply arrives as events; the number returned is the event to read after.

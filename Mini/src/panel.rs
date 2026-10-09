@@ -18,7 +18,7 @@ use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 
 use crate::log::log;
-use crate::{access, settings};
+use crate::{access, settings, signin};
 
 pub const LABEL: &str = "mini";
 
@@ -91,8 +91,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     window.on_window_event(move |event| {
         if let WindowEvent::Focused(false) = event {
             // While Null is asking for Full Disk Access the box stays up over
-            // System Settings, where the user has gone to answer.
-            if !access::asking() {
+            // System Settings, where the user has gone to answer. Likewise during a
+            // sign-in, while the user is in their browser.
+            if !access::asking() && !signin::under_way(&handle) {
                 hide(&handle, "clicked away");
             }
         }

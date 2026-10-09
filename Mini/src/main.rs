@@ -2,7 +2,7 @@
 //! own agent harness. It is one app with no server; the page in `Page/` talks to
 //! this process through commands and events.
 //!
-//! Four switches for development, all read from the environment:
+//! Five switches for development, all read from the environment:
 //! - `NULL_MINI_EXIT_WHEN_READY`: quit as soon as the page has loaded, which makes
 //!   "start, load the page, stop" a check a script can run.
 //! - `NULL_MINI_NO_SHORTCUT`: do not listen for Control+Space, and show the box at
@@ -11,6 +11,8 @@
 //!   comes back, and quit. No window and no shortcut; it checks the harness alone.
 //! - `NULL_MINI_SELFTEST`: type its value into the real page, wait for the reply,
 //!   log what the page shows, and quit. Use with `NULL_MINI_NO_SHORTCUT`.
+//! - `NULL_MINI_PROFILE`: run the harness under that isolated profile of its own,
+//!   so sign-in and first-run behaviour can be tried without the real sign-ins.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -23,6 +25,7 @@ mod log;
 mod panel;
 mod settings;
 mod shortcut;
+mod signin;
 mod translate;
 
 use log::log;
@@ -72,6 +75,11 @@ fn main() {
             harness::new_conversation,
             harness::events_since,
             harness::report,
+            signin::signin_providers,
+            signin::signin_start,
+            signin::signin_answer,
+            signin::signin_cancel,
+            signin::open_url,
         ])
         .setup(|app| {
             log!("started, version {}", app.package_info().version);
@@ -81,6 +89,7 @@ fn main() {
             let handle = app.handle();
             settings::init(handle);
             harness::init(handle);
+            signin::init(handle);
             if let Some(text) = std::env::var_os("NULL_MINI_SMOKE") {
                 harness::smoke(handle, text.to_string_lossy().into_owned());
                 return Ok(());
