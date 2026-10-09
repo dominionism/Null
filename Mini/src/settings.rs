@@ -24,7 +24,19 @@ pub struct Settings {
 pub struct Store(Mutex<Settings>);
 
 fn path(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|dir| dir.join("settings.json"))
+    app.path().app_config_dir().ok().map(|dir| dir.join(file_name("settings", "json")))
+}
+
+/// The name of one of the app's own files. A run under a harness profile
+/// (`NULL_MINI_PROFILE`, for scripted checks) keeps files of its own, so that
+/// a check never changes what the installed app remembers.
+pub fn file_name(stem: &str, extension: &str) -> String {
+    let profile: String = std::env::var("NULL_MINI_PROFILE").unwrap_or_default().chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')).collect();
+    if profile.is_empty() {
+        format!("{stem}.{extension}")
+    } else {
+        format!("{stem}.{profile}.{extension}")
+    }
 }
 
 /// Read the settings file, or start from nothing when it is missing or unreadable.
