@@ -35,7 +35,7 @@
         --red: #ff8078;
         --command: #8ab8ff;
         --line: rgba(255, 255, 255, 0.09);
-        --sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        /* One typeface throughout: the box is a terminal. */
         --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
       }
       html,
@@ -43,7 +43,7 @@
         margin: 0;
         background: transparent;
         overflow: hidden;
-        font: 14px/1.4 var(--sans);
+        font: 13px/1.4 var(--mono);
         color: var(--text);
         cursor: default;
         user-select: none;
@@ -122,23 +122,20 @@
          the agent works, amber while the agent waits for an answer. */
       .caret {
         flex: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         width: 10px;
         height: 22px;
         color: rgb(var(--accent));
-        font-size: 0; /* the › in the markup is drawn below, so it is the same shape in any font */
         transition: color 0.2s ease;
       }
-      .caret::before {
-        content: '';
-        width: 5.5px;
-        height: 5.5px;
-        border: solid currentColor;
-        border-width: 1.75px 1.75px 0 0;
-        border-radius: 1px;
-        transform: translateX(-1.5px) rotate(45deg);
+      /* Drawn, so it is the same shape in any font, and as one stroke with round
+         ends and a round corner, so it reads as a single mark. */
+      .caret svg {
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       .caret.working {
         animation: pulse 1.2s ease-in-out infinite;
@@ -153,12 +150,18 @@
       }
       input,
       #ruler {
-        font: 400 15px/22px var(--sans);
+        font: 400 13.5px/22px var(--mono);
       }
       input {
         flex: 1;
         min-width: 0;
         height: 22px;
+        /* A line of type sits low in its own line box: measured in the app's web
+           engine, small letters were centred 1.5px below the row's middle and
+           capitals 0.25px below. One pixel up puts the row's middle between them,
+           level with the arrow. */
+        position: relative;
+        top: -1px;
         margin: 0;
         padding: 0;
         border: 0;
@@ -191,7 +194,7 @@
         box-sizing: border-box;
         height: 26px;
         padding: 0 14px 0 33px;
-        font: 11.5px/18px var(--sans);
+        font: 11px/18px var(--mono);
         color: var(--dim);
         white-space: nowrap;
         overflow: hidden;
@@ -294,7 +297,7 @@
         margin-top: 8px;
         padding: 0 12px;
         color: var(--faint);
-        font: 600 10px/18px var(--sans);
+        font: 600 10px/18px var(--mono);
         letter-spacing: 0.08em;
         text-transform: uppercase;
       }
@@ -336,7 +339,9 @@
   <body>
     <div class="box" id="box">
       <div class="row">
-        <span class="caret" id="caret">›</span>
+        <span class="caret" id="caret" aria-hidden="true"
+          ><svg viewBox="0 0 10 22" width="10" height="22"><path d="M3 7l4 4-4 4" /></svg
+        ></span>
         <input id="q" autofocus spellcheck="false" />
       </div>
       <div id="pick"></div>
