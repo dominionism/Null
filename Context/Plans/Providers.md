@@ -8,8 +8,9 @@
 > and 5). The limit spike is done (item 2): a failure reaches Null as reply text, never as an error,
 > and the harness can move to another model by itself, which is now the design (decision 4). That
 > is built and installed (item 7): `/backup` sets the order, a switch and a failed reply are said
-> in the box, and the owner's order is Claude Opus 5.5, then DeepSeek V4.1 Flash. No real limit
-> has been seen yet. Not started: `/usage`, first run, and the rest.**
+> in the box, and the owner's order is Claude Opus 5.5, then DeepSeek V4.1 Flash. `/usage` is
+> built and installed too (item 8). No real limit has been seen yet. Not started: first run, and
+> the rest.**
 
 ## Goal
 
@@ -250,7 +251,7 @@ then let's go with that." Each recommendation was looked at again against the de
      hand-made "limit reached" one; anything unreadable becomes "unknown", never a failure.
    - Source: verified locally (shape captured 2026-10-08).
    - Status: In progress — the report is read and served by a `providers` command, which
-     `/model` and `/backup` now ask in order to dim a provider with nothing left (item 7)
+     `/usage`, `/model` and `/backup` ask (items 7 and 8)
    - **Built (2026-10-09):** `Mini/src/providers.rs`. It runs `omp usage --json --redact` off the
      main thread with a 15 second limit, and reads each provider's limits (label, share used,
      reset time, the harness's own status word, and whether the limit covers the whole provider)
@@ -446,7 +447,20 @@ then let's go with that." Each recommendation was looked at again against the de
    - Risk: more words in a box meant to stay bare. Know it by: the owner's eye; the figures appear
      only in these two lists, never in the idle box.
    - Source: specified from user + verified locally (the report).
-   - Status: Not started
+   - Status: In progress — built and installed (2026-10-09); the owner has not yet used it
+   - **Built:** `/usage`, blue like the other commands. It asks the harness afresh and lists each
+     provider with one row a limit: the harness's own name for the limit, how much is used, and
+     when it starts over (the time if that is soon, the day if it is this week, the date after
+     that). A limit that is used up is dimmed and says so. A provider with no report says "no
+     usage report". Enter or Esc puts the list away, and it may be opened while a reply runs.
+     In `/model` and `/backup` each provider's name now carries its tightest limit ("37% left"),
+     or "nothing left, resets 3:54 am".
+   - **Checked:** drawn in the app's web engine with the figures the harness reported for the
+     owner's three providers on 2026-10-09 (anthropic 54% and 63% used, openai-codex 0% and 2%,
+     opencode-go 6%, 29% and 25%), and with one provider used up. All three reports name their
+     limits differently, and each is shown as the harness names it.
+   - **Not proven:** the installed app asking the harness itself; the drawings were fed the
+     figures by a stand-in for the app's command.
 
 9. **Keys**
    - What: a key is one of the things a sign-in may ask for, so item 5 already carries it. What is
