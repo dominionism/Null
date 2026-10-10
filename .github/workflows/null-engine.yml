@@ -1,0 +1,139 @@
+name: Null engine
+
+# Once a week: is there a newer Oh-my-pi, and does Null still work with it?
+#
+# The newest release of Oh-my-pi is fetched and asked what Null depends on (the harness check).
+# When it passes, a branch is pushed that moves Mini/Engine.toml to it, and a pull request is
+# opened for it, or an issue with the link to open one, where the repository does not let a
+# job open pull requests. When it fails, an issue says which questions failed. A person merges.
+#
+# A push that changes this file only tries it: it says what it would do and does none of it.
+on:
+  schedule:
+    # Mondays at 09:17 UTC. Oh-my-pi has several releases a day; once a week is enough.
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/null-engine.yml"
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  newest:
+    # Null is a macOS app, and the Oh-my-pi it carries is fetched for Apple Silicon.
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # A push only tries this workflow.
+      ONLY_SAY: ${{ github.event_name == 'push' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./Mini -> target"
+
+      - name: Keep the carried Oh-my-pi between runs
+        uses: actions/cache@v4
+        with:
+          path: Mini/Engine
+          key: null-engine-${{ hashFiles('Mini/Engine.toml') }}
+
+      - name: Fetch the Oh-my-pi that Null carries
+        run: Mini/Scripts/engine
+
+      # The script fetches the newest release, checks who signed it, asks it what Null depends
+      # on, and writes Mini/Engine.toml only when every question passed.
+      - name: Ask the newest Oh-my-pi what Null depends on
+        id: asked
+        run: |
+          was=$(sed -n 's/^version = "\(.*\)"/\1/p' Mini/Engine.toml | head -1)
+          set +e
+          Mini/Scripts/engine --to newest > "$RUNNER_TEMP/asked.log" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/asked.log"
+          newest=$(sed -n 's/^The newest Oh-my-pi is \(.*\)\.$/\1/p' "$RUNNER_TEMP/asked.log" | head -1)
+          grep -E '^test .* \.\.\. FAILED$' "$RUNNER_TEMP/asked.log" | sed -e 's/^test \(.*\) \.\.\. FAILED$/- \1/' > "$RUNNER_TEMP/failed.md" || true
+          if git diff --quiet -- Mini/Engine.toml; then moved=no; else moved=yes; fi
+          {
+            echo "was=$was"
+            echo "newest=$newest"
+            echo "code=$code"
+            echo "moved=$moved"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Nothing newer
+        if: steps.asked.outputs.code == '0' && steps.asked.outputs.moved == 'no'
+        run: echo "Null already carries the newest Oh-my-pi, ${{ steps.asked.outputs.was }}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: It passed, so propose the move
+        if: steps.asked.outputs.code == '0' && steps.asked.outputs.moved == 'yes'
+        env:
+          WAS: ${{ steps.asked.outputs.was }}
+          NEWEST: ${{ steps.asked.outputs.newest }}
+        run: |
+          branch="engine-$NEWEST"
+          title="build(mini-app): carry Oh-my-pi $NEWEST"
+          if [ "$ONLY_SAY" = "true" ]; then
+            echo "Oh-my-pi $NEWEST passed the harness check. A real run would push $branch and open a pull request: $title" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null 2>&1; then
+            echo "Oh-my-pi $NEWEST passed, and $branch is already there from an earlier run." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add Mini/Engine.toml
+          git commit -m "$title" -m "Oh-my-pi $NEWEST passed the harness check beside $WAS, which Null carried until now, and is signed by the same author. Mini/Engine.toml names it with the checksums of its files."
+          git push origin "$branch"
+          body="Oh-my-pi $NEWEST passed Null's harness check in $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID, beside $WAS, which Null carries now. It is signed by the same author. This moves \`Mini/Engine.toml\` to it. Merging makes \`/update\` offer it, and the next Null carry it."
+          if ! gh pr create --base "${{ github.event.repository.default_branch }}" --head "$branch" --title "$title" --body "$body"; then
+            # The repository does not let a job open pull requests: leave the link for a person.
+            gh issue create --title "Oh-my-pi $NEWEST passed the harness check" --body "$body
+
+          Open the pull request: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$branch?expand=1"
+          fi
+
+      - name: It did not pass, so say which questions failed
+        if: steps.asked.outputs.code != '0'
+        env:
+          WAS: ${{ steps.asked.outputs.was }}
+          NEWEST: ${{ steps.asked.outputs.newest }}
+        run: |
+          title="Oh-my-pi ${NEWEST:-(newest)} does not pass the harness check"
+          {
+            echo "Null stays on Oh-my-pi $WAS. The run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            if [ -s "$RUNNER_TEMP/failed.md" ]; then
+              echo "The questions that failed, each named for what Null relies on:"
+              echo
+              cat "$RUNNER_TEMP/failed.md"
+            else
+              echo "No question was reached. The last lines of the run:"
+              echo
+              echo '```'
+              tail -15 "$RUNNER_TEMP/asked.log"
+              echo '```'
+            fi
+          } > "$RUNNER_TEMP/issue.md"
+          cat "$RUNNER_TEMP/issue.md" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$ONLY_SAY" = "true" ]; then
+            echo "A real run would open an issue: $title" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ -z "$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')" ]; then
+            gh issue create --title "$title" --body-file "$RUNNER_TEMP/issue.md"
+          fi
+          exit 1
