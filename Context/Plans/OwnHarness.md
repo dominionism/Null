@@ -8,8 +8,9 @@
 > Oh-my-pi and starts that one, and `/harness` chooses between it and the owner's own. Items 3, 4
 > and 10 are built, merged and installed (2026-10-09, about 20:06): what a harness can do, the
 > harness check, and `/update`. The carried version is 18.8.7. That installed build has not yet
-> been checked by the owner's hand (see Verification). Item 9 is partly done: the README and the
-> decision record. Not started: items 5 to 8.**
+> been checked by the owner's hand (see Verification). Item 5, the first opening, is built and
+> proven by script, and not installed. Item 9 is partly done: the README and the decision record.
+> Not started: items 6 to 8.**
 
 ## Goal
 
@@ -409,7 +410,8 @@ where it is removed.
      (`Providers.md`, item 1). Know it by: the scripted start under a throwaway folder, with and
      without a local model.
    - Source: specified from user + `Providers.md`.
-   - Status: Not started
+   - Status: In progress. Built and proven by script (2026-10-09); not installed, and not yet
+     tried by a person or on a fresh Mac account
    - **Seen (2026-10-09), on new folders of their own (`NULL_MINI_FOLDER`, item 4):**
      - This Mac runs Ollama, so a folder with nothing signed in still offers one model,
        `ollama/llama3.2:latest`. A message was answered by it after 33 seconds, with
@@ -422,6 +424,45 @@ where it is removed.
        elsewhere too, answers `tools.approvalMode` with `yolo`. Null passes the harness's
        setting on, so a newcomer's Null lets the agent do everything without asking
        (decision 7).
+     - A conversation stays on the model it had when a provider appears, and a new
+       conversation starts on it too. Seen with the stand-in added to a folder that had
+       the Ollama model first. So a newcomer who signs in could go on talking to the small
+       local model without knowing. Not seen with a real provider's sign-in.
+   - **Built:** `Mini/src/welcome.rs`. At a start, once (the setting `welcomed`), Null reads
+     the harness's usage report. With no account in it, the box opens by itself with the
+     sign-in list and the line "no provider is signed in. choose one, or esc for later". With
+     an account it does nothing and does not look again. With no report to read it looks
+     again at the next start. After any sign-in the box says what was added and the model in
+     use: "signed in to anthropic. now on …", or "still on … /model changes it" when the
+     conversation was kept on the model it had; in the first opening the model list then
+     opens on the new provider. When the first opening's sign-in is over, however it went,
+     the box says "the agent may act without asking you first" if the harness's approval
+     setting is `yolo`, and "no provider is signed in. /login signs in" if nothing was
+     added. Full Disk Access is noted at start (`access::at_start`) and asked for after the
+     first reply that ended well (`access::after_reply`). The README says all three.
+   - **Deviation:** the model list is not looked at to decide. The harness gives no way to
+     tell a local model from any other: `omp models --json` has no such field, and a key in
+     the environment adds a provider's models but no account to the report. So the rule is
+     the report alone, and no account means not signed in. A Mac with only a local model
+     gets the first opening, as intended. Someone who gave the harness a key some other way
+     sees it once too, and presses Esc.
+   - **Proven without a person:** 68 unit tests, four of them new: what a report with no
+     account, with an account, and no report at all mean; and when the user is sent to the
+     Full Disk Access switch. The 15 live checks. The real app on new folders: a first start
+     logs "no provider is signed in; opening the box to say so, this once" and then "the
+     sign-in list was read: 82 providers", which only the page asks for; a second start on
+     the same folder does neither; with the folder's settings saying `welcomed`, a message
+     typed into the real page is answered as before. Nine states drawn in the app's web
+     engine with stand-in answers and read back: the first opening; Esc; signed in while a
+     local model was in use (the model list opens on the new provider); signed in with no
+     model before; a sign-in that failed; a harness that asks before acting (no line about
+     acting freely); the user already busy when it arrives (the lines only); and `/login`
+     later, with and without a new provider.
+   - **Not proven:** a real sign-in through the first opening; a report that holds an
+     account (unit-tested only, until the owner's own Null starts on this build and logs "a
+     provider is signed in, so there is no first opening"); the Full Disk Access question
+     after a reply, since the test build reads it as on here and only the rule is tested; a
+     fresh Mac user account; the installed app.
 
 6. **One command to install** (decision 1)
    - What: two ways in, and the same Null at the end of both.
@@ -561,6 +602,11 @@ where it is removed.
   showing both rows as 18.8.7 with no "not checked" label, and the line "built in stays until
   Null is updated. yours follows omp update" under the list; `/update` saying "already on the
   newest checked Oh-my-pi, 18.8.7".
+- By hand, the owner, once the first opening is installed: the box does not open by itself,
+  and the log says "a provider is signed in, so there is no first opening". On a Mac user
+  account that has never had Null: the box opens by itself with the sign-in list, a sign-in
+  ends with the provider and the model said, the line about acting without asking is there,
+  and System Settings opens only after the first reply.
 
 ## Validation
 
