@@ -129,11 +129,17 @@ where it is removed.
 5. **This reverses decision 3 of `Providers.md`** ("It does not download or run an installer").
    The owner asked for it on 2026-10-09; written as
    `Context/ADR/0003-NullCarriesItsOwnHarness.md`.
-6. **How other people get a signing identity at install.** Open. Recommended: the install
-   makes one on each Mac, with one approval (item 6).
-7. **What a newcomer's Null may do without asking.** Open. Oh-my-pi's default is `yolo`, and
-   Null passes the harness's setting on (item 5). Recommended: the first opening says so in
-   one plain line, and the README too.
+6. **How other people get a signing identity at install: settled by the owner on 2026-10-09.**
+   The install makes one on each Mac, with one approval (item 6). Rejected: leaving Null
+   unsigned, since macOS would then ask for everything again after every update. Still to
+   work out: how to ask for that approval in words a person understands.
+7. **What a newcomer's Null may do without asking: settled by the owner on 2026-10-09.** It
+   keeps Oh-my-pi's own default, `yolo`: Null passes the harness's setting on and adds no
+   approval layer of its own (`MiniApp.md`). The first opening says so in one plain line, and
+   the README too (items 5 and 9). Rejected: starting newcomers on a stricter setting, which
+   would mean more questions in a small box and a rule of Null's own.
+8. **When Full Disk Access is asked for on a first run: settled by the owner on 2026-10-09.**
+   After the first reply, not at the first start (item 5).
 
 ## Work items
 
@@ -392,8 +398,10 @@ where it is removed.
    - What: takes over item 6 of `Providers.md`. When no provider reports and the model list has
      nothing but local models, the box opens by itself once, says "No provider is signed in" and
      opens `/login`. After a sign-in the box says which provider was added and which model it is
-     on. Still to settle: whether Full Disk Access is asked for at the first start, as now, or
-     after the first reply.
+     on. Full Disk Access is asked for after the first reply, not at the first start as now
+     (decision 8): the person sees Null work before being sent to System Settings, and until
+     then macOS asks folder by folder. The first opening also says, in one plain line, that
+     the agent may act without asking (decision 7).
    - Why: a newcomer's first minute. Today a message sent with nothing signed in only shows a
      provider's error.
    - Depends on: 2.
@@ -435,13 +443,13 @@ where it is removed.
      it runs on is that Mac's own.
    - Source: specified from user + inferred.
    - Status: Not started
-   - **Gap found (2026-10-09), the owner's decision, open:** `Mini/Scripts/install` signs the
-     app only when a signing keychain is already on the Mac, and nothing makes one for someone
-     else. Their Null would be installed unsigned, and macOS ties Full Disk Access and its
-     folder answers to that exact build, so every update would ask again. Recommended: the
-     install makes a local signing identity on each Mac, with one approval. Open: how to do
-     that without a prompt the person will not understand. To try on the same fresh Mac
-     account as the spike.
+   - **Gap found (2026-10-09), settled by the owner the same day (decision 6):**
+     `Mini/Scripts/install` signs the app only when a signing keychain is already on the Mac,
+     and nothing makes one for someone else. Their Null would be installed unsigned, and macOS
+     ties Full Disk Access and its folder answers to that exact build, so every update would
+     ask again. So the install makes a local signing identity on each Mac, with one approval.
+     Still to work out: how to do that without a prompt the person will not understand. To
+     try on the same fresh Mac account as the spike.
 
 7. **Getting the next Null**
    - What: no mechanism of Null's own. The next version comes the way the first did: `npm update`,
