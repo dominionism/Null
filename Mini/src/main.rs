@@ -2,7 +2,7 @@
 //! own agent harness. It is one app with no server; the page in `Page/` talks to
 //! this process through commands and events.
 //!
-//! Five switches for development, all read from the environment:
+//! Six switches for development, all read from the environment:
 //! - `NULL_MINI_EXIT_WHEN_READY`: quit as soon as the page has loaded, which makes
 //!   "start, load the page, stop" a check a script can run.
 //! - `NULL_MINI_NO_SHORTCUT`: do not listen for Control+Space, and show the box at
@@ -13,6 +13,8 @@
 //!   log what the page shows, and quit. Use with `NULL_MINI_NO_SHORTCUT`.
 //! - `NULL_MINI_PROFILE`: run the harness under that isolated profile of its own,
 //!   so sign-in and first-run behaviour can be tried without the real sign-ins.
+//! - `NULL_MINI_UPDATES`: where `/update` reads which version is checked, in
+//!   place of the repository: a made-up file, as a `file://` address.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -98,6 +100,7 @@ fn main() {
             backups::set_backups,
             engine::harnesses,
             engine::set_harness,
+            engine::update_harness,
             signin::signin_providers,
             signin::signin_start,
             signin::signin_answer,
@@ -111,6 +114,7 @@ fn main() {
 
             let handle = app.handle();
             settings::init(handle);
+            engine::tidy(handle);
             harness::init(handle);
             signin::init(handle);
             providers::init(handle);
