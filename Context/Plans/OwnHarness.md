@@ -8,7 +8,7 @@
 > Null carries Oh-my-pi 18.4.3 and starts that one, and `/harness` chooses between it and the
 > owner's own. Proven by the owner on the installed app the same day: messages answered by the
 > built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
-> kept. Still owed: the way back to the built-in one, and `omp update` in the terminal changing
+> kept, the way back to the built-in one, and `omp update` in the terminal (to 18.8.7) changing
 > nothing in Null. Item 4, the harness check, is built and passes on 18.4.3 and on 18.8.7.
 > Not started: items 3 and 5 to 9.**
 
@@ -173,8 +173,7 @@ where it is removed.
    - Risk: the built-in harness replacing itself. It looks for updates by default. Know it by:
      item 4 checks that the program's checksum is the same after a run.
    - Source: specified from user + codebase + verified locally.
-   - Status: In progress. Built, installed and used by the owner (2026-10-09); the way back to
-     the built-in harness and the `omp update` check are still to be seen
+   - Status: Complete (2026-10-09)
    - **Proven by the owner (2026-10-09):** `/harness` in the installed app listed "built in" and
      "yours". Choosing "yours" let the built-in harness go; the log then shows "the harness is
      now /Users/abdulwahid/.omp/bin/omp, version 18.4.3", "starting the user's own harness",
@@ -203,9 +202,17 @@ where it is removed.
      The program's checksum was the same after a run. A message typed into the real page of
      the debug app was answered through the built-in harness. Nine states of `/harness` drawn
      in the app's web engine with stand-in data and read back.
-   - **Not proven:** choosing "built in" again from the owner's own (the log of 2026-10-09 ends
-     on the owner's own, and the setting still names it); `omp update` in the terminal changing
-     nothing in Null.
+   - **Proven by the owner, later the same day:** choosing "built in" again ("the harness is now
+     /Applications/Null.app/Contents/MacOS/omp, version 18.4.3"). Then `omp update` in a
+     terminal took the owner's own Oh-my-pi from 18.4.3 to 18.8.7. The program inside Null
+     kept the checksum of `Engine.toml` and the app still verified. In Null the owner then
+     went to "yours" (the log: "starting the user's own harness", "harness ready: omp 18.8.7",
+     the conversation loaded back, a reply `completed`), back to "built in" ("starting the
+     built-in harness", "harness ready: omp 18.4.3", the same conversation loaded back, a
+     reply `completed`), and to "yours" again, where the setting was left.
+   - **What that adds:** the two versions took turns on the owner's real folder, with real
+     sign-ins and one conversation, in both directions. The harness check had only seen that
+     in a throwaway folder.
 
 3. **Find out what the harness can do, and lose one feature at a time**
    - What: at the first start of a harness Null notes, in the log and in memory: its version;
@@ -388,7 +395,8 @@ where it is removed.
 - Still fuzzy, on purpose: the npm way of item 6 until its spike, and items 7 and 8, which are
   not designed.
 - Known limits of the evidence: the two-version test did not use a folder with real sign-ins and
-  the two versions were four small steps apart. If versions far apart cannot share a folder, the
+  the two versions were four small steps apart. Since 2026-10-09 the first half is answered for
+  18.4.3 and 18.8.7: they took turns on the owner's real folder (item 2). If versions far apart cannot share a folder, the
   owner's fallback is a folder of Null's own: one more sign-in, with skills and MCP servers still
   there.
 - What this plan costs: Null grows from 12 MB to 217 MB (measured 2026-10-09), and Null takes
