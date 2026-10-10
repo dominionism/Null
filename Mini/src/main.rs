@@ -9,8 +9,10 @@
 //!   start instead. For running beside another copy that owns the shortcut.
 //! - `NULL_MINI_SMOKE`: send its value to the harness as one message, print what
 //!   comes back, and quit. No window and no shortcut; it checks the harness alone.
-//! - `NULL_MINI_SELFTEST`: type its value into the real page, wait for the reply,
-//!   log what the page shows, and quit. Use with `NULL_MINI_NO_SHORTCUT`.
+//! - `NULL_MINI_SELFTEST`: type its value into the real page, a line at a time,
+//!   waiting each time until the page has stopped working, log what the page
+//!   shows, and quit. A message, a command, a choice from a list and an answer to
+//!   a sign-in can follow one another. Use with `NULL_MINI_NO_SHORTCUT`.
 //! - `NULL_MINI_PROFILE`: run the harness under that isolated profile of its own,
 //!   so sign-in and first-run behaviour can be tried without the real sign-ins.
 //! - `NULL_MINI_UPDATES`: where `/update` reads which version is checked, in

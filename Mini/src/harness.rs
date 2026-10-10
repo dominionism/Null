@@ -938,9 +938,49 @@ pub fn smoke(app: &AppHandle, text: String) {
     });
 }
 
-/// Type a message into the real page, wait for the reply, and have the page
-/// report what it is showing, then quit. Checks the whole path a keystroke
-/// takes except the keystroke: page, command, harness, events, page.
+/// What `selftest` runs in the page. Each line goes into the field and is
+/// entered, as a person would, once the page has stopped working: after a
+/// reply, when a list has opened, or when a sign-in asks for something. In a
+/// list, a line narrows it and chooses the first entry left. When the last
+/// line has been dealt with, the page says what it shows.
+const SELFTEST_TYPING: &str = r#"async (lines) => {
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const settled = async () => {
+    let quiet = 0;
+    for (let waited = 0; waited < 120000 && quiet < 500; waited += 50) {
+      await pause(50);
+      quiet = busy || caret.classList.contains('working') ? 0 : quiet + 50;
+    }
+  };
+  for (const text of lines) {
+    await settled();
+    // An empty line only presses Enter, on whatever is chosen or typed already.
+    if (text) {
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+    }
+    await pause(150);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+  }
+  await settled();
+  invoke('report', {
+    shown: out.innerText,
+    list: pick.style.display === 'none' ? '' : pick.innerText,
+    notice: noticeLine.style.display === 'none' ? '' : noticeLine.textContent,
+    arrow: caret.className,
+    height: lastHeight,
+    busy,
+  });
+}"#;
+
+/// How long the page gets for one line before the self-test gives up on it.
+const SELFTEST_TIME_LIMIT: std::time::Duration = std::time::Duration::from_secs(150);
+
+/// Type into the real page, line by line, and have the page report what it is
+/// showing, then quit. Checks the whole path a keystroke takes except the
+/// keystroke: page, command, harness, events, page. A message, a command, a
+/// choice from a list and an answer to a sign-in can follow one another, one
+/// to a line. Nothing of what is typed is logged here.
 pub fn selftest(app: &AppHandle, text: String) {
     let app = app.clone();
     std::thread::spawn(move || {
@@ -949,35 +989,29 @@ pub fn selftest(app: &AppHandle, text: String) {
             app.exit(1);
             return;
         };
-        if let Err(e) = window.eval(format!("send({})", Value::String(text))) {
+        let lines: Vec<&str> = text.lines().collect();
+        if let Err(e) = window.eval(format!("({SELFTEST_TYPING})({})", json!(lines))) {
             log!("selftest: could not type into the page: {e}");
             app.exit(1);
             return;
         }
-        let mut cursor = 0;
-        let mut over = false;
-        while !over {
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            let snapshot = events_since(app.clone(), cursor);
-            for item in &snapshot.events {
-                cursor = item["seq"].as_u64().unwrap_or(cursor);
-                over |= matches!(item["event"]["type"].as_str(), Some("message_done" | "error"));
-            }
-        }
-        // Give the page a moment to draw the last event before asking what it shows.
-        std::thread::sleep(std::time::Duration::from_millis(400));
-        let ask = "invoke('report', { shown: out.innerText, arrow: caret.className, height: lastHeight, busy })";
-        if let Err(e) = window.eval(ask) {
-            log!("selftest: could not ask the page: {e}");
-            app.exit(1);
-        }
+        // The page reports by itself, and the app quits then. This is for a page that never does.
+        std::thread::sleep(SELFTEST_TIME_LIMIT * (lines.len() as u32 + 1));
+        log!("selftest: the page never said what it shows");
+        app.exit(1);
     });
 }
 
 /// The page's answer to `selftest`.
 #[tauri::command]
-pub fn report(app: AppHandle, shown: String, arrow: String, height: f64, busy: bool) {
+pub fn report(app: AppHandle, shown: String, list: String, notice: String, arrow: String, height: f64, busy: bool) {
     log!("selftest: the page shows: {}", shown.replace('\n', " | "));
+    if !list.is_empty() {
+        log!("selftest: the list shows: {}", list.replace('\n', " | "));
+    }
+    if !notice.is_empty() {
+        log!("selftest: the notice says: {notice}");
+    }
     log!("selftest: arrow is \"{arrow}\", window height asked {height}, busy {busy}");
     app.exit(0);
 }
