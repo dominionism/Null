@@ -23,6 +23,7 @@ use agent_client_protocol::schema::v1::{
     CancelNotification, InitializeRequest, LoadSessionRequest, NewSessionRequest, PromptRequest,
     RequestPermissionRequest, RequestPermissionResponse, SessionNotification, SetSessionConfigOptionRequest,
 };
+use agent_client_protocol::schema::v1::ListSessionsRequest;
 use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo, Responder};
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt, StreamExt};
@@ -34,7 +35,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
-use crate::{access, backups, panel, providers, settings};
+use crate::history;
+use crate::{access, attach, backups, panel, providers, settings};
 
 /// The harness this app drives. One for now; the name is also its CLI.
 pub const HARNESS: &str = "omp";
@@ -43,6 +45,10 @@ pub const HARNESS_NAME: &str = "Oh-my-pi";
 /// Events kept for a page that reloads or reopens. A long reply is a few hundred.
 const MAX_EVENTS: usize = 5000;
 
+/// How many pages of the harness's list of conversations are read, at most.
+/// Oh-my-pi gives fifty to a page. A list that never ended would never be shown.
+const MAX_PAGES: usize = 200;
+
 #[derive(Clone, Debug, Serialize)]
 pub struct ModelList {
     pub current: Option<String>,
@@ -50,7 +56,7 @@ pub struct ModelList {
 }
 
 enum Command {
-    Send { text: String },
+    Send { text: String, files: Vec<PathBuf> },
     Interrupt,
     NewConversation,
     /// Let the harness process go, so that the next order starts a fresh one.
@@ -60,6 +66,11 @@ enum Command {
     /// Ask the harness which model the conversation is on now. It can move to a
     /// backup by itself in the middle of a reply, and does not always say so.
     CheckModel,
+    /// List the conversations the harness keeps, for `/history`: each as the
+    /// harness gives it. No list when this harness cannot give one.
+    Conversations { reply: oneshot::Sender<Result<Option<Vec<Value>>, String>> },
+    /// Open one of them in the box, in place of the conversation that is open.
+    OpenEarlier { id: String, reply: oneshot::Sender<Result<(), String>> },
 }
 
 /// What to do with the updates a harness replays while a conversation is loaded back.
@@ -96,6 +107,9 @@ struct Shared {
     /// Whether this harness has been seen to count a reply's tokens. Until it
     /// has, a reply without a count is not taken for a provider's refusal.
     counts_tokens: bool,
+    /// A conversation being opened from the list, and what the harness has
+    /// replayed of it so far. Nothing of it is shown until it has loaded.
+    opening: Option<(String, Vec<Value>)>,
 }
 
 /// The app's handle on the harness thread.
@@ -195,6 +209,7 @@ pub fn init(app: &AppHandle) {
         ask: None,
         noted: None,
         counts_tokens: false,
+        opening: None,
     }));
     let (commands, orders) = mpsc::unbounded();
     app.manage(Harness { shared: shared.clone(), commands });
@@ -227,6 +242,12 @@ fn refuse(app: &AppHandle, shared: &Arc<Mutex<Shared>>, command: Command, reason
             let _ = reply.send(Err(reason.to_string()));
         }
         Command::SetModel { reply, .. } => {
+            let _ = reply.send(Err(reason.to_string()));
+        }
+        Command::Conversations { reply } => {
+            let _ = reply.send(Err(reason.to_string()));
+        }
+        Command::OpenEarlier { reply, .. } => {
             let _ = reply.send(Err(reason.to_string()));
         }
         Command::Interrupt | Command::NewConversation | Command::Restart | Command::CheckModel => {}
@@ -368,7 +389,7 @@ fn mcp_servers(capabilities: &Value) -> Vec<Value> {
 }
 
 /// Where a conversation works: a folder of its own under the app's support directory.
-fn workspace(app: &AppHandle) -> Result<PathBuf, String> {
+pub fn workspace(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = match settings::own_folder() {
         Some(folder) => folder.join("null"),
         None => app.path().app_data_dir().map_err(|e| e.to_string())?,
@@ -386,6 +407,8 @@ struct Conversation<'a> {
     shared: &'a Arc<Mutex<Shared>>,
     mcp_capabilities: Value,
     can_load: bool,
+    /// Whether the harness lists the conversations it keeps. If not, `/history` has nothing to show.
+    can_list: bool,
     /// Whether this harness process holds the conversation in memory.
     loaded: bool,
     /// The harness's answer to the greeting, until what it can do has been noted
@@ -431,6 +454,7 @@ async fn converse(
         shared,
         mcp_capabilities: init.pointer("/agentCapabilities/mcpCapabilities").cloned().unwrap_or(Value::Null),
         can_load: init.pointer("/agentCapabilities/loadSession") == Some(&json!(true)),
+        can_list: translate::lists_conversations(&init),
         loaded: false,
         unnoted: unnoted.then_some(init),
     };
@@ -461,7 +485,7 @@ impl Conversation<'_> {
     /// Carry out one order. An error here means the connection itself is no good.
     async fn handle(&mut self, command: Command) -> Result<(), String> {
         match command {
-            Command::Send { text } => {
+            Command::Send { text, files } => {
                 let session = match self.open().await {
                     Ok(session) => session,
                     Err(reason) => {
@@ -469,7 +493,9 @@ impl Conversation<'_> {
                         return Ok(());
                     }
                 };
-                let request: PromptRequest = typed(json!({ "sessionId": session, "prompt": [{ "type": "text", "text": text }] }))?;
+                history::said(self.app, &session, &text);
+                let request: PromptRequest = typed(json!({ "sessionId": session, "prompt": attach::blocks(&text, &files) }))?;
+                let with_files = !files.is_empty();
                 let (app, shared) = (self.app.clone(), self.shared.clone());
                 self.cx
                     .send_request(request)
@@ -504,7 +530,7 @@ impl Conversation<'_> {
                                 }
                                 let _ = order(&app.state::<Harness>(), Command::CheckModel);
                             }
-                            Err(error) => fail_reply(&app, &shared, error_event(&error)),
+                            Err(error) => fail_reply(&app, &shared, attach::refused(error_event(&error), with_files)),
                         }
                         Ok(())
                     })
@@ -547,7 +573,100 @@ impl Conversation<'_> {
                 let _ = reply.send(result);
             }
             Command::CheckModel => self.check_model().await,
+            Command::Conversations { reply } => {
+                let _ = reply.send(self.conversations().await);
+            }
+            Command::OpenEarlier { id, reply } => {
+                let _ = reply.send(self.open_earlier(&id).await);
+            }
         }
+        Ok(())
+    }
+
+    /// Every conversation the harness keeps, each as the harness lists it, the
+    /// most recently used first. The list comes a page at a time. No list when
+    /// this harness does not give one.
+    async fn conversations(&mut self) -> Result<Option<Vec<Value>>, String> {
+        if !self.can_list {
+            return Ok(None);
+        }
+        let mut listed = Vec::new();
+        let mut next: Option<String> = None;
+        for _ in 0..MAX_PAGES {
+            let request: ListSessionsRequest = typed(json!({ "cursor": next }))?;
+            let answer = as_json(&self.cx.send_request(request).block_task().await.map_err(|e| describe(&e))?);
+            let (kept, more) = history::page(&answer);
+            if kept.is_empty() {
+                break;
+            }
+            listed.extend(kept);
+            next = more;
+            if next.is_none() {
+                break;
+            }
+        }
+        Ok(Some(listed))
+    }
+
+    /// The folder a conversation works in, by the harness's own list. The
+    /// harness loads a conversation back only in that folder, and one made in
+    /// a terminal is not in Null's.
+    async fn folder_of(&mut self, session: &str) -> Option<PathBuf> {
+        let listed = self.conversations().await.ok().flatten()?;
+        history::folder_of(&listed, session)
+    }
+
+    /// Open an earlier conversation in the box, in place of the one that is
+    /// open, and show what was said in it. What the harness replays is kept
+    /// back until the harness has said that it loaded, so a conversation that
+    /// will not load leaves the box, and the conversation open in it, as they were.
+    async fn open_earlier(&mut self, id: &str) -> Result<(), String> {
+        if lock(self.shared).busy {
+            return Err("stop the reply before opening another conversation".into());
+        }
+        if !self.can_load {
+            return Err("this harness does not load a conversation back".into());
+        }
+        let folder = self.folder_of(id).await.ok_or("the harness no longer lists it")?;
+        let servers = mcp_servers(&self.mcp_capabilities);
+        let request: LoadSessionRequest = typed(json!({ "sessionId": id, "cwd": folder, "mcpServers": servers }))?;
+        let was_settling = {
+            let mut shared = lock(self.shared);
+            shared.opening = Some((id.to_string(), Vec::new()));
+            std::mem::replace(&mut shared.settling, true)
+        };
+        let loaded = self.cx.send_request(request).block_task().await;
+        let replayed = {
+            let mut shared = lock(self.shared);
+            shared.settling = was_settling;
+            shared.opening.take().map(|(_, updates)| updates).unwrap_or_default()
+        };
+        let response = match loaded {
+            Ok(response) => as_json(&response),
+            // The harness's own words for it are no use to the person: they go in the log.
+            Err(error) => {
+                log!("could not open the earlier conversation {id}: {}", describe(&error));
+                return Err("the harness would not load it".into());
+            }
+        };
+
+        let before = {
+            let mut shared = lock(self.shared);
+            shared.session = Some(id.to_string());
+            shared.events.clear();
+            shared.tools.clear();
+            shared.model.clone()
+        };
+        self.loaded = true;
+        settings::update(self.app, |settings| settings.session = Some(id.to_string()));
+        self.absorb_options(&response["configOptions"]);
+        log!("opened the earlier conversation {id} in {}", folder.display());
+
+        let events = history::replayed(&replayed);
+        history::opened(self.app, id, &events);
+        // An earlier conversation is on the model it was left on, which may be another.
+        let model = lock(self.shared).model.clone().filter(|model| before.as_ref() != Some(model));
+        publish(self.app, self.shared, json!({ "type": "conversation_opened", "events": events, "model": model }));
         Ok(())
     }
 
@@ -585,11 +704,13 @@ impl Conversation<'_> {
         let servers = mcp_servers(&self.mcp_capabilities);
 
         if let (Some(session), true) = (saved, self.can_load) {
+            // One opened from `/history` may have been made in a terminal, in a folder of its own.
+            let folder = self.folder_of(&session).await.unwrap_or_else(|| cwd.clone());
             {
                 let mut shared = lock(self.shared);
                 shared.replay = if shared.events.is_empty() { Replay::Show } else { Replay::Drop };
             }
-            let request: LoadSessionRequest = typed(json!({ "sessionId": session, "cwd": cwd, "mcpServers": servers }))?;
+            let request: LoadSessionRequest = typed(json!({ "sessionId": session, "cwd": folder, "mcpServers": servers }))?;
             let loaded = self.cx.send_request(request).block_task().await;
             lock(self.shared).replay = Replay::Live;
             match loaded {
@@ -707,6 +828,14 @@ fn moved(app: &AppHandle, shared: &Arc<Mutex<Shared>>, current: Option<String>) 
 fn on_update(app: &AppHandle, shared: &Arc<Mutex<Shared>>, notification: &SessionNotification) {
     let notification = as_json(notification);
     let update = &notification["update"];
+    // A conversation being opened from the list: nothing of it is shown, and
+    // nothing else is heard, until the harness has said that it loaded.
+    if let Some((opening, replayed)) = lock(shared).opening.as_mut() {
+        if notification["sessionId"] == *opening {
+            replayed.push(update.clone());
+        }
+        return;
+    }
     if update["sessionUpdate"] == "config_option_update" {
         let (models, current) = translate::models_from_config_options(&update["configOptions"]);
         if !models.is_empty() {
@@ -794,9 +923,11 @@ pub fn send_text(app: &AppHandle, text: String) -> Result<u64, String> {
         shared.busy = true;
         shared.seq
     };
-    publish(app, &harness.shared, json!({ "type": "user_message", "text": text }));
+    // What is attached goes with this message. A file that has gone stops it.
+    let files = attach::take(app).inspect_err(|_| lock(&harness.shared).busy = false)?;
+    publish(app, &harness.shared, attach::said(&text, &files));
     publish(app, &harness.shared, json!({ "type": "status_change", "status": "running", "reason": null }));
-    if let Err(reason) = order(&harness, Command::Send { text }) {
+    if let Err(reason) = order(&harness, Command::Send { text, files }) {
         fail_reply(app, &harness.shared, json!({ "type": "error", "message": reason, "code": null, "details": null }));
     }
     Ok(cursor)
@@ -853,6 +984,26 @@ pub fn new_conversation(app: AppHandle) -> Result<(), String> {
     }
     lock(&harness.shared).events.clear();
     order(&harness, Command::NewConversation)
+}
+
+/// The conversations the harness keeps, each as the harness lists it, and the
+/// id of the one open in the box. No list when this harness cannot give one.
+pub async fn conversations(app: &AppHandle) -> Result<(Option<Vec<Value>>, Option<String>), String> {
+    let (reply, answer) = oneshot::channel();
+    order(&app.state::<Harness>(), Command::Conversations { reply })?;
+    let listed = answer.await.map_err(|_| "the harness went away".to_string())??;
+    Ok((listed, lock(&app.state::<Harness>().shared).session.clone()))
+}
+
+/// Open an earlier conversation in the box. It arrives as an event, with what
+/// was said in it, and the next message continues it.
+pub async fn open_earlier(app: &AppHandle, id: String) -> Result<(), String> {
+    if lock(&app.state::<Harness>().shared).busy {
+        return Err("stop the reply before opening another conversation".into());
+    }
+    let (reply, answer) = oneshot::channel();
+    order(&app.state::<Harness>(), Command::OpenEarlier { id, reply })?;
+    answer.await.map_err(|_| "the harness went away".to_string())?
 }
 
 #[derive(Serialize)]

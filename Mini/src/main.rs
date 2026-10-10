@@ -32,11 +32,13 @@
 compile_error!("Null is macOS-only for now");
 
 mod access;
+mod attach;
 mod backups;
 #[cfg(test)]
 mod check;
 mod engine;
 mod harness;
+mod history;
 mod log;
 mod markdown;
 mod panel;
@@ -104,6 +106,8 @@ fn main() {
             quit,
             panel::hide_box,
             panel::resize,
+            panel::pet,
+            panel::set_pet,
             harness::send,
             harness::interrupt,
             harness::respond,
@@ -112,6 +116,8 @@ fn main() {
             harness::new_conversation,
             harness::events_since,
             harness::report,
+            history::history,
+            history::open_conversation,
             layout,
             providers::providers,
             backups::backups,
@@ -124,6 +130,10 @@ fn main() {
             signin::signin_answer,
             signin::signin_cancel,
             signin::open_url,
+            attach::attach_list,
+            attach::attach_file,
+            attach::detach_file,
+            attach::attached,
         ])
         .setup(|app| {
             log!("started, version {}", app.package_info().version);

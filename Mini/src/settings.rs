@@ -35,6 +35,8 @@ pub struct Settings {
     /// folder and run as the built-in harness while it is newer than the one that came
     /// with the app.
     pub engine: Option<String>,
+    /// Whether the pet stands beside the box (`/pet`). Nothing here means it does.
+    pub pet: Option<bool>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -158,6 +160,7 @@ mod tests {
             harness: Some("/opt/own/omp".into()),
             counts_tokens: Some("18.8.7".into()),
             engine: Some("18.9.0".into()),
+            pet: Some(false),
         };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);
