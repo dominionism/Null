@@ -10,8 +10,9 @@
 > is built and installed (item 7): `/backup` sets the order, a switch and a failed reply are said
 > in the box, and the owner's order is Claude Opus 5.5, then DeepSeek V4.1 Flash. `/usage` is
 > built and installed too (item 8). No real limit has been seen yet. The first run moved to
-> `OwnHarness.md`, item 5, and is built there. Item 9, keys, is proven by a test (2026-10-09). Not
-> started: saying it for other people (item 10).**
+> `OwnHarness.md`, item 5, and is built there. Item 9, keys, is proven by a test (2026-10-09), and
+> item 10 is written down (2026-10-10). What is left is the owner's hands: `/backup`, `/usage` and
+> a real limit.**
 
 ## Goal
 
@@ -477,7 +478,7 @@ then let's go with that." Each recommendation was looked at again against the de
    - Risk: a key reaching the log or the settings file. Know it by: a test that searches both after
      a sign-in with a marked dummy key.
    - Source: specified from user + decision 1.
-   - Status: Complete (2026-10-09), on the branch `key-proof`, not merged. Nothing is built for a
+   - Status: Complete (2026-10-09), merged the same day. Nothing is built for a
      key that is only in the environment, and nothing is needed (below)
    - **The field:** already there since item 5. While a sign-in is at its steps the field hides
      what is typed, and nothing typed then is drawn in the box.
@@ -513,7 +514,16 @@ then let's go with that." Each recommendation was looked at again against the de
     - Depends on: none for the ADRs and the glossary; item 5 for the README.
     - Risk: low.
     - Source: inferred.
-    - Status: Not started
+    - Status: Complete (2026-10-10), on the owner's general word of that day (`OwnHarness.md`,
+      Constraints), without `/grill`
+    - **Written:** `Context/ADR/0004-NoCredentialRestsInNull.md` and
+      `Context/ADR/0005-NullKnowsNoProvider.md`, from decision 1 and design rules 1 to 3 as they
+      were settled on 2026-10-08. The glossary, `Context/Glossary.md`, with provider, harness,
+      sign-in and limit among its twenty terms.
+    - **The README** already said what Null needs and whose the sign-ins are: its first step
+      (the harness comes with Null; providers, subscriptions and keys are managed by Oh-my-pi,
+      and their terms apply) and its privacy card (answers to `/login` go to the harness's own
+      sign-in and are never written to Null's settings or log).
 
 11. **Other harnesses**
     - What: nothing now. If someone needs a harness other than Oh-my-pi: OpenCode is one more row
