@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>A compact macOS interface to your own agent.</strong><br/>
-  Ask a question. Put it to work. Keep your choice of models and providers.
+  Ask a question. Put it to work. Keep your choice of models and providers. Speak to it voice-to-voice.
 </p>
 
 <p align="center">
