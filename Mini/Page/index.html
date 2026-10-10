@@ -162,13 +162,18 @@
       input {
         flex: 1;
         min-width: 0;
+        /* One 22px line, centred by the row and not moved from there. The engine
+           draws the insertion point (the blinking bar) centred in the line, 16px
+           tall, the face's 13 up and 3 down, so its middle is level with the
+           arrow's tip: measured in the app's web engine at 1x and 2x, both are on
+           the row's middle to within 0.01px, in an empty field and a typed one.
+           Letters sit lower in the line than the bar does: capitals are centred
+           0.25px below the tip and small letters 1.4px below. Lifting the field
+           to split that moves the bar off the tip by as much: one pixel up, as it
+           once was, put the bar a pixel above it, and half a pixel is drawn
+           unevenly at 1x, where the bar of an empty field comes out a pixel
+           shorter than that of a typed one. */
         height: 22px;
-        /* A line of type sits low in its own line box: measured in the app's web
-           engine, small letters were centred 1.5px below the row's middle and
-           capitals 0.25px below. One pixel up puts the row's middle between them,
-           level with the arrow. */
-        position: relative;
-        top: -1px;
         margin: 0;
         padding: 0;
         border: 0;
