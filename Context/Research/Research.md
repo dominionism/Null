@@ -252,13 +252,13 @@ Twelve when this section was written; `engine.rs` and `check.rs` came with `OwnH
 
 | Module | Owns | Decides / does not decide |
 |---|---|---|
-| `main.rs` | Wiring: two plugins, state init, 23 `invoke_handler` commands, five dev switches | Nothing else |
+| `main.rs` | Wiring: two plugins, state init, 24 `invoke_handler` commands, six dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
 | `harness.rs` | The ACP connection: one thread, one `omp … acp` process, one conversation, a 5,000-event ring, pending approval responders | What the harness reported; never what a provider is or whether a model is good |
 | `translate.rs` | ACP JSON → box events; the model list out of session config options; the owner's `mcp.json` → `session/new`; finding the `omp` binary | Pure functions over JSON; no process, no network |
 | `backups.rs` | The fallback order, in the form of the harness's settings | The order, not the switching — the harness moves on and re-sends by itself |
-| `engine.rs` | Which Oh-my-pi runs: the one beside Null's executable, or the user's own by the `harness` setting; the commands `harnesses` and `set_harness` | Which program, never what it does |
+| `engine.rs` | Which Oh-my-pi runs: the built-in one (beside Null's executable, or a newer checked one that `/update` fetched into the support folder), or the user's own by the `harness` setting; the commands `harnesses`, `set_harness` and `update_harness` | Which program, never what it does |
 | `check.rs` | Test-only: the harness check, with a stand-in provider and a throwaway folder (`cargo test -- --ignored`) | Whether a version answers as Null needs; nothing at run time |
 | `providers.rs` | `omp usage --json --redact` (15 s limit, 60 s cache) set beside the model list | What is left; never an account name |
 | `signin.rs` | `omp login` on ordinary pipes: its list, its lines, its questions in, answers out | Nothing about provider semantics and nothing about steps having run |
@@ -302,7 +302,7 @@ returns the session to `running`.
 Commands the page invokes (the `invoke_handler` list in `main.rs`): `page_ready`, `quit`, `layout`,
 `hide_box`, `resize`, `send`, `interrupt`, `respond`, `models`, `set_model`, `new_conversation`,
 `events_since`, `report`, `providers`, `backups`, `set_backups`, `harnesses`, `set_harness`,
-`signin_providers`, `signin_start`,
+`update_harness`, `signin_providers`, `signin_start`,
 `signin_answer`, `signin_cancel`, `open_url`.
 
 Events: `mini:event` carries `user_message`, `text_delta` (`{text, thinking}`), `tool_activity`,
@@ -326,8 +326,9 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 - `…/harness.yml` (it was `backups.yml` until 2026-10-09):
   `{"startup":{"checkUpdate":false},"retry":{"fallbackChains":{"default":[…],"openai-codex/*":[…,"openai-codex/gpt-5.6-sol"]}}}`
   — the update check off, then Null's order first and the owner's own list for that provider.
-  `settings.json` also holds `harness` (the path of the user's own Oh-my-pi when chosen) and
-  `counts_tokens`.
+  `settings.json` also holds `harness` (the path of the user's own Oh-my-pi when chosen),
+  `counts_tokens` and `engine` (the version `/update` fetched, kept in `Engine/<version>/omp`
+  beside the settings until the app itself carries that version or a newer one).
 - `…/Workspace`: the working directory of every conversation (`harness::workspace`).
 - `mini.log`: one `[mini]` line per event plus a float timestamp; the app's only trace.
 

@@ -602,7 +602,7 @@ fn the_program_is_the_same_after_answering() {
 #[test]
 #[ignore]
 fn two_versions_take_turns_on_one_folder() {
-    let (carried, other) = (engine::built_in().expect("Mini/Scripts/engine has fetched Oh-my-pi"), engine::under_test());
+    let (carried, other) = (engine::carried().expect("Mini/Scripts/engine has fetched Oh-my-pi"), engine::under_test());
     if carried == other {
         eprintln!("only the version Null carries is here; set NULL_MINI_ENGINE to another to ask this");
         return;

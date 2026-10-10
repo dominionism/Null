@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 423" width="860" height="423" fill="none" role="img" aria-label="A few commands. No settings window.. /model [filter]: Choose a model from OMP&#x27;s catalogue, across providers, without starting a new conversation /login: Follow the harness&#x27;s own sign-in steps inside the box, browser sign-in or key entry /usage: See the harness&#x27;s usage reports and reset times; providers without a report are marked /backup [filter]: Set an ordered fallback list: Enter adds or removes a model, Esc saves it /harness: See which Oh-my-pi the box runs, the built-in one or your own, and switch between them /new: Start a fresh conversation on the last selected model /quit: Quit and clear the saved conversation pointer A lone unknown /word is refused rather than passed to the agent; other messages go through normally. A listed model is not a guarantee that your account can use it: providers with reported limits exhausted are dimmed but stay selectable, and a model change waits until the current reply is stopped or finished.">
-  <title>A few commands. No settings window.. /model [filter]: Choose a model from OMP&#x27;s catalogue, across providers, without starting a new conversation /login: Follow the harness&#x27;s own sign-in steps inside the box, browser sign-in or key entry /usage: See the harness&#x27;s usage reports and reset times; providers without a report are marked /backup [filter]: Set an ordered fallback list: Enter adds or removes a model, Esc saves it /harness: See which Oh-my-pi the box runs, the built-in one or your own, and switch between them /new: Start a fresh conversation on the last selected model /quit: Quit and clear the saved conversation pointer A lone unknown /word is refused rather than passed to the agent; other messages go through normally. A listed model is not a guarantee that your account can use it: providers with reported limits exhausted are dimmed but stay selectable, and a model change waits until the current reply is stopped or finished.</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 468" width="860" height="468" fill="none" role="img" aria-label="A few commands. No settings window.. /model [filter]: Choose a model from OMP&#x27;s catalogue, across providers, without starting a new conversation /login: Follow the harness&#x27;s own sign-in steps inside the box, browser sign-in or key entry /usage: See the harness&#x27;s usage reports and reset times; providers without a report are marked /backup [filter]: Set an ordered fallback list: Enter adds or removes a model, Esc saves it /harness: See which Oh-my-pi the box runs, the built-in one or your own, and switch between them /update: Move the built-in Oh-my-pi to the newest version the repository&#x27;s harness check has passed /new: Start a fresh conversation on the last selected model /quit: Quit and clear the saved conversation pointer A lone unknown /word is refused rather than passed to the agent; other messages go through normally. A listed model is not a guarantee that your account can use it: providers with reported limits exhausted are dimmed but stay selectable, and a model change waits until the current reply is stopped or finished.">
+  <title>A few commands. No settings window.. /model [filter]: Choose a model from OMP&#x27;s catalogue, across providers, without starting a new conversation /login: Follow the harness&#x27;s own sign-in steps inside the box, browser sign-in or key entry /usage: See the harness&#x27;s usage reports and reset times; providers without a report are marked /backup [filter]: Set an ordered fallback list: Enter adds or removes a model, Esc saves it /harness: See which Oh-my-pi the box runs, the built-in one or your own, and switch between them /update: Move the built-in Oh-my-pi to the newest version the repository&#x27;s harness check has passed /new: Start a fresh conversation on the last selected model /quit: Quit and clear the saved conversation pointer A lone unknown /word is refused rather than passed to the agent; other messages go through normally. A listed model is not a guarantee that your account can use it: providers with reported limits exhausted are dimmed but stay selectable, and a model change waits until the current reply is stopped or finished.</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -11,9 +11,9 @@
     @keyframes hold { 0%, 99.9% { opacity: 1; } 100% { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
   </style>
-  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="422" rx="12"/></clipPath>
+  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="467" rx="12"/></clipPath>
   <g clip-path="url(#win)">
-  <rect width="860" height="423" fill="#0D1117"/>
+  <rect width="860" height="468" fill="#0D1117"/>
   <rect width="860" height="30" fill="#161B22"/>
   <path d="M0 29.5H860" stroke="#21262D"/>
   <circle cx="20" cy="15.0" r="5.5" fill="#FF5F57"/>
@@ -34,14 +34,17 @@
   <text x="24" y="244.0" font-size="12.5" font-weight="700" fill="#3FB950">/harness</text>
   <text x="170.25" y="244.0" font-size="12.5" fill="#C9D1D9">See which Oh-my-pi the box runs, the built-in one or your own, and switch between</text>
   <text x="170.25" y="263.0" font-size="12.5" fill="#C9D1D9">them</text>
-  <text x="24" y="289.0" font-size="12.5" font-weight="700" fill="#3FB950">/new</text>
-  <text x="170.25" y="289.0" font-size="12.5" fill="#C9D1D9">Start a fresh conversation on the last selected model</text>
-  <text x="24" y="315.0" font-size="12.5" font-weight="700" fill="#3FB950">/quit</text>
-  <text x="170.25" y="315.0" font-size="12.5" fill="#C9D1D9">Quit and clear the saved conversation pointer</text>
-  <text x="24" y="340.0" font-size="12.5" fill="#8B949E">A lone unknown /word is refused rather than passed to the agent; other messages go through</text>
-  <text x="24" y="359.0" font-size="12.5" fill="#8B949E">normally. A listed model is not a guarantee that your account can use it: providers with reported</text>
-  <text x="24" y="378.0" font-size="12.5" fill="#8B949E">limits exhausted are dimmed but stay selectable, and a model change waits until the current reply</text>
-  <text x="24" y="397.0" font-size="12.5" fill="#8B949E">is stopped or finished.</text>
+  <text x="24" y="289.0" font-size="12.5" font-weight="700" fill="#3FB950">/update</text>
+  <text x="170.25" y="289.0" font-size="12.5" fill="#C9D1D9">Move the built-in Oh-my-pi to the newest version the repository&#x27;s harness check</text>
+  <text x="170.25" y="308.0" font-size="12.5" fill="#C9D1D9">has passed</text>
+  <text x="24" y="334.0" font-size="12.5" font-weight="700" fill="#3FB950">/new</text>
+  <text x="170.25" y="334.0" font-size="12.5" fill="#C9D1D9">Start a fresh conversation on the last selected model</text>
+  <text x="24" y="360.0" font-size="12.5" font-weight="700" fill="#3FB950">/quit</text>
+  <text x="170.25" y="360.0" font-size="12.5" fill="#C9D1D9">Quit and clear the saved conversation pointer</text>
+  <text x="24" y="385.0" font-size="12.5" fill="#8B949E">A lone unknown /word is refused rather than passed to the agent; other messages go through</text>
+  <text x="24" y="404.0" font-size="12.5" fill="#8B949E">normally. A listed model is not a guarantee that your account can use it: providers with reported</text>
+  <text x="24" y="423.0" font-size="12.5" fill="#8B949E">limits exhausted are dimmed but stay selectable, and a model change waits until the current reply</text>
+  <text x="24" y="442.0" font-size="12.5" fill="#8B949E">is stopped or finished.</text>
   </g>
-  <rect x="0.5" y="0.5" width="859" height="422" rx="12" stroke="#21262D"/>
+  <rect x="0.5" y="0.5" width="859" height="467" rx="12" stroke="#21262D"/>
 </svg>

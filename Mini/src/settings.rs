@@ -28,6 +28,10 @@ pub struct Settings {
     /// count a reply's tokens. Remembered so that a refusal is told from an answer
     /// from the first reply after a restart, not only once an answer has come.
     pub counts_tokens: Option<String>,
+    /// The version of Oh-my-pi that `/update` fetched. It is kept in the app's support
+    /// folder and run as the built-in harness while it is newer than the one that came
+    /// with the app.
+    pub engine: Option<String>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -40,11 +44,17 @@ fn path(app: &AppHandle) -> Option<PathBuf> {
 /// (`NULL_MINI_PROFILE`, for scripted checks) keeps files of its own, so that
 /// a check never changes what the installed app remembers.
 pub fn file_name(stem: &str, extension: &str) -> String {
+    format!("{}.{extension}", folder_name(stem))
+}
+
+/// The name of one of the app's own folders, kept apart for a run under a profile
+/// in the same way.
+pub fn folder_name(stem: &str) -> String {
     let profile: String = std::env::var("NULL_MINI_PROFILE").unwrap_or_default().chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')).collect();
     if profile.is_empty() {
-        format!("{stem}.{extension}")
+        stem.to_string()
     } else {
-        format!("{stem}.{profile}.{extension}")
+        format!("{stem}.{profile}")
     }
 }
 
@@ -105,6 +115,7 @@ mod tests {
             backups: vec!["c/d".into()],
             harness: Some("/opt/own/omp".into()),
             counts_tokens: Some("18.8.7".into()),
+            engine: Some("18.9.0".into()),
         };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);

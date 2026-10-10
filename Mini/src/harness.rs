@@ -401,9 +401,9 @@ async fn converse(
         let unnoted = shared.noted.as_deref() != Some(version.as_str());
         if unnoted {
             shared.noted = Some(version.clone());
-            // Null was checked with the version it carries, which counts tokens. Any other
+            // Null was checked with the built-in version, which counts tokens. Any other
             // has to be seen to, once: what was seen is remembered between runs.
-            shared.counts_tokens = version == engine::carried_version() || settings::get(app).counts_tokens.as_deref() == Some(version.as_str());
+            shared.counts_tokens = engine::checked(app, &version) || settings::get(app).counts_tokens.as_deref() == Some(version.as_str());
         }
         unnoted
     };

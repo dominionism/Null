@@ -6,6 +6,10 @@
 
 version = "18.8.7"
 
+# The oldest Null this version was checked with. /update offers the version to that Null
+# and to newer ones; an older Null is told to get a newer Null first.
+null = "0.1.0"
+
 # One line for each file of the release that travels with Null: the program for each kind
 # of Mac Null is built for, and the licence and notices that have to go with a copy of it.
 [sha256]

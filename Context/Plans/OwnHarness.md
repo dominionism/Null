@@ -447,7 +447,41 @@ where it is removed.
     - Open: how `Engine.toml` says which Null a version was checked with; what `/harness` calls
       a fetched program; whether `/update` also says that a newer Null is there (item 7).
     - Source: specified from user + inferred.
-    - Status: Not started
+    - Status: In progress. Built and proven by script in the real app (2026-10-09); not
+      installed, and not yet used by the owner
+    - **Built:** `/update` in the page and `update_harness` in `engine.rs`. It reads the
+      repository's `Engine.toml` with the Mac's own `curl`, and moves only when that names a
+      version newer than the built-in one. The fetched program is kept in
+      `Engine/<version>/omp` in Null's support folder, only if it has the checksum that file
+      gave, its signature holds, it is signed by whoever signed the program Null came with,
+      and it says it is that version. One fetched version is kept. `engine::tidy` removes it at
+      start once the app itself carries that version or a newer one. The box says what
+      happened in one line, and while fetching says "fetching Oh-my-pi X, about 200 MB".
+    - **The open points, as built:** `Engine.toml` has a line `null`, the oldest Null a version
+      was checked with; `Mini/Scripts/engine --to` writes it from Null's own version when the
+      check passes, and `/update` holds it against the running Null. A fetched program is still
+      called "built in" in `/harness`, and counts as checked. `/update` says a newer Null is
+      needed only when the version it wants needs one.
+    - **Added beyond the item:** the same signer check in `Mini/Scripts/engine --to`, so that
+      a version is never run by the check, or written into `Engine.toml`, unless it is signed
+      by whoever signed the one carried now. A switch, `NULL_MINI_UPDATES`, names a made-up
+      file in place of the repository's for scripted checks.
+    - **Proven without a person:** 63 unit tests, among them what `/update` decides from a
+      file: fetch, stay, needs a newer Null, and nothing without a checksum. In the real app
+      under the probe profile, carrying 18.4.3, with made-up files: the version already
+      carried ("already on the newest checked Oh-my-pi"); a version that needs Null 9.0.0
+      (said, nothing changed); a wrong checksum (200 MB fetched, refused, nothing kept); the
+      real 18.8.7 (fetched, kept, no quarantine mark, macOS rates it "Notarized Developer
+      ID"). A message then started "the built-in harness" from the support folder as 18.8.7
+      and was answered. A build that carries 18.8.7 removed the fetched copy at start. The six
+      lines the box can say, drawn and read back. `--to 18.8.7` with the signer check wrote
+      exactly the `Engine.toml` that was there before.
+    - **Limits:** Null's own version is still 0.1.0 and nothing moves it yet, so the `null`
+      line guards nothing until Null has releases (items 6 and 7). `/update` reads `main`, so
+      it offers a version as soon as a change to `Engine.toml` is merged there. There is no way
+      to stop a fetch once it has begun, short of quitting.
+    - **Not proven:** the installed app; a real newer version on `main`, since none exists
+      yet; the line said when the user is on "yours".
 
 ## Verification
 

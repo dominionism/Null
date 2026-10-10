@@ -5,7 +5,8 @@
      /model opens the model list, /backup sets the models to carry on with when
      the one in use stops answering, /usage shows what each provider has left,
      /login signs in to a provider, /harness shows which Oh-my-pi the box runs
-     and lets you choose your own, /new starts a new conversation, /quit quits
+     and lets you choose your own, /update moves the built-in one to the newest
+     checked version, /new starts a new conversation, /quit quits
      the app and closes the conversation, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
@@ -842,7 +843,7 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
@@ -1307,6 +1308,28 @@
         mark('');
       };
 
+      // /update moves the built-in Oh-my-pi forward when the user asks: to the
+      // newest version the repository has checked with Null, never an unchecked
+      // one. The app says in the notice line when it starts fetching, which is
+      // about 200 MB.
+      const updateHarness = async () => {
+        if (picker || signin) return;
+        if (busy) {
+          notice('stop the reply with ctrl+c before updating');
+          return;
+        }
+        mark('working');
+        try {
+          const did = await invoke('update_harness');
+          if (did.outcome === 'updated') line('note', `the built-in Oh-my-pi is now ${did.version}${did.on_own ? '. you are on yours: /harness switches' : ''}`);
+          else if (did.outcome === 'needs_null') line('note', `Oh-my-pi ${did.version} needs Null ${did.null} or newer, and this is Null ${did.this_null}. update Null, then /update again`);
+          else line('note', `already on the newest checked Oh-my-pi, ${did.version}`);
+        } catch (error) {
+          line('error', `could not update: ${error}`);
+        }
+        mark(busy ? 'working' : '');
+      };
+
       // ── Signing in to a provider ───────────────────────────────────────
       //
       // The harness knows how each provider signs in. /login shows the harness's
@@ -1485,6 +1508,10 @@
           openHarness();
           return;
         }
+        if (text === '/update') {
+          updateHarness();
+          return;
+        }
         if (text === '/quit') {
           invoke('quit');
           return;
@@ -1511,7 +1538,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /new and /quit`);
           return;
         }
         if (busy) {
