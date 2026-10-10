@@ -377,7 +377,7 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
   plugin, pinned `tauri-nspanel`; macOS 13+, compile-time macOS-only. Static `Page/`, no Node/Vite build.
   Oh-my-pi goes into the app as a Tauri external binary from `Mini/Engine/`, which
   `Mini/Scripts/engine` fills from the release `Mini/Engine.toml` names, checksum checked. A build
-  without it stops in `build.rs` and says so. Apple Silicon only. The app is 217 MB.
+  without it stops in `build.rs` and says so. Apple Silicon only. The app is 204 MB with Oh-my-pi 18.8.7 inside (217 MB with 18.4.3).
 - **Voice:** Bun workspace (`app`, `tauri`, `web`, `landing`), React 18/TypeScript/Vite/Tailwind,
   TanStack Router/Query, zustand, WaveSurfer, i18next. `docs` is its own Next/Fumadocs project;
   `landing` is an independent Next marketing site.

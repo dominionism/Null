@@ -287,7 +287,7 @@ def step_build(c):
     c.command("git clone https://github.com/dominionism/Null.git && cd Null")
     c.command("Mini/Scripts/install")
     c.output("Installed /Applications/Null.app and started it. Control+Space opens the box.")
-    c.note("The script fetches the Oh-my-pi named in Mini/Engine.toml (about 214 MB) and keeps it "
+    c.note("The script fetches the Oh-my-pi named in Mini/Engine.toml (about 200 MB) and keeps it "
            "only if its checksum matches. Then it builds Null.app, installs it, registers a login "
            "item and starts it, replacing any previously installed Null app. A source-build workflow "
            "with local signing support, not a notarized release installer.")
