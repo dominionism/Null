@@ -372,15 +372,18 @@ def signing(c):
     c.bullets([
         "macOS ties permission grants to the application's code signature, so an unsigned rebuild "
         "can require permission again.",
-        "When ~/Library/Application Support/Null Signing/signing.keychain-db exists, the installer "
-        "signs with the Null Local Signing identity, using the password file beside it. Without that "
-        "keychain it installs the build unsigned, with a notice.",
+        "The installer signs with a Null Local Signing identity kept on your Mac, in "
+        "~/Library/Application Support/Null Signing/: a keychain of its own and the password file "
+        "beside it. On a Mac that has none it makes one, without asking you anything: macOS is never "
+        "told to trust the certificate, it only has to be the same one each time. If signing fails, "
+        "it installs the build unsigned, with a notice.",
         "The Oh-my-pi inside the app is left as published, with its author's Developer ID signature. "
         "The installer signs the outer app only, and that signature covers it.",
     ])
-    c.note("That identity is a personal-machine setup, not a distributed Developer ID, and the "
-           "installer does not create one on a new machine. Protect both the keychain and its "
-           "password: a process with access to them can sign as Null.")
+    c.note("That identity belongs to one Mac and is not a distributed Developer ID. Protect both "
+           "the keychain and its password: a process with access to them can sign as Null, and so "
+           "inherit what macOS has allowed Null. Whether macOS keeps its answers across an update "
+           "signed this way is still to be seen on a second Mac.")
 
 
 def what_null_keeps(c):
