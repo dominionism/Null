@@ -52,6 +52,12 @@ MCP servers go on being used and a technical person can still put their own Oh-m
   `cargo test -- --ignored` (`MiniApp.md`, and the pattern in `signin.rs` and `providers.rs`).
 - Folder names are capitalized (ADR 0001): new folders are `Mini/Engine/` and the like.
 - The owner's instruction for commits: never an em dash in a commit message.
+- **Verbatim (user, 2026-10-10):** "I will give you the driver's seat to do what is necessary. We
+  are on the same page." Said after the first release and the install, in answer to a request
+  for three hands-on checks, a decision on the README and a merge. The agent's reading, not the
+  owner's words: within this plan the agent merges, changes the README and settles what it had
+  recommended, without asking each time. It does not reach to the owner's own accounts (npm),
+  to a new Mac user account, or to the hands-on checks, which stay owed.
 
 ## What was established (2026-10-09)
 
@@ -126,10 +132,11 @@ where it is removed.
    update, so "built in" and "yours" are the same version again. Installed on 2026-10-09,
    about 20:06.
 3. **Apple Silicon first.** An Intel copy of the harness is another 226 MB. Recommended: Apple
-   Silicon only until someone asks. Built as recommended on 2026-10-09; the owner has not yet
-   said.
+   Silicon only until someone asks. Built as recommended on 2026-10-09. Never confirmed by
+   name; it stands on the owner's general word of 2026-10-10 (Constraints).
 4. **The name of the command** that shows and chooses the harness. Proposed: `/harness`. Built
-   under that name on 2026-10-09; the owner has not yet said.
+   under that name on 2026-10-09 and used by the owner since. Never confirmed by name; it
+   stands on the owner's general word of 2026-10-10 (Constraints).
 5. **This reverses decision 3 of `Providers.md`** ("It does not download or run an installer").
    The owner asked for it on 2026-10-09; written as
    `Context/ADR/0003-NullCarriesItsOwnHarness.md`.
@@ -138,9 +145,9 @@ where it is removed.
    unsigned, since macOS would then ask for everything again after every update. Still to
    work out: how to ask for that approval in words a person understands.
    **Built the same day with no approval at all** (item 6): on macOS 26.5.2 a certificate can
-   sign without macOS being told to trust it, so nothing is asked. The owner has not yet
-   said whether that stands; the approval remains the fallback if a grant turns out not to
-   hold across an update.
+   sign without macOS being told to trust it, so nothing is asked. Recommended to the owner
+   and standing on the general word of 2026-10-10 (Constraints); the approval remains the
+   fallback if a grant turns out not to hold across an update.
 7. **What a newcomer's Null may do without asking: settled by the owner on 2026-10-09.** It
    keeps Oh-my-pi's own default, `yolo`: Null passes the harness's setting on and adds no
    approval layer of its own (`MiniApp.md`). The first opening says so in one plain line, and
@@ -153,10 +160,12 @@ where it is removed.
    to `v` tags) is removed with the cleanup (item 6).
 10. **The first release: the owner gave the word on 2026-10-09, and it was published the same
     day.** Null 0.1.0, by the tag `null-v0.1.0` on `main` (item 6).
-11. **Whether GitHub's jobs may open pull requests in this repository.** Open. Today they may
-    not, so the weekly check (item 8) would open an issue with a link, and a person opens
-    the pull request with one click. Recommended: leave it off; it is one fewer thing a job
-    is allowed to do.
+11. **Whether GitHub's jobs may open pull requests in this repository.** Left off, as
+    recommended, on the owner's general word of 2026-10-10 (Constraints). The weekly check
+    (item 8) then opens an issue with a link, and a person opens the pull request with one
+    click. It is one fewer thing a job is allowed to do.
+12. **Whether the README offers the one-line install.** Yes, as recommended, on the same
+    word: the command installed the owner's own Null on 2026-10-10 (item 6).
 
 ## Work items
 
