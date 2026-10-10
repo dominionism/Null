@@ -263,7 +263,7 @@ def surface(c):
         "list. OMP owns the sign-ins and the retries.",
         "**Readable without getting bigger.** Streamed Markdown, folded tool steps, and code, tables "
         "and diagrams that scroll sideways instead of wrapping.",
-        "**Today:** a standalone macOS text app, built from source. Voice, background tasks, "
+        "**Today:** a standalone macOS text app, installed with one command. Voice, background tasks, "
         "workspaces and the pet are planned, not built.",
     ])
     c.note("The banner above is an illustration, not a recording of an agent session.")
@@ -280,17 +280,26 @@ def step_harness(c):
 
 
 def step_build(c):
-    c.sub("An Apple Silicon Mac with macOS 13+, the Rust toolchain, Xcode Command Line Tools and "
-          "Tauri CLI 2. No Node, Bun, Python or Voice server is needed for the box.")
+    c.sub("An Apple Silicon Mac with macOS 13 or later. Nothing else: no Rust, no developer tools, "
+          "no Node.")
+    c.command("curl -fsSL \\")
+    c.command("  https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null \\")
+    c.command("  | sh -s install")
+    c.output("Installed Null 0.1.0 in /Applications and started it. Control+Space opens the box.")
+    c.note("The command fetches the newest released Null (about 100 MB) and keeps it only if it has "
+           "the published checksum, its seal holds, it is Null, and the Oh-my-pi inside carries its "
+           "author's signature. Then it signs the app on your Mac, puts it in /Applications, "
+           "registers a login item and starts it, replacing a Null that is there. The script is "
+           "Mini/Scripts/null: read it first if you like. Null has no Apple certificate, so the "
+           "same file downloaded with a browser would be stopped by macOS.")
+    c.head("Or build it yourself")
     c.command("xcode-select --install           # once, if the Apple tools are not installed")
     c.command('cargo install tauri-cli --version "^2" --locked')
     c.command("git clone https://github.com/dominionism/Null.git && cd Null")
     c.command("Mini/Scripts/install")
-    c.output("Installed /Applications/Null.app and started it. Control+Space opens the box.")
-    c.note("The script fetches the Oh-my-pi named in Mini/Engine.toml (about 200 MB) and keeps it "
-           "only if its checksum matches. Then it builds Null.app, installs it, registers a login "
-           "item and starts it, replacing any previously installed Null app. A source-build workflow "
-           "with local signing support, not a notarized release installer.")
+    c.note("That needs the Rust toolchain, Xcode Command Line Tools and Tauri CLI 2. The script "
+           "fetches the Oh-my-pi named in Mini/Engine.toml (about 200 MB), builds Null.app, and "
+           "signs and installs it the same way.")
 
 
 def step_open(c):
@@ -302,9 +311,13 @@ def step_open(c):
 
 
 def uninstall(c):
-    c.command("Mini/Scripts/uninstall")
+    c.command("curl -fsSL \\")
+    c.command("  https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null \\")
+    c.command("  | sh -s uninstall")
+    c.output("Null is removed. Settings stay in ~/Library/Application Support/io.github.dominionism.null-mini.")
+    c.row("From a clone", "Mini/Scripts/uninstall does the same")
     c.row("Removes", "/Applications/Null.app, and the login item at ~/Library/LaunchAgents/io.github.dominionism.null-mini.plist")
-    c.row("Left behind", "Settings, workspace files and logs, in ~/Library/Application Support/io.github.dominionism.null-mini/ and ~/Library/Logs/Null/")
+    c.row("Left behind", "Settings, workspace files and logs, in ~/Library/Application Support/io.github.dominionism.null-mini/ and ~/Library/Logs/Null/, and Null's signing identity, in ~/Library/Application Support/Null Signing/, so that a Null installed later is the same app to macOS")
     c.note("OMP's own sign-ins and conversation history are not removed.")
 
 
@@ -512,13 +525,14 @@ def status(c):
         "Model selection, sign-in, usage and backups",
         "Its own Oh-my-pi inside the app, or yours with /harness; /update for the newest checked one",
         "Structured Markdown in a compact transcript",
-        "An independent macOS app",
+        "An independent macOS app, installed with one command",
+        "A first opening that leads a newcomer to sign in",
     ])
     c.head("Planned or incomplete", MUTED)
     c.bullets([
         "Background tasks, activity tray and workspace selection",
-        "First-run guidance, /logout and a sign-in timeout",
-        "A one-command install",
+        "/logout and a sign-in timeout",
+        "An npm package around the install command",
         "A resizable transcript and repeatable visual checks",
         "Cloned-voice conversation, the optional pet and other platforms",
     ], muted=True)
@@ -565,7 +579,7 @@ def license_card(c):
 
 add("surface", "Small surface. Real agent.", surface)
 add("step-harness", "1. The harness comes with Null", step_harness)
-add("step-build", "2. Build and install", step_build)
+add("step-build", "2. Install", step_build)
 add("step-open", "3. Open the box", step_open)
 add("uninstall", "Uninstall", uninstall)
 add("use-null", "Use Null", use_null)
