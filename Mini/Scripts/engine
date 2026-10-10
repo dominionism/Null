@@ -28,13 +28,26 @@ checksum() {
 	shasum -a 256 "$1" | cut -d ' ' -f 1
 }
 
+# Who signed a program: its Apple team.
+signer() {
+	codesign -dv --verbose=2 "$1" 2>&1 | sed -n 's/^TeamIdentifier=//p'
+}
+
+# Stop, leaving nothing behind of a version that was being tried.
+give_up() {
+	if [ -n "${trial:-}" ]; then
+		rm -rf "$trial"
+	fi
+	exit 1
+}
+
 # Fetch one file of a release: the version, its name there, and where to put it.
 download() {
 	echo "Fetching $2 from Oh-my-pi $1"
 	# shellcheck disable=SC2086 # one option per word
 	if ! curl --fail --location --retry 3 $progress --output "$3" "$releases/v$1/$2"; then
 		echo "Oh-my-pi $1 has no $2 to fetch." >&2
-		exit 1
+		give_up
 	fi
 }
 
@@ -86,9 +99,14 @@ move_to() {
 		listed=$(sed -n "s/^\([0-9a-f]\{64\}\)[[:space:]]\{1,\}$name\$/\1/p" "$trial/SHA256SUMS.txt")
 		if [ "$listed" != "$(checksum "$trial/$name")" ]; then
 			echo "$name is not the file the release of Oh-my-pi $next lists, so that version was not tried." >&2
-			exit 1
+			give_up
 		fi
 	done
+	# Nor is one that is not signed by whoever signed the program Null carries now.
+	if ! codesign --verify --strict "$trial/$published" 2> /dev/null || [ "$(signer "$trial/$published")" != "$(signer "$engine/$program")" ]; then
+		echo "Oh-my-pi $next is not signed by whoever signed $version, so that version was not tried." >&2
+		give_up
+	fi
 	chmod +x "$trial/$published"
 
 	echo "Asking Oh-my-pi $next what Null depends on"
@@ -100,6 +118,8 @@ move_to() {
 
 	cp "$toml" "$toml.next"
 	rewrite version "$next"
+	# The Null that just passed the check with it is the oldest one /update may offer it to.
+	rewrite null "$(sed -n 's/^version = "\(.*\)"/\1/p' "$here/Cargo.toml" | head -n 1)"
 	for name in LICENSE THIRD-PARTY-NOTICES.txt "$published"; do
 		rewrite "$name" "$(checksum "$trial/$name")"
 		if [ "$(pinned "$name" "$toml.next")" != "$(checksum "$trial/$name")" ]; then
