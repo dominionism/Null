@@ -7,7 +7,8 @@
      /login signs in to a provider, /harness shows which Oh-my-pi the box runs
      and lets you choose your own, /update moves the built-in one to the newest
      checked version, /new starts a new conversation, /quit quits
-     the app and closes the conversation, Ctrl+C
+     the app and closes the conversation, /history (and the button at the end
+     of the row) lists the earlier conversations and opens one again, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
 
@@ -190,6 +191,35 @@
       /* One of the box's own commands (/model, /login, /new, /quit), as it is typed. */
       input.command {
         color: var(--command);
+      }
+      /* The row's buttons: quiet marks at its right-hand end, drawn like the arrow. */
+      .tool {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--faint);
+        cursor: pointer;
+        transition:
+          color 0.12s ease,
+          background-color 0.12s ease;
+      }
+      .tool:hover,
+      .tool.on {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+      .tool svg {
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       /* Never seen: measures where the typed text ends, so the unused part of the
          field can be used to move the box. */
@@ -540,6 +570,23 @@
         color: var(--red);
       }
 
+      /* ── History ──
+         An earlier conversation in the list: what it was about, and at the row's
+         end, in dim type, where it works and when it was last used. */
+      .option.past {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 2ch;
+      }
+      .option.past > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .option.past > .where {
+        max-width: 30ch;
+        text-align: right;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -560,6 +607,9 @@
           ><svg viewBox="0 0 10 22" width="10" height="22"><path d="M3 7l4 4-4 4" /></svg
         ></span>
         <input id="q" autofocus spellcheck="false" />
+        <button class="tool" id="history" type="button" tabindex="-1" aria-label="earlier conversations">
+          <svg viewBox="0 0 22 22" width="22" height="22"><path d="M6.2 6.9a6.3 6.3 0 1 1-1.4 5.2M5.6 4.2v3h3M11 7.7V11l2.3 1.4" /></svg>
+        </button>
       </div>
       <div id="pick"></div>
       <div id="out"></div>
@@ -849,11 +899,11 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/history', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
-          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || text.startsWith('/backup ') || COMMANDS.some((name) => name.startsWith(text)));
+          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/history ') || COMMANDS.some((name) => name.startsWith(text)));
         input.classList.toggle('command', command);
       };
 
@@ -980,6 +1030,9 @@
             reply = null;
             foldSteps();
             line('error', `error: ${event.message}${event.details ? `\n${event.details}` : ''}`);
+            break;
+          case 'conversation_opened':
+            showEarlier(event);
             break;
         }
         // Either of these ends the reply.
@@ -1341,6 +1394,242 @@
         mark(busy ? 'working' : '');
       };
 
+      // ── History ────────────────────────────────────────────────────────
+      //
+      // The harness keeps every conversation. /history, or the button at the end
+      // of the row, lists them as the harness does: the box's own and the ones
+      // made in a terminal, each in the folder it works in. Choosing one opens it
+      // here with what was said in it, and the next message continues it.
+      //
+      // The list is sorted by when, under today, yesterday, this week and then
+      // each month. Tab sorts it by folder instead, the box's own first, when
+      // there is more than one folder. Typing narrows it by title and folder.
+      //
+      // While the list is open it takes the keys and the typing before the
+      // field's own handlers see them, so that those need not know of it.
+
+      const historyButton = document.getElementById('history');
+      let historyBy = 'when'; // or 'folder'; kept for as long as the app runs
+
+      // How many days ago by the calendar: 0 is today.
+      const daysAgo = (when) => {
+        const midnight = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+        return Math.round((midnight(new Date()) - midnight(when)) / 86400000);
+      };
+      const thisYear = (when) => when.getFullYear() === new Date().getFullYear();
+
+      // The heading a conversation stands under when the list is sorted by when.
+      const era = (entry) => {
+        if (!entry.when) return 'earlier';
+        const ago = daysAgo(entry.when);
+        if (ago < 1) return 'today';
+        if (ago < 2) return 'yesterday';
+        if (ago < 7) return 'this week';
+        const month = entry.when.toLocaleDateString([], { month: 'long' });
+        return thisYear(entry.when) ? month : `${month} ${entry.when.getFullYear()}`;
+      };
+
+      // When it was last used, said briefly: the time if that was today, the day
+      // if it was this week, the date before that.
+      const usedAt = (entry, byFolder) => {
+        if (!entry.when) return '';
+        const ago = daysAgo(entry.when);
+        if (ago < 1 || (ago < 2 && !byFolder)) return entry.when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+        if (ago < 2) return 'yesterday';
+        if (ago < 7) return entry.when.toLocaleDateString([], { weekday: 'short' }).toLowerCase();
+        const date = entry.when.toLocaleDateString([], { month: 'short', day: 'numeric' }).toLowerCase();
+        return thisYear(entry.when) ? date : `${date} ${entry.when.getFullYear()}`;
+      };
+
+      // A folder as a heading names it: ~ for the home folder, and only its last
+      // two parts when it is deep. In a row it is its last part alone.
+      const folderPath = (folder) => {
+        const short = folder.replace(/^\/Users\/[^/]+/, '~');
+        const parts = short.split('/').filter(Boolean);
+        return parts.length > 3 ? `…/${parts.slice(-2).join('/')}` : short;
+      };
+      const folderName = (folder) => folder.split('/').filter(Boolean).pop() || folder;
+
+      const drawHistory = () => {
+        const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+        const byFolder = historyBy === 'folder' && picker.folders > 1;
+        const recent = (a, b) => (b.when ? b.when.getTime() : 0) - (a.when ? a.when.getTime() : 0);
+        const matching = picker.conversations
+          .filter((entry) => {
+            const haystack = `${entry.title || 'untitled'} ${entry.own ? 'the box' : entry.folder}`.toLowerCase();
+            return words.every((word) => haystack.includes(word));
+          })
+          .sort(recent);
+        if (byFolder) {
+          // The box's own first, then each folder by its most recent conversation.
+          const place = new Map();
+          matching.forEach((entry, index) => {
+            const folder = entry.own ? '' : entry.folder;
+            if (!place.has(folder)) place.set(folder, entry.own ? -1 : index);
+          });
+          matching.sort((a, b) => place.get(a.own ? '' : a.folder) - place.get(b.own ? '' : b.folder));
+        }
+        picker.shown = matching;
+        picker.index = Math.min(picker.index, Math.max(matching.length - 1, 0));
+        pick.textContent = '';
+        let under = null;
+        matching.forEach((entry, index) => {
+          const heading = byFolder ? (entry.own ? 'the box' : folderPath(entry.folder) || 'no folder') : era(entry);
+          if (heading !== under) {
+            under = heading;
+            pick.append(el('div', 'provider', heading));
+          }
+          const where = byFolder ? usedAt(entry, true) : [entry.own ? '' : folderName(entry.folder), usedAt(entry, false)].filter(Boolean).join(' · ');
+          const title = el('span', entry.title ? '' : 'id', `${entry.open ? '● ' : '  '}${entry.title || 'untitled'}`);
+          const row = el('div', index === picker.index ? 'option past selected' : 'option past', title, el('span', 'id where', where));
+          row.addEventListener('click', () => {
+            chooseEarlier(entry);
+            input.focus();
+          });
+          pick.append(row);
+          if (index === picker.index && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+        });
+        if (!matching.length) pick.append(el('div', 'provider', 'no conversation matches'));
+        // The one key here that nothing else says.
+        if (picker.folders > 1) notice(byFolder ? 'tab sorts by when' : 'tab sorts by folder', true);
+        fit();
+      };
+
+      const closeHistory = () => {
+        const said = picker.folders > 1;
+        historyButton.classList.remove('on');
+        closePicker();
+        if (said) unnotice();
+      };
+
+      const openHistory = async (filter = '') => {
+        if (picker || signin) return;
+        if (busy) {
+          notice('stop the reply with ctrl+c before opening another conversation');
+          return;
+        }
+        mark('working');
+        let listed;
+        try {
+          listed = await invoke('history');
+        } catch (error) {
+          line('error', `could not list the earlier conversations: ${error}`);
+          mark('');
+          return;
+        }
+        mark(busy ? 'working' : '');
+        if (picker || signin || busy) return; // something else was begun meanwhile
+        if (!listed.lists) {
+          line('note', 'this harness does not list earlier conversations');
+          return;
+        }
+        if (!listed.conversations.length) {
+          notice('no earlier conversations');
+          return;
+        }
+        const conversations = listed.conversations.map((entry) => {
+          const when = entry.used ? new Date(entry.used) : null;
+          return { ...entry, when: when && !Number.isNaN(when.getTime()) ? when : null };
+        });
+        const folders = new Set(conversations.map((entry) => (entry.own ? '' : entry.folder))).size;
+        picker = { history: true, conversations, folders, opening: false, models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        input.value = filter;
+        tint();
+        historyButton.classList.add('on');
+        drawHistory();
+      };
+
+      const chooseEarlier = async (entry) => {
+        if (!entry || picker.opening) return;
+        // The one that is open is asked for like any other: after the app was
+        // started again the box is on it and shows little or nothing of it.
+        const list = picker;
+        list.opening = true;
+        mark('working');
+        try {
+          await invoke('open_conversation', { id: entry.id }); // it arrives as an event
+          await catchUp(); // should the event have been missed
+        } catch (error) {
+          // It would not load: the box stays on the conversation it had.
+          if (picker === list) closeHistory();
+          line('error', `could not open that conversation: ${error}`);
+          return;
+        }
+        if (picker === list) closeHistory();
+      };
+
+      // An earlier conversation has been opened: the box shows it, in place of
+      // what it showed, as the replies it once drew.
+      const showEarlier = (event) => {
+        out.textContent = '';
+        out.style.display = 'none';
+        toolLines.clear();
+        reply = null;
+        steps = null;
+        anchor = null;
+        pendingAsk = null;
+        event.events.forEach(show);
+        // What was replayed is over, whatever it ended on.
+        reply = null;
+        foldSteps();
+        running.clear();
+        following = true;
+        if (picker && picker.history) closeHistory();
+        mark(busy ? 'working' : '');
+        // It is on the model it was left on, which the next message goes to.
+        if (event.model) line('note', `now on ${event.model}`);
+        place();
+        fit();
+      };
+
+      window.addEventListener(
+        'keydown',
+        (event) => {
+          if (!picker || !picker.history || (event.key === 'c' && event.ctrlKey)) return;
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
+            drawHistory();
+          } else if (event.key === 'Enter' && !event.isComposing) {
+            chooseEarlier(picker.shown[picker.index]);
+          } else if (event.key === 'Tab') {
+            if (picker.folders > 1) {
+              historyBy = historyBy === 'when' ? 'folder' : 'when';
+              picker.index = 0;
+              drawHistory();
+            }
+          } else if (event.key === 'Escape') {
+            closeHistory();
+          } else {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+        },
+        true,
+      );
+
+      window.addEventListener(
+        'input',
+        (event) => {
+          if (!picker || !picker.history) return;
+          event.stopPropagation();
+          tint();
+          picker.index = 0;
+          drawHistory();
+        },
+        true,
+      );
+
+      // A press on the button leaves the typing in the field.
+      historyButton.addEventListener('mousedown', (event) => event.preventDefault());
+      historyButton.addEventListener('click', () => {
+        if (picker && picker.history) closeHistory();
+        else openHistory();
+      });
+
       // ── Signing in to a provider ───────────────────────────────────────
       //
       // The harness knows how each provider signs in. /login shows the harness's
@@ -1565,6 +1854,10 @@
           updateHarness();
           return;
         }
+        if (text === '/history' || text.startsWith('/history ')) {
+          openHistory(text.slice(8).trim());
+          return;
+        }
         if (text === '/quit') {
           invoke('quit');
           return;
@@ -1591,7 +1884,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /history, /new and /quit`);
           return;
         }
         if (busy) {

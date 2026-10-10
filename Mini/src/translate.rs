@@ -109,6 +109,8 @@ pub struct Abilities {
     /// Whether it loads a conversation back after it was started again. If not,
     /// a restart begins a new conversation.
     pub loads_back: bool,
+    /// Whether it lists the conversations it keeps. If not, `/history` has nothing to show.
+    pub lists: bool,
 }
 
 /// Read those out of the harness's answer to the greeting and a conversation's settings.
@@ -117,7 +119,14 @@ pub fn abilities(greeting: &Value, options: &Value) -> Abilities {
         models: models_from_config_options(options).0.len(),
         asks_through: other_option(options).map(|(setting, _)| setting),
         loads_back: greeting.pointer("/agentCapabilities/loadSession") == Some(&json!(true)),
+        lists: lists_conversations(greeting),
     }
+}
+
+/// Whether a harness says, in its answer to the greeting, that it lists the
+/// conversations it keeps.
+pub fn lists_conversations(greeting: &Value) -> bool {
+    greeting.pointer("/agentCapabilities/sessionCapabilities/list").is_some_and(|list| !list.is_null())
 }
 
 impl std::fmt::Display for Abilities {
@@ -129,6 +138,10 @@ impl std::fmt::Display for Abilities {
         match &self.asks_through {
             Some(setting) => write!(f, "; says which model is in use when asked through {setting}")?,
             None => write!(f, "; no setting to ask which model is in use with, so a move to a backup may go unsaid")?,
+        }
+        match self.lists {
+            true => write!(f, "; lists earlier conversations")?,
+            false => write!(f, "; does not list earlier conversations, so /history has nothing to show")?,
         }
         match self.loads_back {
             true => write!(f, "; loads a conversation back"),
@@ -262,26 +275,31 @@ mod tests {
 
     #[test]
     fn what_a_harness_can_do_is_read_from_its_greeting_and_a_conversation_s_settings() {
-        let greeting = json!({ "protocolVersion": 1, "agentCapabilities": { "loadSession": true } });
+        let greeting = json!({ "protocolVersion": 1, "agentCapabilities": { "loadSession": true, "sessionCapabilities": { "list": {} } } });
         let settings = json!([
             { "id": "model", "category": "model", "currentValue": "a/one", "options": [{ "value": "a/one", "name": "One" }, { "value": "b/two", "name": "Two" }] },
             { "id": "thinking", "currentValue": "low", "options": [] }
         ]);
         let found = abilities(&greeting, &settings);
-        assert_eq!(found, Abilities { models: 2, asks_through: Some("thinking".into()), loads_back: true });
-        assert_eq!(found.to_string(), "a list of 2 models; says which model is in use when asked through thinking; loads a conversation back");
+        assert_eq!(found, Abilities { models: 2, asks_through: Some("thinking".into()), loads_back: true, lists: true });
+        assert_eq!(found.to_string(), "a list of 2 models; says which model is in use when asked through thinking; lists earlier conversations; loads a conversation back");
     }
 
     #[test]
     fn a_harness_that_offers_less_loses_only_what_it_lacks() {
         // No settings at all, and no word about loading a conversation back.
         let bare = abilities(&json!({ "protocolVersion": 1 }), &Value::Null);
-        assert_eq!(bare, Abilities { models: 0, asks_through: None, loads_back: false });
+        assert_eq!(bare, Abilities { models: 0, asks_through: None, loads_back: false, lists: false });
         assert!(bare.to_string().starts_with("no model list"), "{bare}");
+        assert!(bare.to_string().contains("; does not list earlier conversations, so /history has nothing to show;"), "{bare}");
 
         // A model setting and nothing else: the list is there, only the asking is lost.
         let only_models = json!([{ "id": "model", "currentValue": "a/one", "options": [{ "value": "a/one" }] }]);
-        assert_eq!(abilities(&json!({}), &only_models), Abilities { models: 1, asks_through: None, loads_back: false });
+        assert_eq!(abilities(&json!({}), &only_models), Abilities { models: 1, asks_through: None, loads_back: false, lists: false });
+
+        // It loads a conversation back and says nothing of a list: only /history is lost.
+        let no_list = json!({ "agentCapabilities": { "loadSession": true, "sessionCapabilities": { "close": {} } } });
+        assert_eq!(abilities(&no_list, &only_models), Abilities { models: 1, asks_through: None, loads_back: true, lists: false });
     }
 
     #[test]
