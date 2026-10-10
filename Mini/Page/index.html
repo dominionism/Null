@@ -1563,7 +1563,9 @@
         out.textContent = '';
         out.style.display = 'none';
         toolLines.clear();
+        reply = null;
         steps = null;
+        anchor = null;
         pendingAsk = null;
         event.events.forEach(show);
         // What was replayed is over, whatever it ended on.
