@@ -11,8 +11,10 @@
 > been checked by the owner's hand (see Verification). Item 5, the first opening, is built and
 > proven by script, and not installed. Item 6 is begun: GitHub builds a ready-made Null, Null
 > 0.1.0 is released, and fetched from there it runs on this Mac with no warning; the install
-> command itself and the signing at install are not built. Item 9 is partly done: the README and
-> the decision record. Not started: items 7 and 8.**
+> command and the signing identity it makes are built and tried in trial folders, on branches,
+> and no real install has been made with them. Item 8, the weekly check of new Oh-my-pi
+> versions, is built and tried, on a branch. Item 9 is partly done: the README and the decision
+> record. Not started: item 7.**
 
 ## Goal
 
@@ -152,6 +154,10 @@ where it is removed.
    to `v` tags) is removed with the cleanup (item 6).
 10. **The first release: the owner gave the word on 2026-10-09, and it was published the same
     day.** Null 0.1.0, by the tag `null-v0.1.0` on `main` (item 6).
+11. **Whether GitHub's jobs may open pull requests in this repository.** Open. Today they may
+    not, so the weekly check (item 8) would open an issue with a link, and a person opens
+    the pull request with one click. Recommended: leave it off; it is one fewer thing a job
+    is allowed to do.
 
 ## Work items
 
@@ -387,7 +393,7 @@ where it is removed.
      `--to` on a version that fails, whose "nothing changes" branch has only been read.
    - **Added (2026-10-09):** `.github/workflows/null.yml` runs the unit tests and the harness
      check on GitHub, on a Mac, whenever `Mini/` changes. It passed on `main` at `89f960d`.
-   - **Small things left:** `--to` takes a version number only; there is no `--to latest`. The
+   - **Small things left:** (`--to newest` exists since 2026-10-10, item 8.) The
      two older live checks (the sign-in list and the usage report) still use the profile
      `null-probe` under `~/.omp`, not a throwaway folder, and the sign-in one still reaches
      DeepSeek with a dummy key.
@@ -608,7 +614,35 @@ where it is removed.
    - Depends on: 4.
    - Risk: several releases a day would drown the repo. Hence once a week.
    - Source: inferred.
-   - Status: Not started
+   - Status: In progress. Built and tried (2026-10-10), on the branch `weekly-engine-check`,
+     not merged. It does nothing until it is on `main`, and has not yet met a newer release
+   - **Built:** `Mini/Scripts/engine --to newest`, which takes whichever release of Oh-my-pi
+     is the newest and treats it as a named version is treated. And
+     `.github/workflows/null-engine.yml`, every Monday at 09:17 UTC or started by hand: it
+     runs that on a Mac runner. When `Mini/Engine.toml` was moved, it pushes a branch
+     `engine-<version>` with the one change and opens a pull request; where the repository
+     does not let a job open pull requests, it opens an issue with the link to open one.
+     When the check fails, it opens an issue that names the questions that failed; when the
+     run never got to ask, an issue that says so. A push that changes the workflow only
+     says what it would do.
+   - **Not built:** an agent drafting the fix when a version fails. The issue is where that
+     would start.
+   - **Found:** GitHub's API refuses a job on GitHub's own Macs with 403, since it limits how
+     often it is asked from one address. The first trial failed there. The script now follows
+     the page of the newest release to the release it sends on to, and reads the name from
+     that address. And this repository does not let a job open pull requests
+     (`can_approve_pull_request_reviews` is off), so today a pass would open the issue with
+     the link (decision 11).
+   - **Proven without a person:** here, with the newest release being the one Null carries,
+     the script says so and changes nothing. In a scratch copy of the repository that
+     carried 18.4.3, `--to newest` found 18.8.7, fetched it, passed the 15 live checks beside
+     18.4.3 and wrote an `Engine.toml` that is the real one line for line. On GitHub, a
+     trial run found the newest release and ended with "Null already carries the newest";
+     the run before it, refused by the API, took the "could not be tried" way and, being a
+     trial, opened nothing.
+   - **Not proven:** a real run, since the workflow has to be on `main` to run by the clock
+     or by hand: the branch it pushes, the pull request or issue it opens, and an issue for
+     a version that fails.
 
 9. **Say it**
    - What: the README's first step, from "Bring your harness" to what is true after item 2. An

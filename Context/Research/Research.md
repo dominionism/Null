@@ -456,6 +456,12 @@ dummy key;
 its smoke/self-test switches can send real prompts. `NULL_MINI_PROFILE` isolates settings and OMP
 profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.json`**.
 
+**Keeping up.** `.github/workflows/null-engine.yml` runs every Monday: `Mini/Scripts/engine --to
+newest` fetches the newest Oh-my-pi, checks its signer and puts it through the harness check. A pass
+pushes a branch `engine-<version>` and opens a pull request, or an issue with the link where the
+repository does not let a job open pull requests (it does not, as of 2026-10-10). A failure opens an
+issue naming the questions that failed. A push that changes the workflow only says what it would do.
+
 **Releases.** `.github/workflows/null-release.yml` builds `Null.app` on a Mac runner with the carried
 Oh-my-pi inside, seals it with no certificate and packs it with a checksum. A push that changes
 that file, or a run started by hand, keeps the app with the run; a tag `null-v<version>` publishes
