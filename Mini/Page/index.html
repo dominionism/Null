@@ -6,9 +6,10 @@
      the one in use stops answering, /usage shows what each provider has left,
      /login signs in to a provider, /harness shows which Oh-my-pi the box runs
      and lets you choose your own, /update moves the built-in one to the newest
-     checked version, /new starts a new conversation, /quit quits
-     the app and closes the conversation, /history (and the button at the end
-     of the row) lists the earlier conversations and opens one again, Ctrl+C
+     checked version, /attach (or the plus at the end of the row) hands the
+     agent a file with the next message, /history (and the button after the
+     plus) lists the earlier conversations and opens one again, /new starts a
+     new conversation, /quit quits the app and closes the conversation, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
 
@@ -587,6 +588,42 @@
         text-align: right;
       }
 
+      /* ── Attached files ────────────────────────────────────────────────
+         What goes with the next message stands on the notice line, on the
+         reading edge, until it is sent. A name there is pressed to take it
+         off, and is struck through under the pointer to say so. Under the
+         owner's message, what went with it is a dim line on the same edge. In
+         the list, the folder being shown is written as it is and not in
+         capitals: a name is data. */
+      #notice .off {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--soft);
+        font: inherit;
+        cursor: pointer;
+      }
+      #notice .off:hover {
+        color: var(--text);
+        text-decoration: line-through;
+      }
+      #out > .you > .with {
+        grid-column: 2;
+        margin-bottom: 5px;
+        color: var(--faint);
+        font-size: 11px;
+        letter-spacing: 0.02em;
+      }
+      .provider.where {
+        font: 11px/18px var(--mono);
+        letter-spacing: 0;
+        text-transform: none;
+        white-space: pre;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -607,6 +644,9 @@
           ><svg viewBox="0 0 10 22" width="10" height="22"><path d="M3 7l4 4-4 4" /></svg
         ></span>
         <input id="q" autofocus spellcheck="false" />
+        <button class="tool" id="attach" type="button" tabindex="-1" aria-label="attach a file">
+          <svg viewBox="0 0 22 22" width="22" height="22"><path d="M11 6.5v9M6.5 11h9" /></svg>
+        </button>
         <button class="tool" id="history" type="button" tabindex="-1" aria-label="earlier conversations">
           <svg viewBox="0 0 22 22" width="22" height="22"><path d="M6.2 6.9a6.3 6.3 0 1 1-1.4 5.2M5.6 4.2v3h3M11 7.7V11l2.3 1.4" /></svg>
         </button>
@@ -899,11 +939,14 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/history', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/attach', '/history', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
-          !picker && !signin && text.startsWith('/') && (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/history ') || COMMANDS.some((name) => name.startsWith(text)));
+          !picker &&
+          !signin &&
+          text.startsWith('/') &&
+          (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/attach ') || text.startsWith('/history ') || COMMANDS.some((name) => name.startsWith(text)));
         input.classList.toggle('command', command);
       };
 
@@ -917,6 +960,7 @@
           noticeTimer = setTimeout(() => {
             noticeLine.style.display = 'none';
             fit();
+            restAttached(); // what is attached has the line when nothing newer does
           }, 4000);
         }
         fit();
@@ -926,6 +970,7 @@
         clearTimeout(noticeTimer);
         noticeLine.style.display = 'none';
         fit();
+        restAttached();
       };
 
       // The harness tries a provider that is slow to answer again and again, and
@@ -958,6 +1003,7 @@
             foldSteps();
             following = true;
             anchor = add(el('div', 'you', el('span', 'mark', nullSign()), el('div', 'text', event.text)));
+            wentWith(anchor, event.files);
             place();
             break;
           }
@@ -1150,6 +1196,7 @@
         tint();
         mark(busy ? 'working' : '');
         fit();
+        filesClosed();
       };
 
       // ── What is left ───────────────────────────────────────────────────
@@ -1854,6 +1901,10 @@
           updateHarness();
           return;
         }
+        if (text === '/attach' || text.startsWith('/attach ')) {
+          attach(text.slice(7).trim(), text);
+          return;
+        }
         if (text === '/history' || text.startsWith('/history ')) {
           openHistory(text.slice(8).trim());
           return;
@@ -1884,7 +1935,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /history, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /attach, /history, /new and /quit`);
           return;
         }
         if (busy) {
@@ -1915,6 +1966,215 @@
           line('error', `could not answer: ${error}`);
         }
       };
+
+      // ── Attached files ─────────────────────────────────────────────────
+      //
+      // /attach, or the plus at the end of the row, hands the agent a file with
+      // the next message. Null uploads nothing: the file stays where it is and
+      // the harness is told where (src/attach.rs). The list walks the folders of
+      // this Mac without leaving the box: typing narrows it, Enter opens a
+      // folder, attaches a file or takes an attached one off, and it opens where
+      // it was last. /attach with a path attaches that file at once. What is
+      // attached stands on the notice line until it is sent. A file's name is
+      // data: it only ever becomes text.
+
+      const attachButton = document.getElementById('attach');
+      const MOST_ROWS = 200; // a folder of thousands is narrowed by typing, not drawn whole
+      let attached = []; // { name, path, within }: what goes with the next message
+      let draft = ''; // what was in the field when the plus was pressed: it comes back
+
+      // The notice line says what is attached whenever it has nothing newer to
+      // say. A press on a name takes that file off. True when there is one.
+      const restAttached = () => {
+        if (!attached.length) return false;
+        clearTimeout(noticeTimer);
+        noticeLine.textContent = 'attached: ';
+        attached.forEach((file, index) => {
+          const name = el('button', 'off', file.name);
+          name.type = 'button';
+          name.tabIndex = -1;
+          name.setAttribute('aria-label', `take off ${file.name}`);
+          name.addEventListener('mousedown', (event) => event.preventDefault()); // the typing stays in the field
+          name.addEventListener('click', () => invoke('detach_file', { path: file.path }).catch(() => {}));
+          noticeLine.append(index ? ' · ' : '', name);
+        });
+        noticeLine.style.display = 'block';
+        fit();
+        return true;
+      };
+
+      // Under the owner's message: what went with it.
+      const wentWith = (message, files) => {
+        if (!files || !files.length) return;
+        message.append(el('div', 'with', `attached: ${files.map((file) => file.name).join(' · ')}`));
+      };
+
+      // A long folder keeps its end, which is where the person is.
+      const shortPath = (path) => {
+        if (path.length <= 76) return path;
+        const end = path.slice(-72);
+        return `…${end.slice(Math.max(end.indexOf('/'), 0))}`;
+      };
+
+      // The rows of the list: what is attached first, wherever it is, then the
+      // folder. A path typed from the root or from ~ goes straight there.
+      const fileRows = () => {
+        const { listing } = picker;
+        const typed = input.value.trim();
+        if (/^[/~]/.test(typed)) return [{ name: typed, path: typed, typed: true }];
+        const words = typed.toLowerCase().split(/\s+/).filter(Boolean);
+        const wanted = (row) => words.every((word) => row.name.toLowerCase().includes(word));
+        const taken = new Set(attached.map((file) => file.path));
+        const dots = typed.startsWith('.'); // a name that starts with a dot stays out until one is asked for
+        const up = listing.parent && (!words.length || typed === '..') ? [{ name: '..', path: listing.parent, folder: true }] : [];
+        const here = listing.entries.filter((entry) => !taken.has(entry.path) && (dots || !entry.name.startsWith('.')) && wanted(entry));
+        return attached
+          .filter(wanted)
+          .map((file) => ({ ...file, attached: true }))
+          .concat(up, here);
+      };
+
+      const drawFiles = () => {
+        const { listing } = picker;
+        const rows = fileRows();
+        // A list just opened or narrowed starts below what is attached, so that
+        // Enter adds the file that was looked for and does not take one off.
+        if (picker.index < 0) picker.index = Math.max(rows.findIndex((row) => !row.attached), 0);
+        picker.shown = rows.slice(0, MOST_ROWS);
+        picker.index = Math.min(picker.index, Math.max(picker.shown.length - 1, 0));
+        pick.textContent = '';
+        const where = () => el('div', 'provider where', shortPath(listing.shown));
+        let group = null;
+        picker.shown.forEach((row, index) => {
+          const kind = row.attached ? 'attached' : row.typed ? 'go to' : 'folder';
+          if (kind !== group) {
+            group = kind;
+            pick.append(kind === 'folder' ? where() : el('div', 'provider', kind));
+          }
+          const option = el('div', index === picker.index ? 'option selected' : 'option', el('span', '', `${row.attached ? '● ' : '  '}${row.name}${row.folder ? '/' : ''} `));
+          if (row.attached) option.append(el('span', 'id', row.within));
+          option.addEventListener('click', () => chooseFile(row));
+          pick.append(option);
+          if (index === picker.index && option.scrollIntoView) option.scrollIntoView({ block: 'nearest' });
+        });
+        if (group !== 'folder' && group !== 'go to') pick.append(where(), el('div', 'provider', input.value.trim() ? 'no file matches' : 'nothing here'));
+        if (rows.length > MOST_ROWS) pick.append(el('div', 'provider where', `  and ${rows.length - MOST_ROWS} more. type to narrow`));
+        if (listing.cut) pick.append(el('div', 'provider where', `  ${listing.cut} more are past what the list holds. /attach with a path reaches them`));
+        fit();
+      };
+
+      // Show a folder: the one named, or the one the list last showed. `keep` is
+      // what the field held when the plus was pressed.
+      const openFiles = async (folder, keep = '') => {
+        const elsewhere = () => signin || (picker && !picker.files);
+        if (elsewhere()) return;
+        let listing;
+        try {
+          listing = await invoke('attach_list', { folder: folder || null });
+        } catch (error) {
+          notice(String(error));
+          return;
+        }
+        if (elsewhere()) return; // another list was opened meanwhile
+        if (!picker) {
+          draft = keep;
+          attachButton.classList.add('on');
+          notice(`enter opens a folder${attached.length ? ', attaches a file or takes one off' : ' or attaches a file'}. esc is done`);
+        }
+        picker = { files: true, listing, models: [], current: null, shown: [], index: -1, backups: null, saved: [], spent: new Set(), left: new Map() };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        input.value = '';
+        tint();
+        drawFiles();
+      };
+
+      // Attach the file at a path. A folder opens in the list instead. What
+      // cannot be attached is said in one line, and a command is handed back.
+      const attachPath = async (path, typed) => {
+        let added;
+        try {
+          added = await invoke('attach_file', { path });
+        } catch (error) {
+          if (typed && !picker && !input.value) {
+            input.value = typed;
+            tint();
+          }
+          notice(String(error));
+          return;
+        }
+        if (added.kind === 'folder') openFiles(added.path);
+        else if (picker && picker.files) closePicker(); // what is attached arrives as an event
+      };
+
+      const attach = (path, typed) => (path ? attachPath(path, typed) : openFiles());
+
+      const chooseFile = async (row) => {
+        if (!row) return;
+        if (row.folder) {
+          openFiles(row.path);
+        } else if (row.attached) {
+          await invoke('detach_file', { path: row.path }).catch(() => {});
+          if (picker && picker.files) closePicker();
+        } else {
+          attachPath(row.path);
+        }
+      };
+
+      const narrowFiles = () => {
+        picker.index = -1;
+        drawFiles();
+      };
+
+      const filesKey = (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          const step = event.key === 'ArrowDown' ? 1 : -1;
+          picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
+          drawFiles();
+        } else if (event.key === 'Enter' && !event.isComposing) {
+          chooseFile(picker.shown[picker.index]);
+        }
+      };
+
+      // A list has been put away. If it was this one, the plus goes quiet, the
+      // list's own words go, and what was being typed when the plus was pressed
+      // comes back.
+      const filesClosed = () => {
+        if (!attachButton.classList.contains('on')) return;
+        attachButton.classList.remove('on');
+        unnotice();
+        if (draft) {
+          input.value = draft;
+          draft = '';
+          tint();
+        }
+      };
+
+      // The plus is a second way in to /attach. A press on it, or on a row of
+      // its list, leaves the typing in the field, and a button never starts
+      // moving the box.
+      attachButton.addEventListener('mousedown', (event) => event.preventDefault());
+      attachButton.addEventListener('click', () => {
+        if (picker && picker.files) closePicker();
+        else openFiles(null, input.value);
+      });
+      pick.addEventListener('mousedown', (event) => {
+        if (picker && picker.files) event.preventDefault();
+      });
+
+      // The app says what is attached each time it changes: a file was added or
+      // taken off, or a message took them with it.
+      const showAttached = (files) => {
+        const shown = noticeLine.style.display !== 'none' && !!noticeLine.querySelector('.off');
+        attached = files || [];
+        if (!restAttached() && shown) unnotice();
+        if (picker && picker.files) drawFiles();
+      };
+      listen('mini:attached', (message) => showAttached(message.payload));
+      invoke('attached')
+        .then(showAttached)
+        .catch(() => {});
 
       // ── Moving the box ─────────────────────────────────────────────────
       //
@@ -2011,6 +2271,10 @@
           signin.index = 0;
           drawSignin();
         }
+        if (picker && picker.files) {
+          narrowFiles();
+          return;
+        }
         if (picker && !picker.usage && !picker.harness) {
           picker.index = 0;
           drawPicker();
@@ -2035,6 +2299,10 @@
             mark('working');
             invoke('signin_answer', { text }).catch((error) => line('error', String(error)));
           }
+          return;
+        }
+        if (picker && picker.files) {
+          filesKey(event);
           return;
         }
         if (picker && picker.usage) {

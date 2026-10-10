@@ -24,8 +24,8 @@ use std::time::{Duration, Instant};
 use serde_json::{json, Value};
 
 use crate::history;
-use crate::standin::StandIn;
-use crate::{backups, engine, harness, translate};
+use crate::standin::{self, StandIn};
+use crate::{attach, backups, engine, harness, translate};
 
 /// How long one answer from the harness is waited for. It tries a provider that
 /// refuses several times before it gives up, which takes a quarter of a minute.
@@ -187,8 +187,13 @@ impl Agent {
     /// Send a message. Gives how the reply ended and the words of it, or the
     /// error when the harness answered the message with one.
     fn say(&mut self, session: &str, text: &str) -> Result<(Value, String), Value> {
+        self.hand(session, text, &[])
+    }
+
+    /// Send a message with files attached, as Null hands them over.
+    fn hand(&mut self, session: &str, text: &str, files: &[PathBuf]) -> Result<(Value, String), Value> {
         let before = self.updates.len();
-        let ended = self.request("session/prompt", json!({ "sessionId": session, "prompt": [{ "type": "text", "text": text }] }))?;
+        let ended = self.request("session/prompt", json!({ "sessionId": session, "prompt": attach::blocks(text, files) }))?;
         let mut tools = HashMap::new();
         let words = self.updates[before..]
             .iter()
@@ -309,6 +314,38 @@ fn refusals_in_openai_s_way_of_talking_are_replies_that_count_no_tokens() {
 #[ignore]
 fn refusals_in_chatgpt_s_way_of_talking_are_replies_that_count_no_tokens() {
     refusals_are_replies_that_count_no_tokens("codex");
+}
+
+/// A file attached to a message goes to the harness as a link, and Null reads
+/// none of it. So the harness has to tell the model where the file is, and its
+/// own tool has to read a file that is outside the conversation's folder, with
+/// a name as awkward as names get. The stand-in asks to read what it is
+/// handed, as a model does, so what is in the file has to reach it.
+#[test]
+#[ignore]
+fn the_agent_is_told_where_an_attached_file_is_and_can_read_it() {
+    let (standin, folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", None);
+    let file = folder.root.join("notes \"one\" it's ノート.txt");
+    std::fs::write(&file, "the word to find is heliotrope\n").unwrap();
+    let path = file.display().to_string();
+
+    let (ended, words) = agent.hand(&session, MESSAGE, std::slice::from_ref(&file)).unwrap_or_else(|error| panic!("a message with a file was answered with an error: {error}"));
+    assert_eq!(words.trim(), "pong", "the reply's words: {ended}");
+
+    let heard = standin.heard();
+    let told = |request: &Value| request["messages"].as_array().into_iter().flatten().map(standin::words).collect::<String>();
+    let first = heard.first().map(told).unwrap_or_default();
+    assert!(first.contains(MESSAGE), "the message's own words did not reach the model: {first}");
+    assert!(first.contains(&path), "the model was not told where the attached file is: {first}");
+    assert!(heard.iter().skip(1).any(|request| told(request).contains("the word to find is heliotrope")), "the harness did not read the file for the model: {} requests, the last {}", heard.len(), heard.last().map(told).unwrap_or_default());
+
+    // Loaded back, the message is its words and then where each file is, which is how the box shows its files again.
+    drop(agent);
+    let mut again = Agent::start(&engine::under_test(), &folder, None);
+    again.load(&folder, &session).expect("the conversation loads back");
+    let mut tools = HashMap::new();
+    let replayed: Vec<Value> = again.updates.iter().filter_map(|update| translate::event_from_update(update, &mut tools)).filter(|event| event["type"] == "user_message").collect();
+    assert_eq!(replayed, [attach::said(MESSAGE, &[file])], "the message as the harness gives it back");
 }
 
 /// Null hands over a backup order and leaves the switching to the harness: it

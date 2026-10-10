@@ -36,7 +36,7 @@ use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::history;
-use crate::{access, backups, panel, providers, settings};
+use crate::{access, attach, backups, panel, providers, settings};
 
 /// The harness this app drives. One for now; the name is also its CLI.
 pub const HARNESS: &str = "omp";
@@ -56,7 +56,7 @@ pub struct ModelList {
 }
 
 enum Command {
-    Send { text: String },
+    Send { text: String, files: Vec<PathBuf> },
     Interrupt,
     NewConversation,
     /// Let the harness process go, so that the next order starts a fresh one.
@@ -485,7 +485,7 @@ impl Conversation<'_> {
     /// Carry out one order. An error here means the connection itself is no good.
     async fn handle(&mut self, command: Command) -> Result<(), String> {
         match command {
-            Command::Send { text } => {
+            Command::Send { text, files } => {
                 let session = match self.open().await {
                     Ok(session) => session,
                     Err(reason) => {
@@ -494,7 +494,8 @@ impl Conversation<'_> {
                     }
                 };
                 history::said(self.app, &session, &text);
-                let request: PromptRequest = typed(json!({ "sessionId": session, "prompt": [{ "type": "text", "text": text }] }))?;
+                let request: PromptRequest = typed(json!({ "sessionId": session, "prompt": attach::blocks(&text, &files) }))?;
+                let with_files = !files.is_empty();
                 let (app, shared) = (self.app.clone(), self.shared.clone());
                 self.cx
                     .send_request(request)
@@ -529,7 +530,7 @@ impl Conversation<'_> {
                                 }
                                 let _ = order(&app.state::<Harness>(), Command::CheckModel);
                             }
-                            Err(error) => fail_reply(&app, &shared, error_event(&error)),
+                            Err(error) => fail_reply(&app, &shared, attach::refused(error_event(&error), with_files)),
                         }
                         Ok(())
                     })
@@ -922,9 +923,11 @@ pub fn send_text(app: &AppHandle, text: String) -> Result<u64, String> {
         shared.busy = true;
         shared.seq
     };
-    publish(app, &harness.shared, json!({ "type": "user_message", "text": text }));
+    // What is attached goes with this message. A file that has gone stops it.
+    let files = attach::take(app).inspect_err(|_| lock(&harness.shared).busy = false)?;
+    publish(app, &harness.shared, attach::said(&text, &files));
     publish(app, &harness.shared, json!({ "type": "status_change", "status": "running", "reason": null }));
-    if let Err(reason) = order(&harness, Command::Send { text }) {
+    if let Err(reason) = order(&harness, Command::Send { text, files }) {
         fail_reply(app, &harness.shared, json!({ "type": "error", "message": reason, "code": null, "details": null }));
     }
     Ok(cursor)

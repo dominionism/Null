@@ -32,6 +32,7 @@
 compile_error!("Null is macOS-only for now");
 
 mod access;
+mod attach;
 mod backups;
 #[cfg(test)]
 mod check;
@@ -127,6 +128,10 @@ fn main() {
             signin::signin_answer,
             signin::signin_cancel,
             signin::open_url,
+            attach::attach_list,
+            attach::attach_file,
+            attach::detach_file,
+            attach::attached,
         ])
         .setup(|app| {
             log!("started, version {}", app.package_info().version);

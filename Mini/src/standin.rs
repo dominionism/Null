@@ -7,6 +7,10 @@
 //! are close copies of what those providers send, not recordings, so the first
 //! real limit is still worth setting beside them.
 //!
+//! Handed a file with a message (`attach.rs`), `ok` in Anthropic's way of
+//! talking does what a model does: it asks the harness to read the file, and
+//! replies once it has been given what is in it.
+//!
 //! Two things use it. The harness check (`check.rs`) asks a real Oh-my-pi its
 //! questions against it. And a scripted run of the app itself offers its models
 //! to the harness with `NULL_MINI_STANDIN`, on a folder of the run's own
@@ -39,21 +43,23 @@ pub struct StandIn {
     /// Every address a harness tried to reach through the stand-in, when it was
     /// set as that harness's way out (`Folder::behind`). Nothing is let through.
     reached: Arc<Mutex<Vec<String>>>,
+    /// Everything a model was sent, in order: the body of each message to one.
+    heard: Arc<Mutex<Vec<Value>>>,
 }
 
 impl StandIn {
     pub fn start() -> StandIn {
         let listener = TcpListener::bind("127.0.0.1:0").expect("a free port on this Mac");
         let port = listener.local_addr().expect("the port it was given").port();
-        let (asked, reached) = (Arc::new(Mutex::new(Vec::new())), Arc::new(Mutex::new(Vec::new())));
-        let record = (asked.clone(), reached.clone());
+        let (asked, reached, heard) = (Arc::new(Mutex::new(Vec::new())), Arc::new(Mutex::new(Vec::new())), Arc::new(Mutex::new(Vec::new())));
+        let record = (asked.clone(), reached.clone(), heard.clone());
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
                 let record = record.clone();
-                std::thread::spawn(move || answer(stream, &record.0, &record.1));
+                std::thread::spawn(move || answer(stream, &record.0, &record.1, &record.2));
             }
         });
-        StandIn { port, asked, reached }
+        StandIn { port, asked, reached, heard }
     }
 
     /// The file that offers the stand-in's models to a harness, as `standin-<kind>/<answer>`.
@@ -77,6 +83,11 @@ impl StandIn {
     #[cfg(test)]
     pub fn reached(&self) -> Vec<String> {
         self.reached.lock().unwrap().clone()
+    }
+
+    #[cfg(test)]
+    pub fn heard(&self) -> Vec<Value> {
+        self.heard.lock().unwrap().clone()
     }
 }
 
@@ -117,7 +128,7 @@ fn read_request(stream: &mut TcpStream) -> Option<(String, String, Vec<u8>)> {
     }
 }
 
-fn answer(mut stream: TcpStream, asked: &Mutex<Vec<String>>, reached: &Mutex<Vec<String>>) {
+fn answer(mut stream: TcpStream, asked: &Mutex<Vec<String>>, reached: &Mutex<Vec<String>>, heard: &Mutex<Vec<Value>>) {
     let Some((method, path, body)) = read_request(&mut stream) else { return };
     // Asked to pass a request on to somewhere else: write down where, and refuse.
     if method == "CONNECT" || path.starts_with("http") {
@@ -126,12 +137,15 @@ fn answer(mut stream: TcpStream, asked: &Mutex<Vec<String>>, reached: &Mutex<Vec
         return;
     }
     let kind = path.split('/').nth(1).unwrap_or_default();
-    let model = serde_json::from_slice::<Value>(&body).ok().and_then(|body| Some(body.get("model")?.as_str()?.to_string())).unwrap_or_default();
+    let said = serde_json::from_slice::<Value>(&body).unwrap_or(Value::Null);
+    let model = said.get("model").and_then(Value::as_str).unwrap_or_default().to_string();
     let which = model.rsplit('/').next().unwrap_or_default();
     let (status, headers, body) = match (method.as_str(), which) {
         ("POST", "ok" | "limit" | "auth" | "noaccess") => {
             asked.lock().unwrap().push(format!("{kind}/{which}"));
-            reply(kind, which, &model)
+            let answered = reply(kind, which, &model, &said);
+            heard.lock().unwrap().push(said);
+            answered
         }
         _ => (404, Vec::new(), json!({ "error": { "message": "stand-in: nothing here", "type": "not_found" } }).to_string()),
     };
@@ -152,12 +166,28 @@ fn answer(mut stream: TcpStream, asked: &Mutex<Vec<String>>, reached: &Mutex<Vec
 
 /// What a provider of this kind sends back for this answer: the status, the
 /// headers that say when to come back, and the body.
-fn reply(kind: &str, which: &str, model: &str) -> (u16, Vec<(&'static str, String)>, String) {
+fn reply(kind: &str, which: &str, model: &str, said: &Value) -> (u16, Vec<(&'static str, String)>, String) {
     let soon = |seconds: u64| (SystemTime::now().duration_since(UNIX_EPOCH).map(|now| now.as_secs()).unwrap_or(0) + seconds).to_string();
     let anthropic = |kind_of_error: &str, message: &str| json!({ "type": "error", "error": { "type": kind_of_error, "message": message }, "request_id": "req_standin" }).to_string();
     let openai = |message: String, kind_of_error: &str, code: &str| json!({ "error": { "message": message, "type": kind_of_error, "param": null, "code": code } }).to_string();
     let events = |frames: &[(&str, Value)]| frames.iter().map(|(event, data)| format!("event: {event}\ndata: {data}\n\n")).collect::<String>();
     match (kind, which) {
+        // Handed a file it has not read yet, a model asks to read it.
+        ("anthropic", "ok") if reading(said).is_some() => {
+            let (tool, input) = reading(said).unwrap_or_default();
+            (
+                200,
+                Vec::new(),
+                events(&[
+                    ("message_start", json!({ "type": "message_start", "message": { "id": "msg_standin", "type": "message", "role": "assistant", "model": model, "content": [], "stop_reason": null, "stop_sequence": null, "usage": { "input_tokens": 10, "output_tokens": 1 } } })),
+                    ("content_block_start", json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "tool_use", "id": "toolu_standin", "name": tool, "input": {} } })),
+                    ("content_block_delta", json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "input_json_delta", "partial_json": input.to_string() } })),
+                    ("content_block_stop", json!({ "type": "content_block_stop", "index": 0 })),
+                    ("message_delta", json!({ "type": "message_delta", "delta": { "stop_reason": "tool_use", "stop_sequence": null }, "usage": { "output_tokens": 1 } })),
+                    ("message_stop", json!({ "type": "message_stop" })),
+                ]),
+            )
+        }
         ("anthropic", "ok") => (
             200,
             Vec::new(),
@@ -215,6 +245,45 @@ fn reply(kind: &str, which: &str, model: &str) -> (u16, Vec<(&'static str, Strin
     }
 }
 
+/// Every word of one message of a request, whatever it is made of: plain
+/// text, parts, or what a tool gave back.
+pub fn words(message: &Value) -> String {
+    fn gather(part: &Value, words: &mut String) {
+        match part {
+            Value::String(text) => {
+                words.push_str(text);
+                words.push('\n');
+            }
+            Value::Array(parts) => parts.iter().for_each(|part| gather(part, words)),
+            Value::Object(part) => ["text", "content"].iter().filter_map(|field| part.get(*field)).for_each(|inner| gather(inner, words)),
+            _ => {}
+        }
+    }
+    let mut words = String::new();
+    gather(&message["content"], &mut words);
+    words
+}
+
+/// The tool a model handed a file would call to read it, and with what: the
+/// harness's own tool for reading, given the path the message names. None when
+/// no file was handed over, when the tool has already answered, or when the
+/// harness offers no such tool.
+fn reading(said: &Value) -> Option<(String, Value)> {
+    let last = said.get("messages")?.as_array()?.last()?;
+    if last["content"].as_array().is_some_and(|parts| parts.iter().any(|part| part["type"] == "tool_result")) {
+        return None;
+    }
+    let told = words(last);
+    let file = crate::attach::split(told.trim_end()).1.into_iter().next()?;
+    let tool = said.get("tools")?.as_array()?.iter().find(|tool| tool["name"].as_str().is_some_and(|name| name.trim_start_matches('_') == "read"))?;
+    // Whatever else the tool insists on is a word about why.
+    let mut input = serde_json::Map::new();
+    input.insert("path".into(), json!(file));
+    for wanted in tool.pointer("/input_schema/required").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
+        input.entry(wanted).or_insert(json!("read the attached file"));
+    }
+    Some((tool["name"].as_str()?.to_string(), Value::Object(input)))
+}
 
 /// `NULL_MINI_STANDIN`: start the stand-in and offer its models to the harness of
 /// this run. The run has to be on a folder of its own (`NULL_MINI_FOLDER`), so
