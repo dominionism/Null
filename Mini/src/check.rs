@@ -23,6 +23,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
+use crate::history;
 use crate::standin::StandIn;
 use crate::{backups, engine, harness, translate};
 
@@ -196,6 +197,23 @@ impl Agent {
             .filter_map(|event| event["text"].as_str().map(str::to_string))
             .collect();
         Ok((ended, words))
+    }
+
+    /// Every conversation the harness keeps, a page of its list at a time, as Null reads them.
+    fn conversations(&mut self) -> Vec<Value> {
+        let mut listed = Vec::new();
+        let mut next: Option<String> = None;
+        loop {
+            let asked = next.as_ref().map_or(json!({}), |next| json!({ "cursor": next }));
+            let answer = self.request("session/list", asked).unwrap_or_else(|error| panic!("the harness did not list its conversations: {error}"));
+            let (kept, more) = history::page(&answer);
+            assert!(!kept.is_empty() || more.is_none(), "a page with nothing on it says there is another: {answer}");
+            listed.extend(kept);
+            next = more;
+            if next.is_none() {
+                return listed;
+            }
+        }
     }
 }
 
@@ -431,4 +449,77 @@ fn two_versions_take_turns_on_one_folder() {
         let (ended, words) = agent.say(&session, MESSAGE).unwrap_or_else(|error| panic!("{whose} answered with an error: {error}"));
         assert_eq!(words.trim(), "pong", "{whose}: {ended}");
     }
+}
+
+/// `/history` draws the harness's own list of the conversations it keeps, the
+/// ones made in a terminal in other folders among them: each with the folder
+/// it works in and when it was last used, the most recently used first. And a
+/// conversation opens in the box by the harness loading it back in that
+/// folder and replaying what was said, so that the next message continues it.
+#[test]
+#[ignore]
+fn earlier_conversations_are_listed_with_their_folders_and_one_loads_back_in_its_own() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let binary = engine::under_test();
+    let elsewhere = folder.root.join("elsewhere");
+    std::fs::create_dir_all(&elsewhere).unwrap();
+    const SAID: &str = "Reply with exactly one word: pong\nand nothing after it";
+
+    let (here, there) = {
+        let mut agent = Agent::start(&binary, &folder, None);
+        assert!(translate::lists_conversations(&agent.hello), "the harness does not say that it lists its conversations: {}", agent.hello);
+        let (here, _) = agent.open(&folder);
+        agent.set(&here, "model", json!("standin-anthropic/ok"));
+        agent.say(&here, MESSAGE).expect("the message is answered");
+        // One as a terminal makes them: in a folder that is not Null's.
+        let opened = agent.request("session/new", json!({ "cwd": elsewhere, "mcpServers": [] })).expect("a conversation opens in another folder");
+        let there = opened["sessionId"].as_str().expect("a conversation has an id").to_string();
+        agent.set(&there, "model", json!("standin-anthropic/ok"));
+        agent.say(&there, SAID).expect("the message is answered");
+        // And one in which nothing is said, which the box leaves out.
+        agent.open(&folder);
+        (here, there)
+    };
+
+    // A harness started afresh, as after Null was.
+    let mut agent = Agent::start(&binary, &folder, None);
+    let listed = agent.conversations();
+    let shown = history::entries(&listed, &Default::default(), &folder.work(), Some(&here));
+    assert_eq!(shown.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [there.as_str(), here.as_str()], "the conversations something was said in, the last used first: {listed:?}");
+    assert_eq!((shown[0].folder.as_str(), shown[0].own, shown[0].open), (elsewhere.to_str().unwrap(), false, false), "the one made elsewhere: {listed:?}");
+    assert_eq!((shown[1].folder.as_str(), shown[1].own, shown[1].open), (folder.work().to_str().unwrap(), true, true), "the one made in Null's folder: {listed:?}");
+    assert!(shown.iter().all(|entry| entry.used.as_deref().is_some_and(|used| used.len() >= 20 && used.contains('T'))), "when each was last used: {listed:?}");
+
+    let its_folder = history::folder_of(&listed, &there).expect("the list names the folder of each");
+    let before = agent.updates.len();
+    agent.request("session/load", json!({ "sessionId": there, "cwd": its_folder, "mcpServers": [] })).unwrap_or_else(|error| panic!("the conversation did not load back in its own folder: {error}"));
+    let replayed = history::replayed(&agent.updates[before..]);
+    assert_eq!(replayed.first(), Some(&json!({ "type": "user_message", "text": SAID })), "what was said first is replayed first: {replayed:?}");
+    assert!(replayed.contains(&json!({ "type": "text_delta", "text": "pong", "thinking": false })), "the reply is replayed: {replayed:?}");
+
+    let (ended, words) = agent.say(&there, MESSAGE).unwrap_or_else(|error| panic!("the next message was answered with an error: {error}"));
+    assert_eq!(words.trim(), "pong", "the next message continues it: {ended}");
+    let again = agent.conversations();
+    assert_eq!(history::entries(&again, &Default::default(), &folder.work(), None).len(), 2, "continuing a conversation makes no new one: {again:?}");
+}
+
+/// The harness gives its list a page at a time, and the box shows all of it:
+/// every page has to say how to ask for the next, and the last that there is none.
+#[test]
+#[ignore]
+fn the_list_of_conversations_is_read_to_its_end_a_page_at_a_time() {
+    const MADE: usize = 60;
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let mut agent = Agent::start(&engine::under_test(), &folder, None);
+    let made: std::collections::HashSet<String> = (0..MADE).map(|_| agent.open(&folder).0).collect();
+    assert_eq!(made.len(), MADE, "every conversation has an id of its own");
+
+    let first = agent.request("session/list", json!({})).expect("the harness lists its conversations");
+    let (on_the_first_page, next) = history::page(&first);
+    assert!(on_the_first_page.len() < MADE && next.is_some(), "{MADE} conversations no longer come on more than one page, so this can no longer be told: {} on the first, then {next:?}", on_the_first_page.len());
+
+    let listed: std::collections::HashSet<String> = agent.conversations().iter().filter_map(|kept| kept["sessionId"].as_str().map(str::to_string)).collect();
+    assert_eq!(listed, made, "the pages together are the conversations made, each once");
 }
