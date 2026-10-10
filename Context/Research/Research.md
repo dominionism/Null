@@ -467,7 +467,7 @@ issue naming the questions that failed. A push that changes the workflow only sa
 **Releases.** `.github/workflows/null-release.yml` builds `Null.app` on a Mac runner with the carried
 Oh-my-pi inside, seals it with no certificate and packs it with a checksum. A push that changes
 that file, or a run started by hand, keeps the app with the run; a tag `null-v<version>` publishes
-it. The first release is Null 0.1.0 (`null-v0.1.0`, 2026-10-09). **`release.yml` is not Null's:** it came with the Voice app,
+it. The releases so far are Null 0.1.0 (`null-v0.1.0`, 2026-10-09) and 0.1.1 (2026-10-10). **`release.yml` is not Null's:** it came with the Voice app,
 answers to any tag that starts with `v`, and builds that app for three systems with certificates
 this repository does not have. A plain `v` tag would set it off.
 
