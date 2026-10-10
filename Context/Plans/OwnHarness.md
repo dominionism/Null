@@ -9,9 +9,10 @@
 > and 10 are built, merged and installed (2026-10-09, about 20:06): what a harness can do, the
 > harness check, and `/update`. The carried version is 18.8.7. That installed build has not yet
 > been checked by the owner's hand (see Verification). Item 5, the first opening, is built and
-> proven by script, and not installed. Item 6 is begun: GitHub builds a ready-made Null, and one
-> fetched from there runs on this Mac with no warning. Item 9 is partly done: the README and the
-> decision record. Not started: items 7 and 8.**
+> proven by script, and not installed. Item 6 is begun: GitHub builds a ready-made Null, Null
+> 0.1.0 is released, and fetched from there it runs on this Mac with no warning; the install
+> command itself and the signing at install are not built. Item 9 is partly done: the README and
+> the decision record. Not started: items 7 and 8.**
 
 ## Goal
 
@@ -145,8 +146,8 @@ where it is removed.
 9. **What Null's release tags are called: settled by the owner on 2026-10-09.** `null-v…`,
    as in `null-v0.1.0`, until the Voice app's release workflow (`release.yml`, which answers
    to `v` tags) is removed with the cleanup (item 6).
-10. **The first release: the owner gave the word on 2026-10-09.** Null 0.1.0, by the tag
-    `null-v0.1.0` on `main` once the workflow is merged.
+10. **The first release: the owner gave the word on 2026-10-09, and it was published the same
+    day.** Null 0.1.0, by the tag `null-v0.1.0` on `main` (item 6).
 
 ## Work items
 
@@ -506,9 +507,16 @@ where it is removed.
      (`open`), it started with no warning from macOS. `spctl` calls the app "rejected", which is
      what it says of any app without an Apple certificate, and that verdict is only acted on
      for a file that carries the quarantine mark.
+   - **Released (2026-10-09, at the owner's word):** Null 0.1.0, by the tag `null-v0.1.0` on
+     `main`. The workflow checked the tag against the files, built, and published
+     `Null-0.1.0-macos-arm64.zip` (97 MB) with `SHA256SUMS.txt`. The Voice app's `release.yml`
+     did not start. The published files were fetched with `gh` and tried as the first build
+     was: the checksum matched, the seal held, the app started, answered through the
+     Oh-my-pi it carries, and on a new folder showed the first opening. The release page says
+     that the file is what an installer fetches and that a download through a browser is
+     stopped by macOS.
    - **Not proven:** npm itself as the carrier; a Mac user account that has never had Null;
-     the app signed again on that Mac at install (decision 6); publishing by a tag, which has
-     not been tried since nothing was to be published without the owner's word.
+     the app signed again on that Mac at install (decision 6).
    - **Found:** the repository already has `.github/workflows/release.yml`, which came with
      the Voice app. It answers to any tag that starts with `v`, and would try to build that
      app for three systems with certificates this repository does not have. So Null's tags are
@@ -533,7 +541,8 @@ where it is removed.
      `Engine.toml` guards nothing (item 10, Limits). Not designed. The npm way of item 6
      already needs a build for each release.
    - **Since 2026-10-09:** a release can be built (item 6): a tag `null-v<version>` publishes
-     the version the files name. No tag exists yet, and nothing moves the number.
+     the version the files name. The first is `null-v0.1.0`. Nothing moves the number yet,
+     and nothing in the box looks for a newer Null.
    - Depends on: 6.
    - Status: Not started
 
