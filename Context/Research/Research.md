@@ -418,7 +418,7 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 | Surface | Commands |
 | --- | --- |
 | Null | `Mini/Scripts/engine` once, then `cargo build`, `cargo test`, `cargo tauri build` from `Mini/` |
-| Null harness check | `cargo test -- --ignored` (15 live tests); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
+| Null harness check | `cargo test -- --ignored` (15 live tests, and the key check in `Mini/tests/keys.rs`, which opens the box for a few seconds); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
 | Null install | `Mini/Scripts/install` builds/signs/replaces the app and login agent; mutating, not a check |
 | Voice desktop dev | `just dev` starts backend if needed; `bun run dev` expects it separately |
 | Voice server/web | `bun run dev:server`, `bun run dev:web`, `just dev-web` |
@@ -437,8 +437,11 @@ and never overwrites a `models.yml` it did not write. Then `NULL_MINI_SMOKE` wit
 beforehand with `{"model":"standin-anthropic/ok"}` in the folder's `null/settings.json`) or
 `NULL_MINI_UPDATES=file://…` (a made-up `Engine.toml` for `/update`). The older
 `NULL_MINI_PROFILE=null-probe` still works and still reads the owner's MCP definitions.
-`NULL_MINI_SELFTEST` waits for a reply, so a typed command such as `/update` never ends it: start
-the app in the background, wait for the log line, and stop it by its process id. A local model
+`NULL_MINI_SELFTEST` types into the real page a line at a time, each once the page has stopped
+working, then logs what the page shows (the transcript, an open list, the notice line) and quits. So
+a command, a choice from a list (a line narrows the list and takes the first entry left; an empty
+line only presses Enter) and an answer to a sign-in can follow one another. `Mini/tests/keys.rs`
+uses that to prove a typed key reaches neither Null's log nor its settings. A local model
 server on the Mac is still found on a folder of its own: here, Ollama's `llama3.2`. A new folder has
 no account, so the first opening happens on it; put `"welcomed": true` in the folder's
 `null/settings.json` to run without it. The page's states are drawn and read back with a scratch
@@ -496,9 +499,8 @@ profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.j
 - The first opening is built and proven by script only (`OwnHarness.md`, item 5): no real sign-in
   has gone through it and no fresh Mac account has seen it. No one-command install, `/logout`,
   active-sign-in timeout, content policy, checked-in visual harness or public Null/provider setup
-  documentation is complete. The input is
-  already masked; `Providers.md` item 9's remaining secret-residue proof must not be mistaken for
-  absence of the mask.
+  documentation is complete. The input is masked during a sign-in, and `Mini/tests/keys.rs` proves
+  that a typed key reaches neither Null's log nor its settings (`Providers.md`, item 9).
 - Full terminal parity is an objective, not a theorem: the original ACP spike reported a skills
   count difference, and lone harness slash commands are blocked by Null's unknown-command rule.
 - No background task tray, workspace picker, continuous voice conversation, automatic speaking of
