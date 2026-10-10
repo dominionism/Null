@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 426" width="860" height="426" fill="none" role="img" aria-label="Source map. Page/index.html: Input, commands, transcript, layout, scrolling and selection main.rs: Startup, plugins, state and command registration panel.rs, shortcut.rs: Window, placement, sizing, visibility and Control+Space harness.rs, translate.rs: ACP process and session lifecycle, approvals, events, protocol translation engine.rs: Which Oh-my-pi runs: the carried one or your own, and /harness providers.rs, signin.rs: Usage reports and harness-owned sign-in welcome.rs: The first opening: with no provider signed in, the box opens once with the sign-in list backups.rs: The fallback order written for OMP, and the switch reporting it markdown.rs: Reply text into structured parts, including partial streamed input settings.rs, access.rs, log.rs: Persistence, the Full Disk Access check, and logging check.rs, standin.rs: The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use">
-  <title>Source map. Page/index.html: Input, commands, transcript, layout, scrolling and selection main.rs: Startup, plugins, state and command registration panel.rs, shortcut.rs: Window, placement, sizing, visibility and Control+Space harness.rs, translate.rs: ACP process and session lifecycle, approvals, events, protocol translation engine.rs: Which Oh-my-pi runs: the carried one or your own, and /harness providers.rs, signin.rs: Usage reports and harness-owned sign-in welcome.rs: The first opening: with no provider signed in, the box opens once with the sign-in list backups.rs: The fallback order written for OMP, and the switch reporting it markdown.rs: Reply text into structured parts, including partial streamed input settings.rs, access.rs, log.rs: Persistence, the Full Disk Access check, and logging check.rs, standin.rs: The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 535" width="860" height="535" fill="none" role="img" aria-label="Source map. Page/index.html: Input, commands, transcript, layout, scrolling and selection main.rs: Startup, plugins, state and command registration panel.rs, shortcut.rs: Window, placement, sizing, the pet&#x27;s room beside the box, visibility and Control+Space harness.rs, translate.rs: ACP process and session lifecycle, approvals, events, protocol translation attach.rs: The files that go with the next message, and the list of folders they are chosen from history.rs: Earlier conversations as the harness lists them, their titles, and opening one again engine.rs: Which Oh-my-pi runs: the carried one or your own, and /harness providers.rs, signin.rs: Usage reports and harness-owned sign-in welcome.rs: The first opening: with no provider signed in, the box opens once with the sign-in list backups.rs: The fallback order written for OMP, and the switch reporting it markdown.rs: Reply text into structured parts, including partial streamed input settings.rs, access.rs, log.rs: Persistence, the Full Disk Access check, and logging check.rs, standin.rs: The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use">
+  <title>Source map. Page/index.html: Input, commands, transcript, layout, scrolling and selection main.rs: Startup, plugins, state and command registration panel.rs, shortcut.rs: Window, placement, sizing, the pet&#x27;s room beside the box, visibility and Control+Space harness.rs, translate.rs: ACP process and session lifecycle, approvals, events, protocol translation attach.rs: The files that go with the next message, and the list of folders they are chosen from history.rs: Earlier conversations as the harness lists them, their titles, and opening one again engine.rs: Which Oh-my-pi runs: the carried one or your own, and /harness providers.rs, signin.rs: Usage reports and harness-owned sign-in welcome.rs: The first opening: with no provider signed in, the box opens once with the sign-in list backups.rs: The fallback order written for OMP, and the switch reporting it markdown.rs: Reply text into structured parts, including partial streamed input settings.rs, access.rs, log.rs: Persistence, the Full Disk Access check, and logging check.rs, standin.rs: The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -11,9 +11,9 @@
     @keyframes hold { 0%, 99.9% { opacity: 1; } 100% { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
   </style>
-  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="425" rx="12"/></clipPath>
+  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="534" rx="12"/></clipPath>
   <g clip-path="url(#win)">
-  <rect width="860" height="426" fill="#0D1117"/>
+  <rect width="860" height="535" fill="#0D1117"/>
   <rect width="860" height="30" fill="#161B22"/>
   <path d="M0 29.5H860" stroke="#21262D"/>
   <circle cx="20" cy="15.0" r="5.5" fill="#FF5F57"/>
@@ -25,26 +25,33 @@
   <text x="24" y="109.0" font-size="12.5" font-weight="700" fill="#3FB950">main.rs</text>
   <text x="275.875" y="109.0" font-size="12.5" fill="#C9D1D9">Startup, plugins, state and command registration</text>
   <text x="24" y="135.0" font-size="12.5" font-weight="700" fill="#3FB950">panel.rs, shortcut.rs</text>
-  <text x="275.875" y="135.0" font-size="12.5" fill="#C9D1D9">Window, placement, sizing, visibility and Control+Space</text>
-  <text x="24" y="161.0" font-size="12.5" font-weight="700" fill="#3FB950">harness.rs, translate.rs</text>
-  <text x="275.875" y="161.0" font-size="12.5" fill="#C9D1D9">ACP process and session lifecycle, approvals, events, protocol</text>
-  <text x="275.875" y="180.0" font-size="12.5" fill="#C9D1D9">translation</text>
-  <text x="24" y="206.0" font-size="12.5" font-weight="700" fill="#3FB950">engine.rs</text>
-  <text x="275.875" y="206.0" font-size="12.5" fill="#C9D1D9">Which Oh-my-pi runs: the carried one or your own, and /harness</text>
-  <text x="24" y="232.0" font-size="12.5" font-weight="700" fill="#3FB950">providers.rs, signin.rs</text>
-  <text x="275.875" y="232.0" font-size="12.5" fill="#C9D1D9">Usage reports and harness-owned sign-in</text>
-  <text x="24" y="258.0" font-size="12.5" font-weight="700" fill="#3FB950">welcome.rs</text>
-  <text x="275.875" y="258.0" font-size="12.5" fill="#C9D1D9">The first opening: with no provider signed in, the box opens once</text>
-  <text x="275.875" y="277.0" font-size="12.5" fill="#C9D1D9">with the sign-in list</text>
-  <text x="24" y="303.0" font-size="12.5" font-weight="700" fill="#3FB950">backups.rs</text>
-  <text x="275.875" y="303.0" font-size="12.5" fill="#C9D1D9">The fallback order written for OMP, and the switch reporting it</text>
-  <text x="24" y="329.0" font-size="12.5" font-weight="700" fill="#3FB950">markdown.rs</text>
-  <text x="275.875" y="329.0" font-size="12.5" fill="#C9D1D9">Reply text into structured parts, including partial streamed input</text>
-  <text x="24" y="355.0" font-size="12.5" font-weight="700" fill="#3FB950">settings.rs, access.rs, log.rs</text>
-  <text x="275.875" y="355.0" font-size="12.5" fill="#C9D1D9">Persistence, the Full Disk Access check, and logging</text>
-  <text x="24" y="381.0" font-size="12.5" font-weight="700" fill="#3FB950">check.rs, standin.rs</text>
-  <text x="275.875" y="381.0" font-size="12.5" fill="#C9D1D9">The harness check: live tests of what Null relies on, against the</text>
-  <text x="275.875" y="400.0" font-size="12.5" fill="#C9D1D9">stand-in provider that scripted runs also use</text>
+  <text x="275.875" y="135.0" font-size="12.5" fill="#C9D1D9">Window, placement, sizing, the pet&#x27;s room beside the box, visibility</text>
+  <text x="275.875" y="154.0" font-size="12.5" fill="#C9D1D9">and Control+Space</text>
+  <text x="24" y="180.0" font-size="12.5" font-weight="700" fill="#3FB950">harness.rs, translate.rs</text>
+  <text x="275.875" y="180.0" font-size="12.5" fill="#C9D1D9">ACP process and session lifecycle, approvals, events, protocol</text>
+  <text x="275.875" y="199.0" font-size="12.5" fill="#C9D1D9">translation</text>
+  <text x="24" y="225.0" font-size="12.5" font-weight="700" fill="#3FB950">attach.rs</text>
+  <text x="275.875" y="225.0" font-size="12.5" fill="#C9D1D9">The files that go with the next message, and the list of folders</text>
+  <text x="275.875" y="244.0" font-size="12.5" fill="#C9D1D9">they are chosen from</text>
+  <text x="24" y="270.0" font-size="12.5" font-weight="700" fill="#3FB950">history.rs</text>
+  <text x="275.875" y="270.0" font-size="12.5" fill="#C9D1D9">Earlier conversations as the harness lists them, their titles, and</text>
+  <text x="275.875" y="289.0" font-size="12.5" fill="#C9D1D9">opening one again</text>
+  <text x="24" y="315.0" font-size="12.5" font-weight="700" fill="#3FB950">engine.rs</text>
+  <text x="275.875" y="315.0" font-size="12.5" fill="#C9D1D9">Which Oh-my-pi runs: the carried one or your own, and /harness</text>
+  <text x="24" y="341.0" font-size="12.5" font-weight="700" fill="#3FB950">providers.rs, signin.rs</text>
+  <text x="275.875" y="341.0" font-size="12.5" fill="#C9D1D9">Usage reports and harness-owned sign-in</text>
+  <text x="24" y="367.0" font-size="12.5" font-weight="700" fill="#3FB950">welcome.rs</text>
+  <text x="275.875" y="367.0" font-size="12.5" fill="#C9D1D9">The first opening: with no provider signed in, the box opens once</text>
+  <text x="275.875" y="386.0" font-size="12.5" fill="#C9D1D9">with the sign-in list</text>
+  <text x="24" y="412.0" font-size="12.5" font-weight="700" fill="#3FB950">backups.rs</text>
+  <text x="275.875" y="412.0" font-size="12.5" fill="#C9D1D9">The fallback order written for OMP, and the switch reporting it</text>
+  <text x="24" y="438.0" font-size="12.5" font-weight="700" fill="#3FB950">markdown.rs</text>
+  <text x="275.875" y="438.0" font-size="12.5" fill="#C9D1D9">Reply text into structured parts, including partial streamed input</text>
+  <text x="24" y="464.0" font-size="12.5" font-weight="700" fill="#3FB950">settings.rs, access.rs, log.rs</text>
+  <text x="275.875" y="464.0" font-size="12.5" fill="#C9D1D9">Persistence, the Full Disk Access check, and logging</text>
+  <text x="24" y="490.0" font-size="12.5" font-weight="700" fill="#3FB950">check.rs, standin.rs</text>
+  <text x="275.875" y="490.0" font-size="12.5" fill="#C9D1D9">The harness check: live tests of what Null relies on, against the</text>
+  <text x="275.875" y="509.0" font-size="12.5" fill="#C9D1D9">stand-in provider that scripted runs also use</text>
   </g>
-  <rect x="0.5" y="0.5" width="859" height="425" rx="12" stroke="#21262D"/>
+  <rect x="0.5" y="0.5" width="859" height="534" rx="12" stroke="#21262D"/>
 </svg>
