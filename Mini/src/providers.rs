@@ -194,7 +194,11 @@ pub async fn providers(app: AppHandle, fresh: Option<bool>) -> Result<Vec<Provid
             if let Some(states) = &read {
                 *app.state::<Providers>().0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some((Instant::now(), states.clone()));
             }
-            // No report is not a failure: every provider is then simply unreported.
+            // Asked for outright (`/usage`), a report this harness does not give is said in a line.
+            if read.is_none() && fresh == Some(true) {
+                return Err(format!("this {} gave no usage report that could be read", harness::HARNESS_NAME));
+            }
+            // Otherwise no report is not a failure: every provider is then simply unreported.
             read.unwrap_or_default()
         }
     };

@@ -8,9 +8,9 @@
 > Null carries Oh-my-pi 18.4.3 and starts that one, and `/harness` chooses between it and the
 > owner's own. Proven by the owner on the installed app the same day: messages answered by the
 > built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
-> kept. Still owed: the way back to the built-in one, and `omp update` in the terminal changing
+> kept, the way back to the built-in one, and `omp update` in the terminal (to 18.8.7) changing
 > nothing in Null. Item 4, the harness check, is built and passes on 18.4.3 and on 18.8.7.
-> Not started: items 3 and 5 to 9.**
+> Item 3 is built and checked by script, and not yet installed. Not started: items 5 to 10.**
 
 ## Goal
 
@@ -101,6 +101,8 @@ where it is removed.
 5. **Keeping up happens in the repo.** A check that any Oh-my-pi version can be put through says
    whether Null still works with it. Null moves to a newer version only after it passes. A fix is a
    change to Null's code that the check has to pass. Nothing rewrites itself on a user's Mac.
+   **Amended by the owner on 2026-10-09:** the user may move to the newest checked version
+   themselves, by typing `/update` (item 10). Still nothing unchecked, and nothing by itself.
 
 ## Decisions for the owner
 
@@ -173,8 +175,7 @@ where it is removed.
    - Risk: the built-in harness replacing itself. It looks for updates by default. Know it by:
      item 4 checks that the program's checksum is the same after a run.
    - Source: specified from user + codebase + verified locally.
-   - Status: In progress. Built, installed and used by the owner (2026-10-09); the way back to
-     the built-in harness and the `omp update` check are still to be seen
+   - Status: Complete (2026-10-09)
    - **Proven by the owner (2026-10-09):** `/harness` in the installed app listed "built in" and
      "yours". Choosing "yours" let the built-in harness go; the log then shows "the harness is
      now /Users/abdulwahid/.omp/bin/omp, version 18.4.3", "starting the user's own harness",
@@ -203,9 +204,17 @@ where it is removed.
      The program's checksum was the same after a run. A message typed into the real page of
      the debug app was answered through the built-in harness. Nine states of `/harness` drawn
      in the app's web engine with stand-in data and read back.
-   - **Not proven:** choosing "built in" again from the owner's own (the log of 2026-10-09 ends
-     on the owner's own, and the setting still names it); `omp update` in the terminal changing
-     nothing in Null.
+   - **Proven by the owner, later the same day:** choosing "built in" again ("the harness is now
+     /Applications/Null.app/Contents/MacOS/omp, version 18.4.3"). Then `omp update` in a
+     terminal took the owner's own Oh-my-pi from 18.4.3 to 18.8.7. The program inside Null
+     kept the checksum of `Engine.toml` and the app still verified. In Null the owner then
+     went to "yours" (the log: "starting the user's own harness", "harness ready: omp 18.8.7",
+     the conversation loaded back, a reply `completed`), back to "built in" ("starting the
+     built-in harness", "harness ready: omp 18.4.3", the same conversation loaded back, a
+     reply `completed`), and to "yours" again, where the setting was left.
+   - **What that adds:** the two versions took turns on the owner's real folder, with real
+     sign-ins and one conversation, in both directions. The harness check had only seen that
+     in a throwaway folder.
 
 3. **Find out what the harness can do, and lose one feature at a time**
    - What: at the first start of a harness Null notes, in the log and in memory: its version;
@@ -222,7 +231,45 @@ where it is removed.
    - Risk: a check that is itself wrong hides a feature that works. Know it by: unit tests on the
      noting, and item 4 running the same questions against two real versions.
    - Source: inferred from codebase (`translate::reply_failed`, `providers.rs`, `signin.rs`).
-   - Status: Not started
+   - Status: In progress. Built and checked by script (2026-10-09); not yet installed
+   - **Built:** `translate::abilities`, and one line in the log at the first conversation of
+     each harness version met in a run: "what this harness can do: a list of 19 models; says
+     which model is in use when asked through thinking; loads a conversation back". Whatever
+     is missing is said there with the feature it costs. `translate::judge_reply`: a reply
+     without a token count is taken for a refusal only once this harness has been seen to
+     count one. The version Null carries is trusted from the start, because the harness check
+     asks exactly that of it. `/usage` on a harness whose report cannot be read says so in one
+     line, where it used to list every provider as "no usage report".
+   - **Already there:** `/model` on a harness with no model list says "this harness offers no
+     model list"; `/login` on one that lists no providers says so; `/harness` and the line
+     after choosing mark a version Null was not checked with (item 2).
+   - **Deviation:** the usage report and the sign-in list are not tried at the first start.
+     They are found out when `/usage` or `/login` is used, and a failure is not remembered.
+     Trying at start would cost two more runs of the harness and a round to the providers
+     every time, and a remembered "cannot" would hide a feature after one slow answer, which
+     is the risk named above.
+   - **Changed at the owner's word (2026-10-09, "we have keep things user-friendly and
+     undertandable"):** which version was seen to count tokens is remembered between runs
+     (the setting `counts_tokens`). A first cut forgot it at every restart, so on a version
+     other than the carried one the first reply after each start, if it was a refusal, came
+     in plain words and not in red.
+   - **What is left of that:** the very first reply ever from a version Null has not met, when
+     that reply is a refusal. Null cannot tell a refusal from a harness that never counts
+     tokens until one reply has counted, and taking the reply for a refusal would paint every
+     answer red on such a harness. On the built-in version it never happens.
+   - **Added (same day):** while `/harness` is open the box says what the choice means: "built
+     in stays until Null is updated. yours follows omp update". The owner had to ask what the
+     difference was, which the box should have said.
+   - **Proven without a person:** 59 unit tests, three of them new: the rule before and after
+     tokens were seen; the noting, from a greeting and a conversation's settings; a harness
+     that offers less. The app under the probe profile against the stand-in: on the built-in
+     18.4.3 a bad sign-in as the first reply is marked ("reply ended: completed, with nothing
+     from the model"); on the owner's 18.8.7 the same reply is not marked; and 18.8.7 after a
+     working reply logs that it counts tokens and is remembered, so that after a fresh start a
+     bad sign-in as the very first reply is marked. The 15 live checks still pass. `/harness`
+     drawn again with its line of explanation, which goes when the list is put away.
+   - **Not proven:** a harness that really lacks one of these, since none exists to try and
+     the unit tests stand in for it; the `/usage` line on such a harness; the installed app.
 
 4. **The harness check**
    - What: `Mini/tests/harness.rs`, run with `cargo test -- --ignored` against the built-in
@@ -344,6 +391,8 @@ where it is removed.
    - What: no mechanism of Null's own. The next version comes the way the first did: `npm update`,
      or `git pull` and the install script. That is also how the harness moves forward. To design
      once item 6 exists: the box saying, once, that a newer Null is there.
+   - **Amended (owner, 2026-10-09):** the harness alone can also move forward from the box, with
+     `/update` (item 10). A new Null still comes the way the first did.
    - Depends on: 6.
    - Status: Not started
 
@@ -365,6 +414,33 @@ where it is removed.
      (`/grill`). `Providers.md` already points here from its decision 3 and its item 6.
    - Depends on: 2 for the README.
    - Status: Not started
+
+10. **`/update`: the newest checked harness, from the box**
+    - **Decided (owner, 2026-10-09):** "Let's provide add a command that helps update the latest
+      version of omp if the user chooses to do so. ... Like /update". Asked what it should
+      install, the owner chose the newest version the repo's check has passed, not the very
+      latest; and to build it after item 3.
+    - What: a typed command. It reads `Mini/Engine.toml` on the repo's `main`, which anyone can
+      read without signing in (seen 2026-10-09). If that names a newer version than the one
+      Null runs as "built in", it fetches that version's program from Oh-my-pi's release, holds
+      it against the checksum in that file, and keeps it in Null's support folder. It does not
+      go inside the app, whose seal covers the program it came with. "Built in" then means the
+      newest checked program Null has, and the one that came with the app stays as the
+      fallback. One line says what happened: which version it is on now, or that it is already
+      on the newest checked one. When the newer harness needs a newer Null, `/update` says so,
+      says how to get it, and changes nothing.
+    - Why: the owner's words above. People who never open the repo get the newest checked
+      harness with one command, and only when they choose to.
+    - Depends on: 3 (so that a harness that differs a little costs one feature, not the box)
+      and 4. Most useful with 8, which is what keeps the checked version moving.
+    - Risk: macOS refusing a program the app fetched itself; a version the repo checked against
+      a newer Null than the user has. Know it by: a scripted run under a throwaway profile
+      (fetch, checksum, start, answer), and the "needs a newer Null" line seen with a made-up
+      file.
+    - Open: how `Engine.toml` says which Null a version was checked with; what `/harness` calls
+      a fetched program; whether `/update` also says that a newer Null is there (item 7).
+    - Source: specified from user + inferred.
+    - Status: Not started
 
 ## Verification
 
@@ -388,7 +464,8 @@ where it is removed.
 - Still fuzzy, on purpose: the npm way of item 6 until its spike, and items 7 and 8, which are
   not designed.
 - Known limits of the evidence: the two-version test did not use a folder with real sign-ins and
-  the two versions were four small steps apart. If versions far apart cannot share a folder, the
+  the two versions were four small steps apart. Since 2026-10-09 the first half is answered for
+  18.4.3 and 18.8.7: they took turns on the owner's real folder (item 2). If versions far apart cannot share a folder, the
   owner's fallback is a folder of Null's own: one more sign-in, with skills and MCP servers still
   there.
 - What this plan costs: Null grows from 12 MB to 217 MB (measured 2026-10-09), and Null takes

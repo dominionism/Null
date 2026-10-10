@@ -1075,9 +1075,10 @@
       };
 
       const closePicker = () => {
-        const { backups, saved } = picker;
+        const { backups, saved, harness } = picker;
         picker = null;
         if (backups && backups.join() !== saved.join()) saveBackups(backups);
+        if (harness) unnotice();
         pick.style.display = 'none';
         pick.textContent = '';
         if (out.textContent) {
@@ -1287,6 +1288,8 @@
         input.value = '';
         tint();
         drawHarness();
+        // What the choice means, for as long as it is being made.
+        if (choices.some((choice) => choice.origin === 'own')) notice('built in stays until Null is updated. yours follows omp update', true);
       };
 
       const chooseHarness = async (choice) => {

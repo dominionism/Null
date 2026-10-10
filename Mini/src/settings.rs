@@ -24,6 +24,10 @@ pub struct Settings {
     /// The user's own Oh-my-pi, by its path, when they chose it over the one Null carries
     /// (`/harness`). Nothing here means the one Null carries.
     pub harness: Option<String>,
+    /// The version of a harness other than the one Null carries that was last seen to
+    /// count a reply's tokens. Remembered so that a refusal is told from an answer
+    /// from the first reply after a restart, not only once an answer has come.
+    pub counts_tokens: Option<String>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -100,6 +104,7 @@ mod tests {
             asked_full_disk: true,
             backups: vec!["c/d".into()],
             harness: Some("/opt/own/omp".into()),
+            counts_tokens: Some("18.8.7".into()),
         };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);

@@ -77,7 +77,64 @@ pub fn stop_reason(protocol: &str) -> &'static str {
 /// or a refused model as an error: the provider's words come back as the reply's
 /// text. What sets such a reply apart is that it counts no tokens.
 pub fn reply_failed(response: &Value) -> bool {
-    response.get("stopReason") == Some(&json!("end_turn")) && response.get("usage").is_none_or(Value::is_null)
+    response.get("stopReason") == Some(&json!("end_turn")) && !counts_tokens(response)
+}
+
+/// Whether a reply carries a count of its tokens.
+pub fn counts_tokens(response: &Value) -> bool {
+    response.get("usage").is_some_and(|usage| !usage.is_null())
+}
+
+/// Whether a reply is a refusal passed on, for a harness that has (`seen`) or
+/// has not yet been seen to count a reply's tokens, and whether it has been seen
+/// to now. A harness that never counts them would have every reply taken for a
+/// refusal, so the rule waits for the first reply that does.
+pub fn judge_reply(response: &Value, seen: bool) -> (bool, bool) {
+    if counts_tokens(response) {
+        (false, true)
+    } else {
+        (seen && reply_failed(response), seen)
+    }
+}
+
+/// What a harness was found able to do when it opened a conversation. Each
+/// thing it cannot do costs the one feature that needs it and nothing else.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Abilities {
+    /// How many models its model setting offers. None: `/model` and `/backup` have nothing to list.
+    pub models: usize,
+    /// The setting Null asks which model is in use through. Without one, a move
+    /// to a backup is only known when the harness says so by itself.
+    pub asks_through: Option<String>,
+    /// Whether it loads a conversation back after it was started again. If not,
+    /// a restart begins a new conversation.
+    pub loads_back: bool,
+}
+
+/// Read those out of the harness's answer to the greeting and a conversation's settings.
+pub fn abilities(greeting: &Value, options: &Value) -> Abilities {
+    Abilities {
+        models: models_from_config_options(options).0.len(),
+        asks_through: other_option(options).map(|(setting, _)| setting),
+        loads_back: greeting.pointer("/agentCapabilities/loadSession") == Some(&json!(true)),
+    }
+}
+
+impl std::fmt::Display for Abilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.models {
+            0 => write!(f, "no model list, so /model and /backup have nothing to show")?,
+            count => write!(f, "a list of {count} models")?,
+        }
+        match &self.asks_through {
+            Some(setting) => write!(f, "; says which model is in use when asked through {setting}")?,
+            None => write!(f, "; no setting to ask which model is in use with, so a move to a backup may go unsaid")?,
+        }
+        match self.loads_back {
+            true => write!(f, "; loads a conversation back"),
+            false => write!(f, "; does not load a conversation back, so a restart begins a new one"),
+        }
+    }
 }
 
 /// A setting of the session other than its model, with the value it has now.
@@ -186,6 +243,46 @@ pub fn runnable(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_reply_is_not_taken_for_a_refusal_before_the_harness_was_seen_to_count_tokens() {
+        let refusal = json!({ "stopReason": "end_turn" });
+        let answer = json!({ "stopReason": "end_turn", "usage": { "inputTokens": 10, "outputTokens": 1 } });
+        let stopped = json!({ "stopReason": "cancelled" });
+
+        // A harness that has never counted: nothing is marked, however many replies come without a count.
+        assert_eq!(judge_reply(&refusal, false), (false, false));
+        // The first reply that counts is an answer, and from then on the rule holds.
+        assert_eq!(judge_reply(&answer, false), (false, true));
+        assert_eq!(judge_reply(&refusal, true), (true, true));
+        assert_eq!(judge_reply(&answer, true), (false, true));
+        // A reply the user stopped is never a refusal.
+        assert_eq!(judge_reply(&stopped, true), (false, true));
+    }
+
+    #[test]
+    fn what_a_harness_can_do_is_read_from_its_greeting_and_a_conversation_s_settings() {
+        let greeting = json!({ "protocolVersion": 1, "agentCapabilities": { "loadSession": true } });
+        let settings = json!([
+            { "id": "model", "category": "model", "currentValue": "a/one", "options": [{ "value": "a/one", "name": "One" }, { "value": "b/two", "name": "Two" }] },
+            { "id": "thinking", "currentValue": "low", "options": [] }
+        ]);
+        let found = abilities(&greeting, &settings);
+        assert_eq!(found, Abilities { models: 2, asks_through: Some("thinking".into()), loads_back: true });
+        assert_eq!(found.to_string(), "a list of 2 models; says which model is in use when asked through thinking; loads a conversation back");
+    }
+
+    #[test]
+    fn a_harness_that_offers_less_loses_only_what_it_lacks() {
+        // No settings at all, and no word about loading a conversation back.
+        let bare = abilities(&json!({ "protocolVersion": 1 }), &Value::Null);
+        assert_eq!(bare, Abilities { models: 0, asks_through: None, loads_back: false });
+        assert!(bare.to_string().starts_with("no model list"), "{bare}");
+
+        // A model setting and nothing else: the list is there, only the asking is lost.
+        let only_models = json!([{ "id": "model", "currentValue": "a/one", "options": [{ "value": "a/one" }] }]);
+        assert_eq!(abilities(&json!({}), &only_models), Abilities { models: 1, asks_through: None, loads_back: false });
+    }
 
     #[test]
     fn answer_text_and_thinking_text_are_told_apart() {

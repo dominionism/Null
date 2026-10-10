@@ -90,6 +90,12 @@ struct Shared {
     /// A setting of the conversation other than its model, and its value. Setting
     /// it to that same value changes nothing and answers with the model in use.
     ask: Option<(String, Value)>,
+    /// The version of the harness whose abilities were last noted. Another
+    /// version is found out about afresh.
+    noted: Option<String>,
+    /// Whether this harness has been seen to count a reply's tokens. Until it
+    /// has, a reply without a count is not taken for a provider's refusal.
+    counts_tokens: bool,
 }
 
 /// The app's handle on the harness thread.
@@ -187,6 +193,8 @@ pub fn init(app: &AppHandle) {
         replay: Replay::Live,
         settling: false,
         ask: None,
+        noted: None,
+        counts_tokens: false,
     }));
     let (commands, orders) = mpsc::unbounded();
     app.manage(Harness { shared: shared.clone(), commands });
@@ -363,6 +371,9 @@ struct Conversation<'a> {
     can_load: bool,
     /// Whether this harness process holds the conversation in memory.
     loaded: bool,
+    /// The harness's answer to the greeting, until what it can do has been noted
+    /// in the log: once for each version met.
+    unnoted: Option<Value>,
 }
 
 async fn converse(
@@ -381,7 +392,21 @@ async fn converse(
     if init.get("protocolVersion") != Some(&json!(1)) {
         return Err(format!("{HARNESS_NAME} speaks protocol version {}; Null speaks version 1", init["protocolVersion"]));
     }
-    log!("harness ready: {} {}", init.pointer("/agentInfo/name").and_then(Value::as_str).unwrap_or("?"), init.pointer("/agentInfo/version").and_then(Value::as_str).unwrap_or("?"));
+    let version = init.pointer("/agentInfo/version").and_then(Value::as_str).unwrap_or("?").to_string();
+    log!("harness ready: {} {version}", init.pointer("/agentInfo/name").and_then(Value::as_str).unwrap_or("?"));
+
+    // A harness Null has not met in this run is found out about, not assumed.
+    let unnoted = {
+        let mut shared = lock(shared);
+        let unnoted = shared.noted.as_deref() != Some(version.as_str());
+        if unnoted {
+            shared.noted = Some(version.clone());
+            // Null was checked with the version it carries, which counts tokens. Any other
+            // has to be seen to, once: what was seen is remembered between runs.
+            shared.counts_tokens = version == engine::carried_version() || settings::get(app).counts_tokens.as_deref() == Some(version.as_str());
+        }
+        unnoted
+    };
 
     let mut conversation = Conversation {
         cx,
@@ -390,6 +415,7 @@ async fn converse(
         mcp_capabilities: init.pointer("/agentCapabilities/mcpCapabilities").cloned().unwrap_or(Value::Null),
         can_load: init.pointer("/agentCapabilities/loadSession") == Some(&json!(true)),
         loaded: false,
+        unnoted: unnoted.then_some(init),
     };
 
     let mut next = Some(first);
@@ -436,7 +462,17 @@ impl Conversation<'_> {
                                 let response = as_json(&response);
                                 let reason = response["stopReason"].as_str().map(translate::stop_reason).unwrap_or("completed");
                                 // The harness reports a provider's refusal as a reply like any other.
-                                let failed = translate::reply_failed(&response);
+                                let (failed, learned) = {
+                                    let mut shared = lock(&shared);
+                                    let (failed, counts) = translate::judge_reply(&response, shared.counts_tokens);
+                                    let learned = (counts && !shared.counts_tokens).then(|| shared.noted.clone()).flatten();
+                                    shared.counts_tokens = counts;
+                                    (failed, learned)
+                                };
+                                if let Some(version) = learned {
+                                    log!("this harness counts a reply's tokens; from now on a reply without a count is taken for a refusal");
+                                    settings::update(&app, |settings| settings.counts_tokens = Some(version));
+                                }
                                 log!("reply ended: {reason}{}", if failed { ", with nothing from the model" } else { "" });
                                 if failed {
                                     providers::forget(&app);
@@ -608,7 +644,10 @@ impl Conversation<'_> {
         Ok(())
     }
 
-    fn absorb_options(&self, options: &Value) {
+    fn absorb_options(&mut self, options: &Value) {
+        if let Some(greeting) = self.unnoted.take() {
+            log!("what this harness can do: {}", translate::abilities(&greeting, options));
+        }
         let (models, current) = translate::models_from_config_options(options);
         if models.is_empty() {
             return;
