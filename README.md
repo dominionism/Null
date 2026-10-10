@@ -29,9 +29,9 @@
 </p>
 
 <a id="get-started"></a>
-<a id="step-1-bring-your-harness"></a>
+<a id="step-1-the-harness-comes-with-null"></a>
 <p align="center">
-  <img src=".github/Readme/step-harness.svg" width="100%" alt="1. Bring your harness: install Oh-my-pi, whose sign-ins, subscriptions and keys Null does not manage; Null looks on PATH and in known install folders, and does not install it." />
+  <img src=".github/Readme/step-harness.svg" width="100%" alt="1. The harness comes with Null: nothing to install first; Null carries one checked version of Oh-my-pi and works from OMP's usual folder, with your existing sign-ins, skills and MCP servers; OMP manages providers, subscriptions and keys; /harness switches to your own copy and back; Apple Silicon Macs only, for now." />
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@
 
 <a id="step-2-build-and-install"></a>
 <p align="center">
-  <img src=".github/Readme/step-build.svg" width="100%" alt="2. Build and install: macOS 13+, the Rust toolchain, Xcode Command Line Tools and Tauri CLI 2; xcode-select --install, cargo install tauri-cli, git clone, then Mini/Scripts/install, which prints that Null.app is installed and Control+Space opens the box." />
+  <img src=".github/Readme/step-build.svg" width="100%" alt="2. Build and install: an Apple Silicon Mac with macOS 13+, the Rust toolchain, Xcode Command Line Tools and Tauri CLI 2; xcode-select --install, cargo install tauri-cli, git clone, then Mini/Scripts/install, which fetches the Oh-my-pi named in Mini/Engine.toml, builds, and prints that Null.app is installed and Control+Space opens the box." />
 </p>
 
 <p align="center">
@@ -66,7 +66,7 @@
 
 <a id="commands"></a>
 <p align="center">
-  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /new and /quit, with what each does and what an unknown command does." />
+  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /new and /quit, with what each does and what an unknown command does." />
 </p>
 
 <a id="when-a-provider-stops-answering"></a>
@@ -76,33 +76,35 @@
 
 <a id="privacy-and-permissions"></a>
 <p align="center">
-  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, Null has no listener or database, /login answers stay with the harness, the shortcut needs no Accessibility permission, and Full Disk Access is a separate choice." />
+  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, the shortcut needs no Accessibility permission, and Full Disk Access is a separate choice." />
 </p>
 
 <a id="signing-and-permission-persistence"></a>
 <p align="center">
-  <img src=".github/Readme/signing.svg" width="100%" alt="Signing and permission persistence: grants follow the code signature, so an unsigned rebuild can ask again; with the local signing keychain the installer signs as Null Local Signing, and without it installs unsigned." />
+  <img src=".github/Readme/signing.svg" width="100%" alt="Signing and permission persistence: grants follow the code signature, so an unsigned rebuild can ask again; with the local signing keychain the installer signs as Null Local Signing, and without it installs unsigned; the Oh-my-pi inside keeps its author's signature." />
 </p>
 
 <a id="what-null-keeps"></a>
 <p align="center">
-  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, backups.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
+  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
 </p>
 
 <a id="under-the-hood"></a>
 <p align="center">
-  <img src=".github/Readme/under-the-hood.svg" width="100%" alt="Under the hood: Control+Space reaches Null's page, Tauri commands reach OMP over ACP, and text, tools and approvals come back; one native Tauri app with a static page and no web server." />
+  <img src=".github/Readme/under-the-hood.svg" width="100%" alt="Under the hood: Control+Space reaches Null's page, Tauri commands reach OMP over ACP, and text, tools and approvals come back; one native Tauri app that carries and launches OMP, with a static page and no web server." />
 </p>
 
 <a id="source-map"></a>
 <p align="center">
-  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, providers.rs, signin.rs and backups.rs, markdown.rs, and settings.rs, access.rs and log.rs, each with what it owns." />
+  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, engine.rs, providers.rs, signin.rs and backups.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs, each with what it owns." />
 </p>
 
 <p align="center">
   <a href="Mini/Page/index.html"><img src=".github/Readme/link-page-html.svg" height="30" alt="Page/index.html" /></a>
   &nbsp;
   <a href="Mini/src/harness.rs"><img src=".github/Readme/link-harness-rs.svg" height="30" alt="harness.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/engine.rs"><img src=".github/Readme/link-engine-rs.svg" height="30" alt="engine.rs" /></a>
   &nbsp;
   <a href="Mini/src/translate.rs"><img src=".github/Readme/link-translate-rs.svg" height="30" alt="translate.rs" /></a>
   &nbsp;
@@ -111,11 +113,13 @@
   <a href="Mini/src/panel.rs"><img src=".github/Readme/link-panel-rs.svg" height="30" alt="panel.rs" /></a>
   &nbsp;
   <a href="Mini/src/settings.rs"><img src=".github/Readme/link-settings-rs.svg" height="30" alt="settings.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/check.rs"><img src=".github/Readme/link-check-rs.svg" height="30" alt="check.rs" /></a>
 </p>
 
 <a id="development"></a>
 <p align="center">
-  <img src=".github/Readme/development.svg" width="100%" alt="Development: cd Mini and cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle, and why not to use bunx tauri." />
+  <img src=".github/Readme/development.svg" width="100%" alt="Development: Mini/Scripts/engine once to fetch the Oh-my-pi the build takes in, cd Mini and cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle, why not to use bunx tauri, and the harness check." />
 </p>
 
 <a id="development-switches-and-smoke-checks"></a>
@@ -165,13 +169,15 @@
 
 <a id="read-the-reasoning"></a>
 <p align="center">
-  <img src=".github/Readme/reasoning.svg" width="100%" alt="Read the reasoning: the app design, providers, conversation display and future-phase plans, the decisions that constrain changes, and the codebase map including what was never traced." />
+  <img src=".github/Readme/reasoning.svg" width="100%" alt="Read the reasoning: the app design, providers, own-harness, conversation display and future-phase plans, the decisions that constrain changes, and the codebase map including what was never traced." />
 </p>
 
 <p align="center">
   <a href="Context/Plans/MiniApp.md"><img src=".github/Readme/link-miniapp.svg" height="30" alt="App design" /></a>
   &nbsp;
   <a href="Context/Plans/Providers.md"><img src=".github/Readme/link-providers.svg" height="30" alt="Providers" /></a>
+  &nbsp;
+  <a href="Context/Plans/OwnHarness.md"><img src=".github/Readme/link-own-harness.svg" height="30" alt="Own harness" /></a>
   &nbsp;
   <a href="Context/Plans/ConversationDisplay.md"><img src=".github/Readme/link-display.svg" height="30" alt="Conversation display" /></a>
   &nbsp;

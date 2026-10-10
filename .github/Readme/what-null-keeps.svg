@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 283" width="860" height="283" fill="none" role="img" aria-label="What Null keeps. Under ~/Library/Application Support/io.github.dominionism.null-mini/ settings.json: Window position, chosen model, saved session ID, Full Disk Access prompt state and backup order backups.yml: Model-only OMP fallback overlay, rewritten when starting the harness with a nonempty backup order Workspace/: Default working directory for conversations; not a filesystem access boundary With no backup order set, no overlay is passed and an older file may remain on disk. OMP owns the transcript and the credentials: a restart resumes the saved session, while /quit and idle Ctrl+C clear Null&#x27;s pointer, not OMP&#x27;s stored transcript. Logs are in ~/Library/Logs/Null/mini.log, and the smoke and self-test modes can log reply text, so keep sensitive prompts out of those checks.">
-  <title>What Null keeps. Under ~/Library/Application Support/io.github.dominionism.null-mini/ settings.json: Window position, chosen model, saved session ID, Full Disk Access prompt state and backup order backups.yml: Model-only OMP fallback overlay, rewritten when starting the harness with a nonempty backup order Workspace/: Default working directory for conversations; not a filesystem access boundary With no backup order set, no overlay is passed and an older file may remain on disk. OMP owns the transcript and the credentials: a restart resumes the saved session, while /quit and idle Ctrl+C clear Null&#x27;s pointer, not OMP&#x27;s stored transcript. Logs are in ~/Library/Logs/Null/mini.log, and the smoke and self-test modes can log reply text, so keep sensitive prompts out of those checks.</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 283" width="860" height="283" fill="none" role="img" aria-label="What Null keeps. Under ~/Library/Application Support/io.github.dominionism.null-mini/ settings.json: Window position, chosen model, saved session ID, Full Disk Access prompt state, backup order, and your own harness if you chose it harness.yml: Settings handed to OMP at every start: no update check, and your backup order when there is one. Rewritten each time Workspace/: Default working directory for conversations; not a filesystem access boundary Your own OMP settings are not modified. OMP owns the transcript and the credentials: a restart resumes the saved session, while /quit and idle Ctrl+C clear Null&#x27;s pointer, not OMP&#x27;s stored transcript. Logs are in ~/Library/Logs/Null/mini.log, and the smoke and self-test modes can log reply text, so keep sensitive prompts out of those checks.">
+  <title>What Null keeps. Under ~/Library/Application Support/io.github.dominionism.null-mini/ settings.json: Window position, chosen model, saved session ID, Full Disk Access prompt state, backup order, and your own harness if you chose it harness.yml: Settings handed to OMP at every start: no update check, and your backup order when there is one. Rewritten each time Workspace/: Default working directory for conversations; not a filesystem access boundary Your own OMP settings are not modified. OMP owns the transcript and the credentials: a restart resumes the saved session, while /quit and idle Ctrl+C clear Null&#x27;s pointer, not OMP&#x27;s stored transcript. Logs are in ~/Library/Logs/Null/mini.log, and the smoke and self-test modes can log reply text, so keep sensitive prompts out of those checks.</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -22,17 +22,17 @@
   <text x="430.0" y="19.0" font-size="13" font-weight="600" fill="#E6EDF3" text-anchor="middle">What Null keeps</text>
   <text x="24" y="66.0" font-size="12.5" fill="#C9D1D9" font-style="italic">Under ~/Library/Application Support/io.github.dominionism.null-mini/</text>
   <text x="24" y="85.0" font-size="12.5" font-weight="700" fill="#3FB950">settings.json</text>
-  <text x="170.25" y="85.0" font-size="12.5" fill="#C9D1D9">Window position, chosen model, saved session ID, Full Disk Access prompt state</text>
-  <text x="170.25" y="104.0" font-size="12.5" fill="#C9D1D9">and backup order</text>
-  <text x="24" y="130.0" font-size="12.5" font-weight="700" fill="#3FB950">backups.yml</text>
-  <text x="170.25" y="130.0" font-size="12.5" fill="#C9D1D9">Model-only OMP fallback overlay, rewritten when starting the harness with a</text>
-  <text x="170.25" y="149.0" font-size="12.5" fill="#C9D1D9">nonempty backup order</text>
+  <text x="170.25" y="85.0" font-size="12.5" fill="#C9D1D9">Window position, chosen model, saved session ID, Full Disk Access prompt state,</text>
+  <text x="170.25" y="104.0" font-size="12.5" fill="#C9D1D9">backup order, and your own harness if you chose it</text>
+  <text x="24" y="130.0" font-size="12.5" font-weight="700" fill="#3FB950">harness.yml</text>
+  <text x="170.25" y="130.0" font-size="12.5" fill="#C9D1D9">Settings handed to OMP at every start: no update check, and your backup order</text>
+  <text x="170.25" y="149.0" font-size="12.5" fill="#C9D1D9">when there is one. Rewritten each time</text>
   <text x="24" y="175.0" font-size="12.5" font-weight="700" fill="#3FB950">Workspace/</text>
   <text x="170.25" y="175.0" font-size="12.5" fill="#C9D1D9">Default working directory for conversations; not a filesystem access boundary</text>
-  <text x="24" y="200.0" font-size="12.5" fill="#8B949E">With no backup order set, no overlay is passed and an older file may remain on disk. OMP owns the</text>
-  <text x="24" y="219.0" font-size="12.5" fill="#8B949E">transcript and the credentials: a restart resumes the saved session, while /quit and idle Ctrl+C</text>
-  <text x="24" y="238.0" font-size="12.5" fill="#8B949E">clear Null&#x27;s pointer, not OMP&#x27;s stored transcript. Logs are in ~/Library/Logs/Null/mini.log, and</text>
-  <text x="24" y="257.0" font-size="12.5" fill="#8B949E">the smoke and self-test modes can log reply text, so keep sensitive prompts out of those checks.</text>
+  <text x="24" y="200.0" font-size="12.5" fill="#8B949E">Your own OMP settings are not modified. OMP owns the transcript and the credentials: a restart</text>
+  <text x="24" y="219.0" font-size="12.5" fill="#8B949E">resumes the saved session, while /quit and idle Ctrl+C clear Null&#x27;s pointer, not OMP&#x27;s stored</text>
+  <text x="24" y="238.0" font-size="12.5" fill="#8B949E">transcript. Logs are in ~/Library/Logs/Null/mini.log, and the smoke and self-test modes can log</text>
+  <text x="24" y="257.0" font-size="12.5" fill="#8B949E">reply text, so keep sensitive prompts out of those checks.</text>
   </g>
   <rect x="0.5" y="0.5" width="859" height="282" rx="12" stroke="#21262D"/>
 </svg>

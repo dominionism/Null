@@ -9,6 +9,11 @@
 > statements above and in `## Architecture`; it does not replace them, and the rest of this file is
 > unchanged.
 
+> Third addition, 2026-10-09: `Context/Plans/OwnHarness.md` items 1 to 4 landed on `main`
+> (`128f778`) and item 3 on a branch. The statements about Null that this made untrue were corrected
+> in place by the session that built them: where the harness comes from, the settings file handed to
+> it, the source files and the commands. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -34,6 +39,11 @@ sign-in or API key is the distribution goal.
 - `Providers.md` supersedes Phase 2 of `NullMini.md`: **OMP is the current harness; providers are
   reached through OMP.** Supporting several providers does not require several harness adapters.
   Other harnesses are deferred until there is a need.
+- `OwnHarness.md` reverses one decision of `Providers.md`: **Null carries Oh-my-pi inside the app, at
+  one version named in `Mini/Engine.toml`, and starts that one.** The user's own copy is used only
+  when chosen with `/harness`. A newer version is let in by the harness check (`Mini/src/check.rs`,
+  `Mini/Scripts/engine --to`). Its items 5 to 10 (first opening, one-command install, `/update`) are
+  not built.
 - `ConversationDisplay.md` defines the current presentation: compact black-and-white box, SF Mono,
   one reading edge, null sign beside user messages, no left-side rules, no boxes around code or
   diagrams, quiet/folded tool activity. The latest look is built but not yet owner-accepted.
@@ -65,8 +75,8 @@ sign-in or API key is the distribution goal.
 
 ## Architecture
 
-Null's static page sends commands to its own Rust host, which lazily starts OMP and exchanges ACP
-messages over stdio; OMP executes tools and streams replies back. The page decides presentation,
+Null's static page sends commands to its own Rust host, which lazily starts the Oh-my-pi it carries
+(or the user's own, when chosen with `/harness`) and exchanges ACP messages over stdio; OMP executes tools and streams replies back. The page decides presentation,
 not provider behavior; the Rust host decides window/process/session coordination, not credentials
 or inference. Separately, Voice's React application calls a Python FastAPI service that owns SQLite,
 audio and local inference; its native host decides OS integration, not domain state. Voice has two
@@ -78,7 +88,7 @@ agent routes of its own: a retained Python ACP API and herdr delivery into termi
 | --- | --- | --- |
 | `Mini/Page/index.html` | Input, command pickers, transcript, structured reply DOM, scrolling/dragging requests | Process launch, durable transcript, provider catalogue, retry policy |
 | `Mini/src/` | Non-activating panel, shortcut, settings, OMP lifecycle, ACP client, event buffer, local sign-in presentation | Provider entitlement/authentication internals, tool execution, model inference |
-| Installed OMP | Credentials, provider/model catalogue, tools, transcript, approvals, actual retries/fallback | Null window and visual layout |
+| OMP: the copy inside Null.app, or the user's own | Credentials, provider/model catalogue, tools, transcript, approvals, actual retries/fallback | Null window and visual layout |
 | `app/` | Shared Voice screens, API orchestration, recording state, React Query/zustand state, playback | OS shortcuts, native clipboard/focus transactions, model execution |
 | `tauri/` | Voice desktop, sidecar supervision, global chords, focus/paste, pill window, speak subscription | SQLite, profiles, transcription, speech engine selection |
 | `web/` | Browser host for shared Voice UI, browser download/playback adapters | Native capability emulation or server supervision |
@@ -95,8 +105,10 @@ agent routes of its own: a retained Python ACP API and herdr delivery into termi
 3. Enter in `Mini/Page/index.html` handles `/model`, `/backup`, `/usage`, `/login`, `/new`, `/quit`
    locally. Ordinary text invokes `harness::send`; blank input and a second concurrent turn are
    rejected. A lone unknown slash-word is rejected, not sent to the agent.
-4. `harness.rs` discovers OMP by executable path/fallback install directories and starts
-   `omp [--profile ...] [--approval-mode ...] [--config ...] acp`. It reads OMP's configured approval
+4. `engine.rs` picks the program: the user's own when the `harness` setting names one that can be
+   run, else the one beside Null's executable (`Contents/MacOS/omp`), else, with a line in the log,
+   one found on PATH or in the install directories. `harness.rs` starts it as
+   `omp [--profile ...] [--approval-mode ...] --config harness.yml acp`. It reads OMP's configured approval
    mode explicitly and supplies supported MCP definitions from `~/.omp/agent/mcp.json`, because
    ACP did not inherit these terminal settings in the recorded spike.
 5. ACP protocol v1 is initialized. `session/load` resumes a saved conversation when possible;
@@ -126,7 +138,8 @@ agent routes of its own: a retained Python ACP API and herdr delivery into termi
 - `providers.rs` runs `omp usage --json --redact` with a 15-second deadline and 60-second cache;
   `/usage` forces freshness. It stores provider/limit data, not account names. Missing/key-only/local
   reports mean “no usage report,” not no usable model. Tier limits do not exhaust an entire provider.
-- `backups.rs` stores the user's ordered model list and writes an OMP config overlay. Null's order
+- `backups.rs` stores the user's ordered model list and puts it in the form of OMP's settings.
+  `harness.rs` writes that, with `startup.checkUpdate: false`, to `harness.yml` at every start. Null's order
   goes before existing model/provider-specific fallback entries for that run; original OMP settings
   remain unchanged. **OMP retries and resends; Null does not implement a second retry loop.**
 - Fallback is not exclusive to quota exhaustion: refusal and authentication failures can trigger it.
@@ -135,6 +148,9 @@ agent routes of its own: a retained Python ACP API and herdr delivery into termi
 - Provider failures can arrive as ordinary reply text with `end_turn`, not protocol errors.
   `translate.rs` uses absent token usage to flag a failed reply, enabled by ACP's
   `unstable_end_turn_token_usage` feature. This is version-sensitive, not a universal protocol rule.
+  So a reply without a count is taken for a failure only once that harness version has been seen
+  to count one (`translate::judge_reply`): the carried version is trusted, and what was seen of
+  another is remembered in `settings.json` (`counts_tokens`).
 - After 20 quiet seconds without tools/approval, the box explains it is still waiting. Failed reply
   text stays visible in red; manual model selection does not automatically resend the failed prompt.
 
@@ -230,16 +246,20 @@ both `Mini/Scripts/*` were read. Facts marked *(observed)* come from the app's o
 `~/Library/Logs/Null/mini.log` (856 lines), `settings.json` and `backups.yml`, read on 2026-10-09 —
 not produced by a run made for this section.
 
-### The twelve files in `Mini/src/`, and what each decides
+### The files in `Mini/src/`, and what each decides
+
+Twelve when this section was written; `engine.rs` and `check.rs` came with `OwnHarness.md`.
 
 | Module | Owns | Decides / does not decide |
 |---|---|---|
-| `main.rs` | Wiring: two plugins, state init, 21 `invoke_handler` commands, five dev switches | Nothing else |
+| `main.rs` | Wiring: two plugins, state init, 23 `invoke_handler` commands, five dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
 | `harness.rs` | The ACP connection: one thread, one `omp … acp` process, one conversation, a 5,000-event ring, pending approval responders | What the harness reported; never what a provider is or whether a model is good |
 | `translate.rs` | ACP JSON → box events; the model list out of session config options; the owner's `mcp.json` → `session/new`; finding the `omp` binary | Pure functions over JSON; no process, no network |
-| `backups.rs` | The fallback order: `backups.yml` beside the settings, passed as `--config` | The order, not the switching — the harness moves on and re-sends by itself |
+| `backups.rs` | The fallback order, in the form of the harness's settings | The order, not the switching — the harness moves on and re-sends by itself |
+| `engine.rs` | Which Oh-my-pi runs: the one beside Null's executable, or the user's own by the `harness` setting; the commands `harnesses` and `set_harness` | Which program, never what it does |
+| `check.rs` | Test-only: the harness check, with a stand-in provider and a throwaway folder (`cargo test -- --ignored`) | Whether a version answers as Null needs; nothing at run time |
 | `providers.rs` | `omp usage --json --redact` (15 s limit, 60 s cache) set beside the model list | What is left; never an account name |
 | `signin.rs` | `omp login` on ordinary pipes: its list, its lines, its questions in, answers out | Nothing about provider semantics and nothing about steps having run |
 | `access.rs` | Full Disk Access: a file only it unlocks, one ask, then the user's decision | That macOS asks folder by folder, not whether the user agrees |
@@ -259,12 +279,12 @@ a provider requires; it adds no approval layer — the approval mode read from
 3. `harness::send_text`: refuse if busy; set busy; publish `user_message`, then `status_change
    running`; queue `Command::Send`.
 4. The harness thread (`serve` → `converse` → `Conversation::handle`) builds
-   `omp [--profile P] [--approval-mode M] [--config …/backups.yml] acp`, `initialize`s (the protocol
+   `omp [--profile P] [--approval-mode M] --config …/harness.yml acp`, `initialize`s (the protocol
    version must come back 1), then opens a session: `session/load` on the saved id when the agent
    advertises `loadSession`, else `session/new`; MCP servers come from `~/.omp/agent/mcp.json` in
-   either case. *(observed)* the real start line is
-   `omp --approval-mode yolo --config /…/io.github.dominionism.null-mini/backups.yml acp`, followed by
-   `loaded the conversation 01a11fb9-… back`.
+   either case. *(observed, installed app, 2026-10-09)* the real start line is "starting the
+   built-in harness: /Applications/Null.app/Contents/MacOS/omp --approval-mode yolo --config
+   /…/io.github.dominionism.null-mini/harness.yml acp", followed by "harness ready: omp 18.4.3".
 5. `session/prompt` → `agent_message_chunk` / `agent_thought_chunk` → `on_update` →
    `translate::event_from_update` → `text_delta` → `publish` → `mini:event` → the page appends.
 6. Reply ends → `stop_reason`, `reply_failed`, `status_change ready`, `message_done`, `finish`, then
@@ -281,7 +301,8 @@ returns the session to `running`.
 
 Commands the page invokes (the `invoke_handler` list in `main.rs`): `page_ready`, `quit`, `layout`,
 `hide_box`, `resize`, `send`, `interrupt`, `respond`, `models`, `set_model`, `new_conversation`,
-`events_since`, `report`, `providers`, `backups`, `set_backups`, `signin_providers`, `signin_start`,
+`events_since`, `report`, `providers`, `backups`, `set_backups`, `harnesses`, `set_harness`,
+`signin_providers`, `signin_start`,
 `signin_answer`, `signin_cancel`, `open_url`.
 
 Events: `mini:event` carries `user_message`, `text_delta` (`{text, thinking}`), `tool_activity`,
@@ -302,8 +323,11 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 - `…/io.github.dominionism.null-mini/settings.json`: `position [958,322]`,
   `model "opencode-go/deepseek-v4.1-flash"`, `session 01a11fb9-…`, `asked_full_disk true`,
   `backups ["anthropic/claude-opus-5-5","opencode-go/deepseek-v4.1-flash"]`.
-- `…/backups.yml`: `{"retry":{"fallbackChains":{"default":[…],"openai-codex/*":[…,"openai-codex/gpt-5.6-sol"]}}}`
-  — Null's order first, then the owner's own list for that provider.
+- `…/harness.yml` (it was `backups.yml` until 2026-10-09):
+  `{"startup":{"checkUpdate":false},"retry":{"fallbackChains":{"default":[…],"openai-codex/*":[…,"openai-codex/gpt-5.6-sol"]}}}`
+  — the update check off, then Null's order first and the owner's own list for that provider.
+  `settings.json` also holds `harness` (the path of the user's own Oh-my-pi when chosen) and
+  `counts_tokens`.
 - `…/Workspace`: the working directory of every conversation (`harness::workspace`).
 - `mini.log`: one `[mini]` line per event plus a float timestamp; the app's only trace.
 
@@ -327,7 +351,8 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
   and account access. Null does not need a new harness for each model vendor.
 - **Null conversation:** OMP transcript + saved session ID; one active turn, bounded in-memory UI
   events. Not a Voice `Capture`, not a narration session, not a herdr pane.
-- **Null settings:** position, chosen model, session ID, one-time Full Disk Access ask, backup order.
+- **Null settings:** position, chosen model, session ID, one-time Full Disk Access ask, backup order,
+  the user's own harness when chosen, and the harness version last seen to count tokens.
   Stored under the bundle's application-support directory; profile-specific settings/overlay names
   isolate development state. OMP remains transcript/credential owner.
 - **VoiceProfile / ProfileSample:** cloned/preset/designed voice configuration and reference audio,
@@ -350,6 +375,9 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 
 - **Null:** standalone Rust 2021/Tauri 2 crate in `Mini/`; ACP v3, `pulldown-cmark`, global-shortcut
   plugin, pinned `tauri-nspanel`; macOS 13+, compile-time macOS-only. Static `Page/`, no Node/Vite build.
+  Oh-my-pi goes into the app as a Tauri external binary from `Mini/Engine/`, which
+  `Mini/Scripts/engine` fills from the release `Mini/Engine.toml` names, checksum checked. A build
+  without it stops in `build.rs` and says so. Apple Silicon only. The app is 217 MB.
 - **Voice:** Bun workspace (`app`, `tauri`, `web`, `landing`), React 18/TypeScript/Vite/Tailwind,
   TanStack Router/Query, zustand, WaveSurfer, i18next. `docs` is its own Next/Fumadocs project;
   `landing` is an independent Next marketing site.
@@ -373,7 +401,8 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 
 | Surface | Commands |
 | --- | --- |
-| Null | `cargo build`, `cargo test`, `cargo tauri build` from `Mini/` |
+| Null | `Mini/Scripts/engine` once, then `cargo build`, `cargo test`, `cargo tauri build` from `Mini/` |
+| Null harness check | `cargo test -- --ignored` (15 live tests); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
 | Null install | `Mini/Scripts/install` builds/signs/replaces the app and login agent; mutating, not a check |
 | Voice desktop dev | `just dev` starts backend if needed; `bun run dev` expects it separately |
 | Voice server/web | `bun run dev:server`, `bun run dev:web`, `just dev-web` |
@@ -383,7 +412,9 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 
 CI currently runs frontend typecheck and web build only, not Mini/Rust/Python behavior. Voice has no
 frontend behavioral suite and only a manual system-audio Rust integration test. Python tests mix
-isolated tests with live-server/model/download checks. Mini's ignored integration tests execute OMP;
+isolated tests with live-server/model/download checks. Mini's ignored tests are the harness check:
+they execute OMP in throwaway folders against a stand-in provider, and one reaches DeepSeek with a
+dummy key;
 its smoke/self-test switches can send real prompts. `NULL_MINI_PROFILE` isolates settings and OMP
 profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.json`**.
 
