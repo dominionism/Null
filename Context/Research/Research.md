@@ -382,8 +382,10 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
   Voice's cloud bearer key is separate from OMP provider credentials; do not conflate the boundaries.
 - **Ephemeral runtime state:** generation queue/task registry, speak subscribers, narration sessions,
   Python Mini sessions, Rust Mini event buffer and approval responders. None is a durable task tray.
-- `Context/Glossary.md` is still an unfilled template. These distinctions are a factual research
-  vocabulary, not newly settled glossary/ADR decisions. `Project` ORM remains without a service/API.
+- `Context/Glossary.md` holds Null's words since 2026-10-10 (harness, engine, provider, sign-in,
+  account, backup, refusal and the rest); it has none of the Voice project's. The distinctions
+  above are a factual research vocabulary, and where the two differ the glossary is the settled
+  one. `Project` ORM remains without a service/API.
 
 ## Patterns
 
@@ -495,8 +497,10 @@ this repository does not have. A plain `v` tag would set it off.
 - **0003, Null carries its own harness:** Oh-my-pi is inside the app at one version named in
   `Mini/Engine.toml`, moved only after the harness check passes. It reverses decision 3 of
   `Providers.md`.
-- Provider credential ownership and provider-agnostic presentation are settled in `Providers.md`,
-  but their proposed ADRs/glossary entries are not written. Research does not create new decisions.
+- **0004, no credential rests in Null:** a key goes to the harness's own sign-in and nowhere
+  else; `Mini/tests/keys.rs` checks it.
+- **0005, Null knows nothing about any one provider:** no list of providers and no sign-in steps
+  in Null; the harness's lists and reports are drawn as they come.
 
 ## Open Questions and Current Gaps
 

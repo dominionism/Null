@@ -673,9 +673,14 @@ where it is removed.
      `Providers.md` and why. Glossary entries for harness, provider, backup and sign-in
      (`/grill`). `Providers.md` already points here from its decision 3 and its item 6.
    - Depends on: 2 for the README.
-   - Status: In progress. The README is done (2026-10-09, pull request #11) and the decision
-     record is written (`Context/ADR/0003-NullCarriesItsOwnHarness.md`). The glossary is not
-     written; "engine" or "harness" is the first word to settle (`/grill`)
+   - Status: Complete (2026-10-10). The README (pull request #11, and the one-line install
+     since), the decision record (`Context/ADR/0003-NullCarriesItsOwnHarness.md`) and the
+     glossary (`Context/Glossary.md`)
+   - **The glossary was written without `/grill`,** on the owner's general word of 2026-10-10
+     (Constraints): twenty terms, as the plans, the code and the box already use them. The one
+     word that was open is settled as recommended: the harness is the part Oh-my-pi plays, and
+     the engine is the program file Null carries. The owner has not read it term by term, and
+     `/grill` remains the way to change one.
 
 10. **`/update`: the newest checked harness, from the box**
     - **Decided (owner, 2026-10-09):** "Let's provide add a command that helps update the latest
