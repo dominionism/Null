@@ -8,15 +8,17 @@
      and lets you choose your own, /update moves the built-in one to the newest
      checked version, /attach (or the plus at the end of the row) hands the
      agent a file with the next message, /history (and the button after the
-     plus) lists the earlier conversations and opens one again, /new starts a
-     new conversation, /quit quits the app and closes the conversation, Ctrl+C
+     plus) lists the earlier conversations and opens one again, /pet shows the
+     pet or puts it away, /new starts a new conversation, /quit quits the app
+     and closes the conversation, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
 
      Nothing is shown but the arrow and the text box until there is something
      to say. The arrow is the status: it pulses while the agent works and turns
-     amber while it waits for an answer. Press and drag anywhere that is not
-     text to move the box.
+     amber while it waits for an answer. The pet, left of the box, is the same
+     status with a body. Press and drag anywhere that is not text to move the
+     box.
 
      The page talks to the app through commands (invoke) and hears from it
      through events; see src/harness.rs and src/panel.rs. -->
@@ -118,6 +120,156 @@
       .box:focus-within {
         --edge-top: #ffffff;
         --edge-bottom: #d6d6dc;
+      }
+
+      /* The pet: Nil, the null sign with eyes and feet. It stands left of the box
+         with its middle level with the arrow's tip, and is the arrow's status with
+         a body: it rests, works, asks, hops once when a reply ends and sinks when
+         one fails. It is drawn on a grid of 16 by 16 at three times its size, and
+         every movement is one whole pixel of that grid, never a slide. Black with
+         a one-pixel light edge, as the box has, so that it shows on a dark desktop
+         as well as on a light one.
+
+         Sizing contract with src/panel.rs. With the pet the box starts 62px in (4px,
+         the pet's 48, and 10 between them) where it otherwise starts 16px in, so
+         the window is LANE = 46px wider, on its left. The pet's top is 6px down:
+         that puts its middle (24) on the row's (8 margin + 1 edge + 21), which is
+         where the arrow's tip is. */
+      .pet {
+        display: none;
+        position: absolute;
+        top: 6px;
+        left: 4px;
+        overflow: visible;
+        fill: #0b0b0d;
+        shape-rendering: crispEdges;
+        filter: drop-shadow(1px 0 0 #f4f4f7) drop-shadow(-1px 0 0 #f4f4f7) drop-shadow(0 1px 0 #f4f4f7) drop-shadow(0 -1px 0 #f4f4f7);
+      }
+      body.with-pet .pet {
+        display: block;
+      }
+      body.with-pet .box {
+        margin-left: 62px;
+      }
+      .pet .eyes {
+        fill: #fff;
+      }
+      /* Three pairs of eyes, one shown: open, glad when a reply has ended, flat
+         when one has failed. */
+      .pet .glad,
+      .pet .flat,
+      .pet.done .open,
+      .pet.fail .open {
+        display: none;
+      }
+      .pet.done .glad,
+      .pet.fail .flat {
+        display: inline;
+      }
+      /* Its eyes take the box's own two signal colours, and look up to ask. */
+      .pet.ask .eyes {
+        fill: rgb(var(--amber));
+        transform: translateY(-1px);
+      }
+      .pet.fail .eyes {
+        fill: var(--red);
+      }
+      .pet.rest .top {
+        animation: pet-bob 2.6s steps(1) infinite;
+      }
+      .pet.rest .eyes {
+        animation: pet-blink 4.4s steps(1) infinite;
+      }
+      .pet.rest .flag {
+        animation: pet-twitch 5.2s steps(1) infinite;
+      }
+      .pet.work .top {
+        animation: pet-bob 0.64s steps(1) infinite;
+      }
+      .pet.work .left {
+        animation: pet-lift 0.64s steps(1) infinite;
+      }
+      .pet.work .right {
+        animation: pet-lift 0.64s steps(1) -0.32s infinite;
+      }
+      .pet.work .eyes {
+        animation: pet-scan 2.56s steps(1) infinite;
+      }
+      .pet.ask .top {
+        animation: pet-bob 1.8s steps(1) infinite;
+      }
+      .pet.ask .flag {
+        animation: pet-lift 0.9s steps(1) infinite;
+      }
+      /* The two gestures are made once. HOP in the script is the hop's length. */
+      .pet.done .all {
+        animation: pet-hop 2.2s steps(1);
+      }
+      .pet.fail .all {
+        transform: translateY(1px);
+        animation: pet-shake 3.4s steps(1);
+      }
+      @keyframes pet-bob {
+        60% {
+          transform: translateY(1px);
+        }
+      }
+      @keyframes pet-blink {
+        93% {
+          opacity: 0;
+        }
+        97% {
+          opacity: 1;
+        }
+      }
+      @keyframes pet-lift {
+        50% {
+          transform: translateY(-1px);
+        }
+      }
+      @keyframes pet-twitch {
+        90% {
+          transform: translateY(-1px);
+        }
+        95% {
+          transform: none;
+        }
+      }
+      @keyframes pet-scan {
+        35% {
+          transform: translateX(1px);
+        }
+        50% {
+          transform: none;
+        }
+        85% {
+          transform: translateX(-1px);
+        }
+      }
+      @keyframes pet-hop {
+        10% {
+          transform: translateY(-2px);
+        }
+        20% {
+          transform: none;
+        }
+        30% {
+          transform: translateY(-1px);
+        }
+        40% {
+          transform: none;
+        }
+      }
+      @keyframes pet-shake {
+        6% {
+          transform: translate(-1px, 1px);
+        }
+        12% {
+          transform: translate(1px, 1px);
+        }
+        18% {
+          transform: translateY(1px);
+        }
       }
 
       .row {
@@ -638,6 +790,25 @@
     </style>
   </head>
   <body>
+    <!-- The pet, a pixel to a square: its round body, the stroke of the null sign
+         as an antenna (.flag) above and a tail below, three pairs of eyes, and two
+         feet. The grid's rows 2 to 18 are shown, so that its middle is the picture's. -->
+    <svg class="pet rest" id="pet" viewBox="0 2 16 16" width="48" height="48" aria-hidden="true">
+      <g class="all">
+        <g class="top">
+          <path d="M6 5h4v1h-4zM4 6h8v2h-8zM3 8h10v4h-10zM4 12h8v2h-8zM6 14h4v1h-4z" />
+          <path class="flag" d="M13 4h1v1h-1zM12 5h1v1h-1z" />
+          <g class="eyes">
+            <path class="open" d="M5 9h1v2h-1zM10 9h1v2h-1z" />
+            <path class="glad" d="M5 9h1v1h-1zM4 10h1v1h-1zM6 10h1v1h-1zM10 9h1v1h-1zM9 10h1v1h-1zM11 10h1v1h-1z" />
+            <path class="flat" d="M4 10h2v1h-2zM10 10h2v1h-2z" />
+          </g>
+        </g>
+        <path d="M3 14h1v1h-1zM2 15h1v1h-1z" />
+        <path class="left" d="M5 15h2v1h-2z" />
+        <path class="right" d="M9 15h2v1h-2z" />
+      </g>
+    </svg>
     <div class="box" id="box">
       <div class="row">
         <span class="caret" id="caret" aria-hidden="true"
@@ -931,15 +1102,40 @@
         fit();
       };
 
+      // ── The pet ────────────────────────────────────────────────────────
+      //
+      // It follows the arrow: resting, working, asking. When a reply ends it hops
+      // once, and when one fails it sinks and stays sunk until the arrow next
+      // changes. /pet shows it or puts it away, and the app remembers which.
+
+      const pet = document.getElementById('pet');
+      const HOP = 2200; // as long as the hop in the style above
+      let petShown = false; // until the app has said
+      let hopTimer = null;
+      let noAnswer = false; // the reply that is ending brought the provider's refusal
+      const mood = (name) => {
+        clearTimeout(hopTimer);
+        pet.setAttribute('class', `pet ${name}`);
+        if (name === 'done') hopTimer = setTimeout(() => mood('rest'), HOP);
+      };
+      const showPet = (shown) => {
+        petShown = !!shown;
+        document.body.classList.toggle('with-pet', petShown);
+      };
+
       // '' when idle, 'working' while the agent works, 'asking' while it waits for an answer.
       const mark = (state) => {
+        const before = caret.className;
         caret.className = state ? `caret ${state}` : 'caret';
+        // The pet moves when the arrow changes. Told again that nothing is
+        // running, it keeps the gesture it is making.
+        if (caret.className !== before) mood(state === 'working' ? 'work' : state === 'asking' ? 'ask' : 'rest');
       };
 
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/attach', '/history', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/attach', '/history', '/pet', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
@@ -1061,6 +1257,7 @@
             break;
           case 'reply_failed':
             // What came back is the provider's refusal, not the model's answer.
+            noAnswer = true;
             if (reply) reply.element.classList.add('failed');
             reply = null;
             line('note', 'no answer from the provider. /model picks another model');
@@ -1087,6 +1284,10 @@
           pendingAsk = null;
           running.clear();
           mark('');
+          // How it ended, in the pet's own way. A reply the owner stopped ends quietly.
+          if (event.type === 'error' || noAnswer || event.stop_reason === 'refused') mood('fail');
+          else if (event.stop_reason !== 'cancelled') mood('done');
+          noAnswer = false;
         }
         watchQuiet();
       };
@@ -1909,6 +2110,12 @@
           openHistory(text.slice(8).trim());
           return;
         }
+        if (text === '/pet') {
+          // The page and the window change together: the box stays where it is.
+          showPet(!petShown);
+          invoke('set_pet', { on: petShown }).catch((error) => notice(String(error)));
+          return;
+        }
         if (text === '/quit') {
           invoke('quit');
           return;
@@ -1935,7 +2142,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /attach, /history, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /attach, /history, /pet, /new and /quit`);
           return;
         }
         if (busy) {
@@ -2371,6 +2578,11 @@
         unnotice();
       });
 
+      // Whether the pet shows is the app's to remember, and the window is already
+      // as wide as that needs.
+      invoke('pet')
+        .then(showPet)
+        .catch(() => {});
       catchUp();
       fit();
       invoke('page_ready');
