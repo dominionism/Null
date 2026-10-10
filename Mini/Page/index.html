@@ -404,16 +404,32 @@
         border-top: 1px solid var(--line);
         overflow-y: auto;
       }
-      #out::-webkit-scrollbar,
-      #pick::-webkit-scrollbar {
+      #out::-webkit-scrollbar {
         width: 10px;
       }
-      #out::-webkit-scrollbar-thumb,
-      #pick::-webkit-scrollbar-thumb {
+      #out::-webkit-scrollbar-thumb {
         border: 3px solid transparent;
         border-radius: 5px;
         background: rgba(255, 255, 255, 0.2);
         background-clip: padding-box;
+      }
+      /* A list draws no scroll bar: the bar's own lane would stop a row's band
+         short of the box's right-hand edge. Where there is more than the box
+         shows, the list fades at that end instead, as the conversation does. */
+      #pick::-webkit-scrollbar {
+        width: 0;
+      }
+      #pick.below {
+        -webkit-mask-image: linear-gradient(#000 calc(100% - 26px), transparent);
+        mask-image: linear-gradient(#000 calc(100% - 26px), transparent);
+      }
+      #pick.above {
+        -webkit-mask-image: linear-gradient(transparent, #000 26px);
+        mask-image: linear-gradient(transparent, #000 26px);
+      }
+      #pick.above.below {
+        -webkit-mask-image: linear-gradient(transparent, #000 26px, #000 calc(100% - 26px), transparent);
+        mask-image: linear-gradient(transparent, #000 26px, #000 calc(100% - 26px), transparent);
       }
       /* One reading edge. Everything in the transcript starts 33px in, which is
          where the typed text starts in the field above (14px + the 19px gutter),
@@ -655,16 +671,20 @@
         cursor: default;
       }
 
+      /* A row's highlight, under the pointer or chosen with the keys, is a band
+         that runs the whole width of the box, from edge to edge, and not a
+         rounded shape of its own inside it. So the list keeps no room at its
+         sides, and each row brings its own: its words start 18px in, as before. */
       #pick {
         max-height: 212px;
-        padding: 6px;
-        scroll-padding: 6px; /* the chosen row keeps clear of the edge when keys scroll to it */
+        padding: 6px 0;
+        scroll-padding: 25px 0; /* the chosen row keeps clear of the fade when keys scroll to it */
         font: 12.5px/19px var(--mono);
         color: var(--soft);
       }
       .provider {
         margin-top: 8px;
-        padding: 0 12px;
+        padding: 0 18px;
         color: var(--faint);
         font: 600 10px/18px var(--mono);
         letter-spacing: 0.08em;
@@ -674,8 +694,7 @@
         margin-top: 0;
       }
       .option {
-        padding: 2px 12px;
-        border-radius: 7px;
+        padding: 2px 18px;
         cursor: pointer;
         white-space: pre;
         overflow: hidden;
@@ -700,7 +719,7 @@
       .left {
         display: grid;
         grid-template-columns: 19ch 11ch minmax(0, 1fr);
-        padding: 2px 12px;
+        padding: 2px 18px;
         white-space: pre;
       }
       .left > span {
@@ -890,6 +909,23 @@
         { passive: true },
       );
       out.addEventListener('scroll', () => out.classList.toggle('more', out.scrollTop < out.scrollHeight - out.clientHeight - 2));
+
+      // A list has no scroll bar. It fades at whichever end has more to show,
+      // looked at again whenever it is scrolled or drawn.
+      const fade = () => {
+        const end = pick.scrollHeight - pick.clientHeight;
+        pick.classList.toggle('above', pick.scrollTop > 2);
+        pick.classList.toggle('below', pick.scrollTop < end - 2);
+      };
+      pick.addEventListener('scroll', fade);
+      // The rows are drawn one by one, and the chosen one is scrolled to before
+      // the rows after it are there, so it comes to rest against the list's end.
+      // Once they are all there, it is brought clear of the fade.
+      new MutationObserver(() => {
+        const chosen = pick.querySelector('.selected');
+        if (chosen) chosen.scrollIntoView({ block: 'nearest' });
+        fade();
+      }).observe(pick, { childList: true });
 
       const add = (element) => {
         if (!picker) out.style.display = 'block'; // behind an open list until the list is put away
