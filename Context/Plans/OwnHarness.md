@@ -515,8 +515,30 @@ where it is removed.
      Oh-my-pi it carries, and on a new folder showed the first opening. The release page says
      that the file is what an installer fetches and that a download through a browser is
      stopped by macOS.
-   - **Not proven:** npm itself as the carrier; a Mac user account that has never had Null;
-     the app signed again on that Mac at install (decision 6).
+   - **The install command (2026-10-09):** `Mini/Scripts/null`, a script that needs nothing
+     but macOS. `null install` fetches the newest release of Null (or the one named), checks
+     it, signs it if the Mac has Null's signing identity, puts it in `/Applications`, makes it
+     start at login and starts it; `null uninstall` takes it away. It can be run from a clone
+     or piped from the repository with `curl … | sh -s install`, and is what an npm package
+     would run. It keeps nothing unless the file has the published checksum, the app's seal
+     holds, the app is Null, and the Oh-my-pi inside carries a Developer ID signature. Two
+     switches for trying it: `NULL_TRY_IN` puts the app in a folder and leaves the rest of the
+     Mac alone, and `NULL_RELEASES` fetches from a folder in place of GitHub.
+   - **Proven without a person, in a trial folder:** the newest release fetched from GitHub,
+     placed, started from there, and removed again; the same when the script is piped into
+     `sh`. From a folder of made-up releases, each refused with its own line and nothing
+     placed: a checksum that is not the file's, an app changed after it was sealed, an app
+     that is not Null, an Oh-my-pi that is not its author's, a version that does not exist,
+     and a word that is not a version. Afterwards the installed Null, its login item, what
+     was running and the keychain list were as before.
+   - **Not proven:** the script's real path, which signs, replaces the app in `/Applications`
+     and writes the login item (those lines are the ones `Mini/Scripts/install` has used); npm
+     itself as the carrier; a Mac user account that has never had Null; a signing identity
+     made at install (decision 6).
+   - **Not settled:** what vouches for the published checksum. It is fetched from the same
+     release as the app, so it proves the transfer and not who published. An npm package
+     would carry the checksum itself; the script trusts GitHub and the repository, as a clone
+     does.
    - **Found:** the repository already has `.github/workflows/release.yml`, which came with
      the Voice app. It answers to any tag that starts with `v`, and would try to build that
      app for three systems with certificates this repository does not have. So Null's tags are
