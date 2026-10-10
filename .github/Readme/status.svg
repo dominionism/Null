@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 457" width="860" height="457" fill="none" role="img" aria-label="Status and direction. Available in the box Text conversation and agent tools Model selection, sign-in, usage and backups Its own Oh-my-pi inside the app, or yours with /harness Structured Markdown in a compact transcript An independent macOS app Planned or incomplete Background tasks, activity tray and workspace selection First-run guidance, /logout and a sign-in timeout A one-command install, and /update for the newest checked harness A resizable transcript and repeatable visual checks Cloned-voice conversation, the optional pet and other platforms The latest display and some provider flows still need hands-on validation, and no real provider quota exhaustion has been verified. See the plans for evidence and open decisions rather than assuming every implemented path is finished.">
-  <title>Status and direction. Available in the box Text conversation and agent tools Model selection, sign-in, usage and backups Its own Oh-my-pi inside the app, or yours with /harness Structured Markdown in a compact transcript An independent macOS app Planned or incomplete Background tasks, activity tray and workspace selection First-run guidance, /logout and a sign-in timeout A one-command install, and /update for the newest checked harness A resizable transcript and repeatable visual checks Cloned-voice conversation, the optional pet and other platforms The latest display and some provider flows still need hands-on validation, and no real provider quota exhaustion has been verified. See the plans for evidence and open decisions rather than assuming every implemented path is finished.</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 457" width="860" height="457" fill="none" role="img" aria-label="Status and direction. Available in the box Text conversation and agent tools Model selection, sign-in, usage and backups Its own Oh-my-pi inside the app, or yours with /harness; /update for the newest checked one Structured Markdown in a compact transcript An independent macOS app Planned or incomplete Background tasks, activity tray and workspace selection First-run guidance, /logout and a sign-in timeout A one-command install A resizable transcript and repeatable visual checks Cloned-voice conversation, the optional pet and other platforms The latest display and some provider flows still need hands-on validation, and no real provider quota exhaustion has been verified. See the plans for evidence and open decisions rather than assuming every implemented path is finished.">
+  <title>Status and direction. Available in the box Text conversation and agent tools Model selection, sign-in, usage and backups Its own Oh-my-pi inside the app, or yours with /harness; /update for the newest checked one Structured Markdown in a compact transcript An independent macOS app Planned or incomplete Background tasks, activity tray and workspace selection First-run guidance, /logout and a sign-in timeout A one-command install A resizable transcript and repeatable visual checks Cloned-voice conversation, the optional pet and other platforms The latest display and some provider flows still need hands-on validation, and no real provider quota exhaustion has been verified. See the plans for evidence and open decisions rather than assuming every implemented path is finished.</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -26,7 +26,7 @@
   <text x="28" y="147.0" font-size="12.5" fill="#3FB950">▸</text>
   <text x="46" y="147.0" font-size="12.5" fill="#C9D1D9">Model selection, sign-in, usage and backups</text>
   <text x="28" y="170.0" font-size="12.5" fill="#3FB950">▸</text>
-  <text x="46" y="170.0" font-size="12.5" fill="#C9D1D9">Its own Oh-my-pi inside the app, or yours with /harness</text>
+  <text x="46" y="170.0" font-size="12.5" fill="#C9D1D9">Its own Oh-my-pi inside the app, or yours with /harness; /update for the newest checked one</text>
   <text x="28" y="193.0" font-size="12.5" fill="#3FB950">▸</text>
   <text x="46" y="193.0" font-size="12.5" fill="#C9D1D9">Structured Markdown in a compact transcript</text>
   <text x="28" y="216.0" font-size="12.5" fill="#3FB950">▸</text>
@@ -37,7 +37,7 @@
   <text x="28" y="299.0" font-size="12.5" fill="#8B949E">▸</text>
   <text x="46" y="299.0" font-size="12.5" fill="#8B949E">First-run guidance, /logout and a sign-in timeout</text>
   <text x="28" y="322.0" font-size="12.5" fill="#8B949E">▸</text>
-  <text x="46" y="322.0" font-size="12.5" fill="#8B949E">A one-command install, and /update for the newest checked harness</text>
+  <text x="46" y="322.0" font-size="12.5" fill="#8B949E">A one-command install</text>
   <text x="28" y="345.0" font-size="12.5" fill="#8B949E">▸</text>
   <text x="46" y="345.0" font-size="12.5" fill="#8B949E">A resizable transcript and repeatable visual checks</text>
   <text x="28" y="368.0" font-size="12.5" fill="#8B949E">▸</text>

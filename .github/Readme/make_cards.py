@@ -329,6 +329,7 @@ def commands(c):
         ("/usage", "See the harness's usage reports and reset times; providers without a report are marked"),
         ("/backup [filter]", "Set an ordered fallback list: Enter adds or removes a model, Esc saves it"),
         ("/harness", "See which Oh-my-pi the box runs, the built-in one or your own, and switch between them"),
+        ("/update", "Move the built-in Oh-my-pi to the newest version the repository's harness check has passed"),
         ("/new", "Start a fresh conversation on the last selected model"),
         ("/quit", "Quit and clear the saved conversation pointer"),
     ]:
@@ -453,6 +454,7 @@ def dev_switches(c):
         ("SELFTEST=\"<text>\"", "Send through the real page, log its output, exit"),
         ("PROFILE=<name>", "Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files"),
         ("BACKUPS=\"m/one,m/two\"", "Override the backup order for this run without changing the saved order"),
+        ("UPDATES=<address>", "Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address"),
     ]:
         c.row(f"NULL_MINI_{key}", value)
     c.command("NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \\")
@@ -494,7 +496,7 @@ def status(c):
     c.bullets([
         "Text conversation and agent tools",
         "Model selection, sign-in, usage and backups",
-        "Its own Oh-my-pi inside the app, or yours with /harness",
+        "Its own Oh-my-pi inside the app, or yours with /harness; /update for the newest checked one",
         "Structured Markdown in a compact transcript",
         "An independent macOS app",
     ])
@@ -502,7 +504,7 @@ def status(c):
     c.bullets([
         "Background tasks, activity tray and workspace selection",
         "First-run guidance, /logout and a sign-in timeout",
-        "A one-command install, and /update for the newest checked harness",
+        "A one-command install",
         "A resizable transcript and repeatable visual checks",
         "Cloned-voice conversation, the optional pet and other platforms",
     ], muted=True)
