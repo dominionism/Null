@@ -136,6 +136,10 @@ where it is removed.
    The install makes one on each Mac, with one approval (item 6). Rejected: leaving Null
    unsigned, since macOS would then ask for everything again after every update. Still to
    work out: how to ask for that approval in words a person understands.
+   **Built the same day with no approval at all** (item 6): on macOS 26.5.2 a certificate can
+   sign without macOS being told to trust it, so nothing is asked. The owner has not yet
+   said whether that stands; the approval remains the fallback if a grant turns out not to
+   hold across an update.
 7. **What a newcomer's Null may do without asking: settled by the owner on 2026-10-09.** It
    keeps Oh-my-pi's own default, `yolo`: Null passes the harness's setting on and adds no
    approval layer of its own (`MiniApp.md`). The first opening says so in one plain line, and
@@ -535,6 +539,33 @@ where it is removed.
      and writes the login item (those lines are the ones `Mini/Scripts/install` has used); npm
      itself as the carrier; a Mac user account that has never had Null; a signing identity
      made at install (decision 6).
+   - **The signing identity at install (2026-10-09, decision 6):** `Mini/Scripts/null` makes
+     one on a Mac that has none, and `Mini/Scripts/install` asks it to (`null identity`). A
+     2048-bit key and a ten-year certificate that can only sign code, from `/usr/bin/openssl`,
+     in a keychain file of its own in `~/Library/Application Support/Null Signing/` beside its
+     password, as the owner's own was made. What differs: macOS is never told to trust the
+     certificate, so there is no approval and nothing is asked of the person. If the identity
+     cannot be made or cannot sign, the app is installed as it was fetched, with a line that
+     says so.
+   - **Seen (2026-10-09, macOS 26.5.2), against what `MiniApp.md` recorded on 2026-10-08:**
+     `codesign` signs with a self-signed certificate that is not trusted, once its keychain is
+     on the search list. `security find-identity` lists it as not trusted, and still
+     `codesign --verify --strict` calls the result valid, the program runs, and its designated
+     requirement, which is how macOS knows an app again, has the same form as the installed
+     Null's: the identifier and the certificate's fingerprint. `MiniApp.md` said "`codesign`
+     refuses the certificate without that trust"; that was not seen here.
+   - **Proven without a person, in trial folders, with identities kept in scratch folders:**
+     a first install with no identity made one, signed the app, and the app was whole,
+     started and answered, with the Oh-my-pi inside still its author's; a second install
+     signed with the same identity had the same designated requirement; an identity that
+     cannot sign left the app whole and installed as fetched; `null identity` alone made one
+     and did nothing the second time. The folder is closed to other users and the password
+     file to everyone but its owner. The keychain search list was as before each time, and
+     the owner's own identity was not touched.
+   - **Not proven, and it is the point of the whole thing:** that macOS keeps Full Disk
+     Access and its folder answers across an update when the certificate was never trusted.
+     Only a person can show it: give Null a permission, install again, and see whether it is
+     still there. Also not seen: macOS 13 to 15, where `codesign` may behave differently.
    - **Not settled:** what vouches for the published checksum. It is fetched from the same
      release as the app, so it proves the transfer and not who published. An npm package
      would carry the checksum itself; the script trusts GitHub and the repository, as a clone

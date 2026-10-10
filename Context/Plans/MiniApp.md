@@ -276,6 +276,10 @@ Mini/
      prompt. `codesign` refuses the certificate without that trust, and does not find it unless
      its keychain is on the search list. Claude Code's safety check stopped the first attempt
      ("unauthorized persistence"); it went ahead only after the user authorised it.
+     **Seen otherwise on 2026-10-09 (macOS 26.5.2):** a certificate made the same way and never
+     trusted did sign, and the result verified, once its keychain was on the search list. See
+     `OwnHarness.md`, item 6. Whatever stopped `codesign` on 2026-10-08, it was not shown to be
+     the missing trust.
    - **What this costs:** anything running as the user can read that password, sign as Null, and
      so inherit whatever macOS has granted Null. Worth remembering with Full Disk Access on.
    - **For other people:** a self-signed certificate works on one Mac. For macOS to keep what it
