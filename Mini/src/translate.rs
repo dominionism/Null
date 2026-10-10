@@ -35,7 +35,7 @@ pub fn event_from_update(update: &Value, tools: &mut HashMap<String, Value>) -> 
         // What the user said, replayed when a conversation is loaded again.
         "user_message_chunk" => {
             let text = update.pointer("/content/text")?.as_str()?;
-            Some(json!({ "type": "user_message", "text": text }))
+            Some(crate::attach::said_again(text))
         }
         "tool_call" | "tool_call_update" => {
             let call_id = update.get("toolCallId")?.as_str()?.to_string();
