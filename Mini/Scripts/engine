@@ -11,6 +11,7 @@
 # in place. Otherwise nothing changes.
 #
 #   Mini/Scripts/engine --to 18.8.7
+#   Mini/Scripts/engine --to newest    whichever release of Oh-my-pi is the newest
 set -eu
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -84,6 +85,14 @@ rewrite() {
 # Try another version, and move Null to it only if it passes the harness check.
 move_to() {
 	next=${1#v}
+	if [ "$next" = "newest" ]; then
+		next=$(curl --fail --silent --show-error --location "https://api.github.com/repos/can1357/oh-my-pi/releases/latest" | sed -n 's/^ *"tag_name": "v\{0,1\}\([^"]*\)",$/\1/p' | head -n 1)
+		if [ -z "$next" ]; then
+			echo "Could not ask GitHub which Oh-my-pi is the newest." >&2
+			exit 1
+		fi
+		echo "The newest Oh-my-pi is $next."
+	fi
 	if [ "$next" = "$version" ]; then
 		echo "Null already carries Oh-my-pi $version."
 		return
@@ -110,7 +119,8 @@ move_to() {
 	chmod +x "$trial/$published"
 
 	echo "Asking Oh-my-pi $next what Null depends on"
-	if ! (cd "$here" && NULL_MINI_ENGINE="$trial/$published" cargo test -- --ignored); then
+	# Null's own live checks only: the key check beside them opens the app, and asks nothing of Oh-my-pi's version.
+	if ! (cd "$here" && NULL_MINI_ENGINE="$trial/$published" cargo test --bin null-mini -- --ignored); then
 		echo "Oh-my-pi $next did not pass the harness check, so Null stays on $version." >&2
 		echo "The version that was tried is in $trial." >&2
 		exit 1
