@@ -81,7 +81,7 @@
 
 <a id="signing-and-permission-persistence"></a>
 <p align="center">
-  <img src=".github/Readme/signing.svg" width="100%" alt="Signing and permission persistence: grants follow the code signature, so an unsigned rebuild can ask again; with the local signing keychain the installer signs as Null Local Signing, and without it installs unsigned; the Oh-my-pi inside keeps its author's signature." />
+  <img src=".github/Readme/signing.svg" width="100%" alt="Signing and permission persistence: grants follow the code signature, so an unsigned rebuild can ask again; the installer signs as Null Local Signing with an identity kept on your Mac, makes one without asking when there is none, and installs unsigned only if signing fails; the Oh-my-pi inside keeps its author's signature." />
 </p>
 
 <a id="what-null-keeps"></a>

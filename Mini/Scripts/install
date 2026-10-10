@@ -14,7 +14,8 @@ agent="$HOME/Library/LaunchAgents/io.github.dominionism.null-mini.plist"
 # about folders) to who signed it. Unsigned, that is the exact build, so every
 # rebuild starts the questions again; signed with one certificate, the answers
 # hold. The certificate is kept in a keychain file of its own on this Mac, beside
-# the password that opens it. Without that keychain the app is installed unsigned.
+# the password that opens it. A Mac that has none gets one made (Scripts/null);
+# if that fails, the app is installed unsigned.
 identity="Null Local Signing"
 keychain="$HOME/Library/Application Support/Null Signing/signing.keychain-db"
 newline='
@@ -60,6 +61,9 @@ cd "$here"
 Scripts/engine
 
 cargo tauri build
+
+# Make this Mac's signing identity, if it has none. Nothing is asked of the person.
+Scripts/null identity || true
 
 if [ -f "$keychain" ]; then
 	sign "target/release/bundle/macos/$app"
