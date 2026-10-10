@@ -9,7 +9,8 @@
 > owner's own. Proven by the owner on the installed app the same day: messages answered by the
 > built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
 > kept. Still owed: the way back to the built-in one, and `omp update` in the terminal changing
-> nothing in Null. Not started: items 3 to 9.**
+> nothing in Null. Item 4, the harness check, is built and passes on 18.4.3 and on 18.8.7.
+> Not started: items 3 and 5 to 9.**
 
 ## Goal
 
@@ -242,7 +243,66 @@ where it is removed.
    - Risk: the stand-in drifting from what real providers send. Know it by: the first real limit
      the owner meets, set beside what the stand-in sends (`Providers.md`, item 2).
    - Source: codebase (this month's spikes, recorded in `Providers.md`) + inferred.
-   - Status: Not started
+   - Status: In progress. Built, and passed by 18.4.3 and 18.8.7 (2026-10-09). Not yet seen to
+     stop a version that really breaks Null
+   - **Built:** `Mini/src/check.rs`: the stand-in provider in Rust (three ways of talking; the
+     model asked for picks the answer: `ok`, `limit`, `auth`, `noaccess`), a harness started as
+     Null starts it and spoken to over the protocol, and twelve questions, one test each, named
+     for what Null relies on. With the three live checks that were there before, that is 15
+     tests, run by `cargo test -- --ignored` in about 18 seconds. `NULL_MINI_ENGINE=<path>`
+     puts all 15 on another program. `Mini/Scripts/engine --to <version>` fetches that version,
+     holds each file against the release's own `SHA256SUMS.txt`, runs the 15 on it, and only
+     then writes `Mini/Engine.toml` and puts the program in place.
+   - **The questions:** protocol version 1, a conversation that opens and can be loaded back,
+     a model setting, and another setting to ask with; a working reply counts tokens (two ways
+     of talking); a used-up limit, a bad sign-in and a refused model come back as replies with
+     words and no tokens (three ways of talking, nine cases); a backup takes over, the message
+     is sent again and the failed model is not tried for the next message; the model in use is
+     answered when asked; Null's order goes ahead of a list the user already has, read with
+     `config get retry.fallbackChains --json`; the setting that stops the update check is still
+     a yes or no; started as Null starts it, the harness does not look for its own releases;
+     the program has the same checksum after answering; the carried version and the one under
+     test take turns on one conversation. The usage report and the sign-in with a dummy key are
+     the two earlier live checks.
+   - **Deviation:** the check is in `Mini/src/`, not `Mini/tests/`. Null is a program with no
+     library, so a test under `tests/` cannot use Null's own code. In the crate, the harness's
+     answers go through the very readers the app uses (`translate::reply_failed`,
+     `models_from_config_options`, `other_option`, `event_from_update`, `backups::overlay`,
+     `backups::lists_read`, `harness::own_settings`), so a pass means Null reads them, not that
+     a copy of its rules does.
+   - **Deviation:** the throwaway folder is a real temporary folder, given to the harness with
+     `PI_CODING_AGENT_DIR`, not a profile under `~/.omp`. Seen on 2026-10-09: such a folder has
+     no accounts and default settings, and the owner's folder is not touched. Each question
+     makes its own and removes it; none was left behind.
+   - **Deviation:** "settings handed over at start being accepted" could not be asked as
+     written. The harness's own `config get` does not show a setting handed over for one run:
+     it printed the stored value for the update check and for the backup lists alike, though
+     the backup lists demonstrably take effect in a conversation. So the question became two:
+     the setting still exists as a yes or no, and the harness does not go looking (below).
+   - **Learned (2026-10-09):** in the mode Null uses, Oh-my-pi does not look for a newer
+     version of itself at all. Kept behind a stand-in that wrote down every address it tried
+     to reach, it asked for the same twelve with and without the setting, and none was GitHub
+     or the npm registry. The update check belongs to the terminal's start. The setting is
+     still handed over. This answers the open question whether the built-in harness ever
+     replaces itself: it does not look, and its checksum is the same after a run.
+   - **Also seen there:** at start the harness asks seven outside services for their model
+     lists (api.commandcode.ai, api.kilo.ai, api.venice.ai, catalog.stencil.so,
+     coding-intl.dashscope.aliyuncs.com, hyper.charm.land, zenmux.ai) and three ports on this
+     Mac for local models (11434, 1234, 8080). That is the harness's doing, in the terminal as
+     in Null; it is noted because "local" is easily read as "nothing leaves the Mac".
+   - **Proven without a person:** 18.4.3 passed all 15, and so did 18.8.7, by
+     `NULL_MINI_ENGINE` and again through `Mini/Scripts/engine --to 18.8.7`, which wrote the
+     new version and checksum into `Engine.toml` and put the program in place. That was then
+     undone: Null stays on 18.4.3 until the owner says otherwise (decision 2). A program that
+     is no harness (`/bin/echo`) failed 14 of the 15 in half a second, each by its name; the
+     one that passed is about the carried program itself. The script refuses a wrong word, a
+     missing version and a version with no release, and says so when asked for the version
+     already carried. The first form of the handed-over question failed on 18.4.3 and was
+     reported by name, which is how its fault was found.
+   - **Not covered:** a short rate limit, which keeps the harness silent for minutes; the
+     usage report of a real account; a folder with real sign-ins; versions further apart than
+     18.4.3 and 18.8.7; the stand-in set beside a real limit (the risk above still stands);
+     `--to` on a version that fails, whose "nothing changes" branch has only been read.
 
 5. **First opening, for someone who has never used it**
    - What: takes over item 6 of `Providers.md`. When no provider reports and the model list has
