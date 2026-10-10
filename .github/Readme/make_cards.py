@@ -173,11 +173,14 @@ CHIPS = {
     "page-html": ("Page/index.html", "Mini/Page/index.html", False),
     "harness-rs": ("harness.rs", "Mini/src/harness.rs", False),
     "translate-rs": ("translate.rs", "Mini/src/translate.rs", False),
+    "engine-rs": ("engine.rs", "Mini/src/engine.rs", False),
+    "check-rs": ("check.rs", "Mini/src/check.rs", False),
     "markdown-rs": ("markdown.rs", "Mini/src/markdown.rs", False),
     "panel-rs": ("panel.rs", "Mini/src/panel.rs", False),
     "settings-rs": ("settings.rs", "Mini/src/settings.rs", False),
     "miniapp": ("App design", "Context/Plans/MiniApp.md", False),
     "providers": ("Providers", "Context/Plans/Providers.md", False),
+    "own-harness": ("Own harness", "Context/Plans/OwnHarness.md", False),
     "display": ("Conversation display", "Context/Plans/ConversationDisplay.md", False),
     "phases": ("Future phases", "Context/Plans/NullMini.md", False),
     "adrs": ("Decisions", "Context/ADR/", False),
@@ -199,11 +202,11 @@ NAV = ["nav-get-started", "nav-use-null", "nav-privacy", "nav-architecture", "na
 LINK_ROWS = [
     ["oh-my-pi"],
     ["rust", "tauri"],
-    ["page-html", "harness-rs", "translate-rs", "markdown-rs", "panel-rs", "settings-rs"],
+    ["page-html", "harness-rs", "engine-rs", "translate-rs", "markdown-rs", "panel-rs", "settings-rs", "check-rs"],
     ["voicebox", "adr-0002"],
     ["bun", "just", "research"],
     ["cleanup-plan", "adr-0001"],
-    ["miniapp", "providers", "display", "phases", "adrs", "research"],
+    ["miniapp", "providers", "own-harness", "display", "phases", "adrs", "research"],
     ["license", "responsible", "security", "contributing"],
 ]
 
@@ -254,8 +257,8 @@ def add(name, title, build, key_cols=KEY_COLS):
 def surface(c):
     c.sub("Press Control+Space from the app you are in. Type, and your agent answers in the box.")
     c.bullets([
-        "**Your tools, not just chat.** Null drives your installed Oh-my-pi harness: its tools, its "
-        "configured MCP servers, its approval mode.",
+        "**Your tools, not just chat.** Null drives the Oh-my-pi harness it carries: its tools, your "
+        "configured MCP servers, your approval mode.",
         "**Your providers, one conversation.** Switch models, read usage, keep an ordered fallback "
         "list. OMP owns the sign-ins and the retries.",
         "**Readable without getting bigger.** Streamed Markdown, folded tool steps, and code, tables "
@@ -268,23 +271,26 @@ def surface(c):
 
 # ── Get started ───────────────────────────────────────────────────────────
 def step_harness(c):
-    c.sub("Install Oh-my-pi (omp). Use existing sign-ins, or run /login inside Null afterwards.")
+    c.sub("Nothing to install first. Null carries one checked version of Oh-my-pi (omp) inside the app.")
+    c.row("Your folder", "It works from OMP's usual folder, ~/.omp: existing sign-ins, skills and MCP servers are used as they are. With none, run /login inside Null.")
     c.row("Managed by OMP", "Providers, subscriptions and API keys. Their availability and terms still apply.")
-    c.row("Null looks in", "PATH, then ~/.omp/bin, ~/.opencode/bin, ~/.local/bin, /opt/homebrew/bin and /usr/local/bin")
-    c.note("Null does not install OMP.")
+    c.row("Your own copy", "/harness switches to an Oh-my-pi found on PATH, then in ~/.omp/bin, ~/.opencode/bin, ~/.local/bin, /opt/homebrew/bin or /usr/local/bin, and back")
+    c.note("The carried version is named in Mini/Engine.toml and moves only after the repository's "
+           "harness check has passed it. Apple Silicon Macs only, for now.")
 
 
 def step_build(c):
-    c.sub("macOS 13+, the Rust toolchain, Xcode Command Line Tools and Tauri CLI 2. No Node, Bun, "
-          "Python or Voice server is needed for the box.")
+    c.sub("An Apple Silicon Mac with macOS 13+, the Rust toolchain, Xcode Command Line Tools and "
+          "Tauri CLI 2. No Node, Bun, Python or Voice server is needed for the box.")
     c.command("xcode-select --install           # once, if the Apple tools are not installed")
     c.command('cargo install tauri-cli --version "^2" --locked')
     c.command("git clone https://github.com/dominionism/Null.git && cd Null")
     c.command("Mini/Scripts/install")
     c.output("Installed /Applications/Null.app and started it. Control+Space opens the box.")
-    c.note("The script builds Null.app, installs it, registers a login item and starts it, replacing "
-           "any previously installed Null app. A source-build workflow with local signing support, "
-           "not a notarized release installer.")
+    c.note("The script fetches the Oh-my-pi named in Mini/Engine.toml (about 214 MB) and keeps it "
+           "only if its checksum matches. Then it builds Null.app, installs it, registers a login "
+           "item and starts it, replacing any previously installed Null app. A source-build workflow "
+           "with local signing support, not a notarized release installer.")
 
 
 def step_open(c):
@@ -322,6 +328,7 @@ def commands(c):
         ("/login", "Follow the harness's own sign-in steps inside the box, browser sign-in or key entry"),
         ("/usage", "See the harness's usage reports and reset times; providers without a report are marked"),
         ("/backup [filter]", "Set an ordered fallback list: Enter adds or removes a model, Esc saves it"),
+        ("/harness", "See which Oh-my-pi the box runs, the built-in one or your own, and switch between them"),
         ("/new", "Start a fresh conversation on the last selected model"),
         ("/quit", "Quit and clear the saved conversation pointer"),
     ]:
@@ -343,14 +350,16 @@ def provider_stops(c):
         "one: recall it with the up arrow or type it again.",
     ])
     c.note("Failure detection uses OMP's end-of-turn token-usage signal, an unstable protocol "
-           "extension. The fallback path has been exercised with simulated failures; real "
+           "extension, which the repository's harness check asks of every version before Null "
+           "carries it. The fallback path has been exercised with simulated failures; real "
            "account-limit behavior is still awaiting verification.")
 
 
 # ── Privacy and permissions ───────────────────────────────────────────────
 def privacy(c):
     c.row("Not offline", "Local interface does not mean offline agent: OMP may send prompts and tool context to your chosen provider, and tools and MCP servers may make their own network requests")
-    c.row("No listener", "Null has no HTTP listener and no database of its own; it starts OMP as a child process and talks over stdio")
+    c.row("Model lists", "When it starts, OMP asks several outside services for their public model catalogues and probes local model servers on this Mac. This is OMP's own behaviour, in a terminal as in Null")
+    c.row("No listener", "Null has no HTTP listener and no database of its own; it starts the OMP it carries as a child process and talks over stdio")
     c.row("Credentials", "Your /login answers go to the local omp login process, are masked in the UI and are never written to Null's settings or log. OMP handles authentication; no Null account exists")
     c.row("Shortcut", "Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice")
     c.row("Full Disk Access", "A separate choice, asked once with an explanation: macOS attributes the agent's file access to Null. It is broader file access, not a sandbox, and it does not replace OMP's approval rules. The box opens without it")
@@ -363,6 +372,8 @@ def signing(c):
         "When ~/Library/Application Support/Null Signing/signing.keychain-db exists, the installer "
         "signs with the Null Local Signing identity, using the password file beside it. Without that "
         "keychain it installs the build unsigned, with a notice.",
+        "The Oh-my-pi inside the app is left as published, with its author's Developer ID signature. "
+        "The installer signs the outer app only, and that signature covers it.",
     ])
     c.note("That identity is a personal-machine setup, not a distributed Developer ID, and the "
            "installer does not create one on a new machine. Protect both the keychain and its "
@@ -371,10 +382,10 @@ def signing(c):
 
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
-    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state and backup order")
-    c.row("backups.yml", "Model-only OMP fallback overlay, rewritten when starting the harness with a nonempty backup order")
+    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, backup order, and your own harness if you chose it")
+    c.row("harness.yml", "Settings handed to OMP at every start: no update check, and your backup order when there is one. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
-    c.note("With no backup order set, no overlay is passed and an older file may remain on disk. OMP "
+    c.note("Your own OMP settings are not modified. OMP "
            "owns the transcript and the credentials: a restart resumes the saved session, while "
            "/quit and idle Ctrl+C clear Null's pointer, not OMP's stored transcript. Logs are in "
            "~/Library/Logs/Null/mini.log, and the smoke and self-test modes can log reply text, so "
@@ -383,14 +394,17 @@ def what_null_keeps(c):
 
 # ── Under the hood ────────────────────────────────────────────────────────
 def under_the_hood(c):
-    c.sub("One native Tauri app plus the OMP process it launches. The page is a static HTML file: no "
-          "web server, bundler or Node runtime.")
+    c.sub("One native Tauri app plus the OMP process it carries and launches. The page is a static "
+          "HTML file: no web server, bundler or Node runtime.")
     c.raw("Control+Space → Null's page → Tauri commands → OMP over ACP\n"
           "                    ↑                            │\n"
           "                    └── text, tools, approvals ──┘")
     c.bullets([
         "Rust owns the non-activating panel, the shortcut and the ACP connection; OMP owns agent "
         "execution, providers and conversation history.",
+        "Null starts the Oh-my-pi beside its own executable, at the version in Mini/Engine.toml. "
+        "Only the program is Null's: it works from your ~/.omp folder, and /harness can run your "
+        "own copy instead.",
         "Null carries OMP's approval mode and supported MCP definitions into the session: your "
         "terminal agent in a smaller surface, not a separate set of permissions.",
         "Terminal parity has edges. The box does not pass through OMP's lone slash commands or show "
@@ -407,22 +421,28 @@ def source_map(c):
         ("main.rs", "Startup, plugins, state and command registration"),
         ("panel.rs, shortcut.rs", "Window, placement, sizing, visibility and Control+Space"),
         ("harness.rs, translate.rs", "ACP process and session lifecycle, approvals, events, protocol translation"),
+        ("engine.rs", "Which Oh-my-pi runs: the carried one or your own, and /harness"),
         ("providers.rs, signin.rs", "Usage reports and harness-owned sign-in"),
         ("backups.rs", "The fallback order written for OMP, and the switch reporting it"),
         ("markdown.rs", "Reply text into structured parts, including partial streamed input"),
         ("settings.rs, access.rs, log.rs", "Persistence, the Full Disk Access check, and logging"),
+        ("check.rs", "The harness check: live tests of what Null relies on, against a stand-in provider"),
     ]:
         c.row(key, value)
 
 
 # ── Development ───────────────────────────────────────────────────────────
 def development(c):
+    c.command("Mini/Scripts/engine          # once: fetch the Oh-my-pi the build takes in")
     c.command("cd Mini && cargo test        # offline unit tests; live ones are ignored")
     c.command("cargo build                  # local debug binary")
     c.command("cargo tauri build            # app bundle, no installation")
     c.note("Use cargo tauri, not bunx tauri: the latter names a different npm package. "
-           "cargo test -- --ignored runs live harness and provider checks and is not an offline "
-           "command. Repository CI checks the Voice frontend and web build, not Mini/.")
+           "cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a "
+           "stand-in provider, one of which reaches a real provider with a dummy key. "
+           "NULL_MINI_ENGINE=<path> runs them on another Oh-my-pi, and Mini/Scripts/engine --to "
+           "<version> moves Null to that version only if they pass. Repository CI checks the Voice "
+           "frontend and web build, not Mini/.")
 
 
 def dev_switches(c):
@@ -431,7 +451,7 @@ def dev_switches(c):
         ("NO_SHORTCUT=1", "Show at startup without claiming Control+Space"),
         ("SMOKE=\"<text>\"", "Send a real harness prompt, log the reply, exit without a window; also SMOKE_MODEL and SMOKE_STOP_AFTER (seconds)"),
         ("SELFTEST=\"<text>\"", "Send through the real page, log its output, exit"),
-        ("PROFILE=<name>", "Pass an isolated profile to OMP and use profile-specific Null settings and backup files"),
+        ("PROFILE=<name>", "Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files"),
         ("BACKUPS=\"m/one,m/two\"", "Override the backup order for this run without changing the saved order"),
     ]:
         c.row(f"NULL_MINI_{key}", value)
@@ -474,6 +494,7 @@ def status(c):
     c.bullets([
         "Text conversation and agent tools",
         "Model selection, sign-in, usage and backups",
+        "Its own Oh-my-pi inside the app, or yours with /harness",
         "Structured Markdown in a compact transcript",
         "An independent macOS app",
     ])
@@ -481,6 +502,7 @@ def status(c):
     c.bullets([
         "Background tasks, activity tray and workspace selection",
         "First-run guidance, /logout and a sign-in timeout",
+        "A one-command install, and /update for the newest checked harness",
         "A resizable transcript and repeatable visual checks",
         "Cloned-voice conversation, the optional pet and other platforms",
     ], muted=True)
@@ -509,6 +531,7 @@ def reasoning(c):
     for key, value in [
         ("MiniApp.md", "The app design"),
         ("Providers.md", "Sign-in, usage and fallbacks"),
+        ("OwnHarness.md", "Why Null carries its harness, and the check that guards it"),
         ("ConversationDisplay.md", "How a reply is laid out"),
         ("NullMini.md", "The later phases"),
         ("ADR/", "The decisions that constrain changes"),
@@ -525,7 +548,7 @@ def license_card(c):
 
 
 add("surface", "Small surface. Real agent.", surface)
-add("step-harness", "1. Bring your harness", step_harness)
+add("step-harness", "1. The harness comes with Null", step_harness)
 add("step-build", "2. Build and install", step_build)
 add("step-open", "3. Open the box", step_open)
 add("uninstall", "Uninstall", uninstall)
