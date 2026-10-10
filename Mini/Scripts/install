@@ -1,5 +1,6 @@
 #!/bin/sh
-# Build Null, sign it, put it in /Applications, make it start at login, and start it.
+# Fetch the Oh-my-pi that Null carries, build Null, sign it, put it in /Applications, make it
+# start at login, and start it.
 #
 #   Mini/Scripts/install
 set -eu
@@ -54,6 +55,10 @@ sign() {
 }
 
 cd "$here"
+
+# Oh-my-pi travels inside the app, and the build takes it from Engine/.
+Scripts/engine
+
 cargo tauri build
 
 if [ -f "$keychain" ]; then

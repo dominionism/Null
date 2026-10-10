@@ -1,9 +1,10 @@
 //! The connection to the user's agent harness, over the Agent Client Protocol.
 //!
-//! The harness is the agent CLI the user already has installed and signed in to
-//! (Oh-my-pi today). This module starts it, keeps one conversation open on it,
-//! and turns what it reports into the events the box shows. The harness keeps
-//! its own sign-in, tools and transcript; nothing here touches a provider token.
+//! The harness is the agent CLI behind the box (Oh-my-pi today): the copy Null
+//! carries, or the user's own when they chose it (`engine.rs`). This module
+//! starts it, keeps one conversation open on it, and turns what it reports into
+//! the events the box shows. The harness keeps its own sign-in, tools and
+//! transcript; nothing here touches a provider token.
 //!
 //! Two things the protocol does not carry over from the terminal, learned from
 //! OMP: the approval mode the user configured, and the user's MCP servers. Both
@@ -30,12 +31,13 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::{backups, panel, providers, settings};
 
 /// The harness this app drives. One for now; the name is also its CLI.
-const HARNESS: &str = "omp";
+pub const HARNESS: &str = "omp";
 pub const HARNESS_NAME: &str = "Oh-my-pi";
 
 /// Events kept for a page that reloads or reopens. A long reply is a few hundred.
@@ -233,16 +235,17 @@ async fn serve(
     if matches!(first, Command::Restart | Command::CheckModel) {
         return Ok(()); // nothing is running; the next order starts a fresh process anyway
     }
-    let Some(binary) = installed() else {
+    let Some((binary, origin)) = engine::in_use(app) else {
         refuse(app, shared, first, &format!("{HARNESS_NAME} is not installed"));
         return Ok(());
     };
     let mut argv = vec![binary.display().to_string()];
     argv.extend(extra_args());
     argv.extend(launch_args(&binary));
-    argv.extend(backups::launch_args(app, &binary));
+    argv.extend(settings_args(app, &binary));
     argv.push("acp".into());
-    log!("starting the harness: {}", argv.join(" "));
+    let whose = if origin == Origin::BuiltIn { "the built-in harness" } else { "the user's own harness" };
+    log!("starting {whose}: {}", argv.join(" "));
     let agent = AcpAgent::from_args(argv).map_err(|e| e.to_string())?;
 
     let updates = (app.clone(), shared.clone());
@@ -275,9 +278,34 @@ async fn serve(
     }
 }
 
-/// Where the harness is installed, or None when it is not.
-pub fn installed() -> Option<PathBuf> {
-    translate::find_installed(HARNESS, None)
+/// The settings Null hands the harness at every start. Always that it is not to
+/// look for a newer version of itself: Null runs the version it chose, and moves
+/// on only with a new Null. And the backup order, when there is one.
+pub fn own_settings(backups: Option<Value>) -> Value {
+    let mut settings = json!({ "startup": { "checkUpdate": false } });
+    if let (Some(all), Some(Value::Object(more))) = (settings.as_object_mut(), backups) {
+        all.extend(more);
+    }
+    settings
+}
+
+/// What to add when starting the harness so that it reads those settings. They
+/// go in a file of Null's own beside Null's settings, written afresh each time;
+/// the user's own Oh-my-pi settings are not touched. The text is JSON, which the
+/// harness's settings format accepts.
+fn settings_args(app: &AppHandle, binary: &Path) -> Vec<String> {
+    let Ok(dir) = app.path().app_config_dir() else { return Vec::new() };
+    let path = dir.join(settings::file_name("harness", "yml"));
+    let _ = std::fs::create_dir_all(&dir);
+    // The file had another name while the backup order was all it held.
+    let _ = std::fs::remove_file(dir.join(settings::file_name("backups", "yml")));
+    match std::fs::write(&path, own_settings(backups::harness_settings(app, binary)).to_string()) {
+        Ok(()) => vec!["--config".into(), path.display().to_string()],
+        Err(e) => {
+            log!("could not write the harness's settings to {}: {e}", path.display());
+            Vec::new()
+        }
+    }
 }
 
 /// Arguments every run of the harness gets. `NULL_MINI_PROFILE` names an isolated
@@ -892,4 +920,20 @@ pub fn report(app: AppHandle, shown: String, arrow: String, height: f64, busy: b
     log!("selftest: the page shows: {}", shown.replace('\n', " | "));
     log!("selftest: arrow is \"{arrow}\", window height asked {height}, busy {busy}");
     app.exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_harness_is_always_told_not_to_look_for_a_newer_version_of_itself() {
+        assert_eq!(own_settings(None), json!({ "startup": { "checkUpdate": false } }));
+    }
+
+    #[test]
+    fn the_backup_order_goes_in_the_same_settings() {
+        let backups = json!({ "retry": { "fallbackChains": { "default": ["a/one"] } } });
+        assert_eq!(own_settings(Some(backups)), json!({ "startup": { "checkUpdate": false }, "retry": { "fallbackChains": { "default": ["a/one"] } } }));
+    }
 }

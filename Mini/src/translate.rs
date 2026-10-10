@@ -178,7 +178,7 @@ pub fn find_installed(name: &str, chosen: Option<&str>) -> Option<PathBuf> {
     find_binary(name, chosen, &home, &path_var, &INSTALL_DIRS)
 }
 
-fn runnable(path: &Path) -> bool {
+pub fn runnable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     std::fs::metadata(path).map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0).unwrap_or(false)
 }

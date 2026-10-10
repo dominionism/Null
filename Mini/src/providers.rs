@@ -8,6 +8,7 @@
 //! The report is asked for with account names redacted, and nothing that names an
 //! account is kept. The harness is never asked for a key or a token.
 
+use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -17,7 +18,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
 use crate::log::log;
-use crate::{harness, signin};
+use crate::{engine, harness, signin};
 
 /// How long one reading of the report is good for. Asking takes about a second
 /// and goes out to the providers.
@@ -164,8 +165,7 @@ fn remembered(app: &AppHandle) -> Option<Vec<ProviderState>> {
 
 /// Run the harness's usage report and read it. None when there is no report to
 /// read; nothing of what the harness printed is logged.
-fn read_report(extra: &[String]) -> Option<Vec<ProviderState>> {
-    let binary = harness::installed()?;
+fn read_report(binary: &Path, extra: &[String]) -> Option<Vec<ProviderState>> {
     let mut command = Command::new(binary);
     command.args(extra).args(["usage", "--json", "--redact"]);
     let printed = signin::run_briefly(command, REPORT_TIME_LIMIT).ok()?;
@@ -189,7 +189,8 @@ pub async fn providers(app: AppHandle, fresh: Option<bool>) -> Result<Vec<Provid
     let reported = match remembered(&app) {
         Some(states) => states,
         None => {
-            let read = tauri::async_runtime::spawn_blocking(|| read_report(&harness::extra_args())).await.map_err(|e| e.to_string())?;
+            let binary = engine::in_use(&app).map(|(binary, _)| binary);
+            let read = tauri::async_runtime::spawn_blocking(move || read_report(&binary?, &harness::extra_args())).await.map_err(|e| e.to_string())?;
             if let Some(states) = &read {
                 *app.state::<Providers>().0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some((Instant::now(), states.clone()));
             }
@@ -365,13 +366,13 @@ mod tests {
         assert!(!states[2].reported);
     }
 
-    /// Needs Oh-my-pi installed, so it runs only when asked: `cargo test -- --ignored`.
+    /// Runs Oh-my-pi itself, so it runs only when asked: `cargo test -- --ignored`.
     /// It uses the probe profile, which is signed in to nothing, never the real sign-ins.
     #[test]
     #[ignore]
     fn the_harness_report_is_read_for_a_profile_with_nothing_signed_in() {
         let extra = vec!["--profile".to_string(), "null-probe".to_string()];
-        assert_eq!(read_report(&extra), Some(Vec::new()));
+        assert_eq!(read_report(&engine::under_test(), &extra), Some(Vec::new()));
     }
 
     #[test]

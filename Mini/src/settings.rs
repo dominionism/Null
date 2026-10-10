@@ -21,6 +21,9 @@ pub struct Settings {
     pub asked_full_disk: bool,
     /// The models to carry on with when the one in use stops answering, in the order to try them.
     pub backups: Vec<String>,
+    /// The user's own Oh-my-pi, by its path, when they chose it over the one Null carries
+    /// (`/harness`). Nothing here means the one Null carries.
+    pub harness: Option<String>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -90,8 +93,14 @@ mod tests {
 
     #[test]
     fn settings_survive_a_round_trip() {
-        let settings =
-            Settings { position: Some((40, -12)), model: Some("a/b".into()), session: Some("s1".into()), asked_full_disk: true, backups: vec!["c/d".into()] };
+        let settings = Settings {
+            position: Some((40, -12)),
+            model: Some("a/b".into()),
+            session: Some("s1".into()),
+            asked_full_disk: true,
+            backups: vec!["c/d".into()],
+            harness: Some("/opt/own/omp".into()),
+        };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);
     }

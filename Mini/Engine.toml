@@ -1,0 +1,14 @@
+# The Oh-my-pi that Null carries: one version, chosen here, and changed only by a new Null.
+#
+# Mini/Scripts/engine fetches these files from that version's release into Mini/Engine/,
+# where the build takes them from. A file whose checksum is not the one written here is
+# refused, wherever it came from.
+
+version = "18.4.3"
+
+# One line for each file of the release that travels with Null: the program for each kind
+# of Mac Null is built for, and the licence and notices that have to go with a copy of it.
+[sha256]
+omp-darwin-arm64 = "1339e8e98b82d3e2341d198b8e17fd8b56ded2a8d83bc76f8086a858aca7c347"
+LICENSE = "16c45f9d667442781f03fa198914cc39abcaa48ec5ed8f644643e554ca2fbf63"
+"THIRD-PARTY-NOTICES.txt" = "d0c2e7c05bb4d755044b13fa560be58d01ab7c980b87892400a979397e569a8b"

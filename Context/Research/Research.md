@@ -314,8 +314,6 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 - **`ConversationDisplay.md` items 1, 8 and 9 are not started:** the look-check harness
   (`Mini/Scripts/Look/`), the note that tells the agent about the box, and more room (which would
   move `MAX_HEIGHT` and the page's height sums).
-- **`MiniApp.md`'s file and switch lists trail the code:** they lack `providers.rs`, `signin.rs`,
-  `backups.rs`, `markdown.rs` and the fifth switch `NULL_MINI_PROFILE`.
 - **Mini has no task-runner entry.** No `justfile` recipe, and it is outside the bun workspaces
   (Rust crate only); `cargo test` in `Mini/` is manual and was run in neither pass.
 - **No other repo code depends on `Mini/`.** Outside it the only references are the plans, the
@@ -459,8 +457,8 @@ profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.j
   lacks a durable resume index entirely. Do not use either as proof of background-task persistence.
 - Upstream Voicebox updater/branding remains in the Voice host. Root README describes Voicebox, not
   current Null; its preserved-history statement is not evidence of imported upstream history.
-- Cleanup remains unmerged. Its explicit handoff deltas still need promotion into
-  `CapitalFolders.md`; no cleanup/rebase/switch/service mutation was done during this research.
+- Cleanup remains unmerged; `CapitalFolders.md` holds its state as of 2026-10-09. No
+  cleanup/rebase/switch/service mutation was done during this research.
 
 ### Observed runtime, 2026-10-09
 

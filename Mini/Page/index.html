@@ -4,7 +4,8 @@
      Enter sends what you typed to your agent and the reply streams in below.
      /model opens the model list, /backup sets the models to carry on with when
      the one in use stops answering, /usage shows what each provider has left,
-     /login signs in to a provider, /new starts a new conversation, /quit quits
+     /login signs in to a provider, /harness shows which Oh-my-pi the box runs
+     and lets you choose your own, /new starts a new conversation, /quit quits
      the app and closes the conversation, Ctrl+C
      stops a reply or, with nothing running, does what /quit does, Esc hides the
      box.
@@ -578,7 +579,7 @@
       let anchor = null; // the owner's latest message: held at the top once the reply outgrows the box
       let following = true; // false once the owner has scrolled for themselves
       let pendingAsk = null; // { requestId, options, element }
-      let picker = null; // { models, current, shown, index, backups, spent, left } while a list is open
+      let picker = null; // { models, current, shown, index, backups, spent, left } while a list is open; usage or harness says which other list
       const running = new Set(); // the tool calls under way
       let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
       const toolLines = new Map(); // call id → { row, block }
@@ -841,7 +842,7 @@
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
       // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/new', '/quit'];
+      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/new', '/quit'];
       const tint = () => {
         const text = input.value;
         const command =
@@ -1234,6 +1235,75 @@
         mark('');
       };
 
+      // ── Choosing the harness ───────────────────────────────────────────
+      //
+      // Null carries its own Oh-my-pi and runs that one. /harness shows it and,
+      // beside it, an Oh-my-pi of the user's own when one is on this Mac, for
+      // someone who would sooner run theirs. Null was checked with the version it
+      // carries, so any other version is said to be unchecked.
+
+      const harnessName = (choice) => (choice.version ? `Oh-my-pi ${choice.version}` : 'Oh-my-pi');
+
+      const drawHarness = () => {
+        pick.textContent = '';
+        pick.append(el('div', 'provider', 'harness'));
+        picker.shown.forEach((choice, index) => {
+          const own = choice.origin === 'own';
+          const about = [harnessName(choice)];
+          if (own) about.push(choice.path.replace(/^\/Users\/[^/]+/, '~'));
+          if (!choice.checked) about.push('not checked with Null');
+          const lead = `${choice.current ? '● ' : '  '}${own ? 'yours' : 'built in'} `;
+          const row = el('div', index === picker.index ? 'option selected' : 'option', el('span', '', lead), el('span', 'id', about.join(' · ')));
+          row.addEventListener('click', () => chooseHarness(choice));
+          pick.append(row);
+        });
+        fit();
+      };
+
+      const openHarness = async () => {
+        if (picker || signin) return;
+        if (busy) {
+          notice('stop the reply with ctrl+c before changing the harness');
+          return;
+        }
+        mark('working');
+        let choices;
+        try {
+          choices = await invoke('harnesses');
+        } catch (error) {
+          line('error', `could not list the harnesses: ${error}`);
+          mark('');
+          return;
+        }
+        mark('');
+        if (!choices.length) {
+          line('error', 'no Oh-my-pi was found');
+          return;
+        }
+        const at = choices.findIndex((choice) => choice.current);
+        picker = { harness: true, models: [], current: null, shown: choices, index: Math.max(at, 0), backups: null, saved: [], spent: new Set(), left: new Map() };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        input.value = '';
+        tint();
+        drawHarness();
+      };
+
+      const chooseHarness = async (choice) => {
+        if (!choice) return;
+        closePicker();
+        if (choice.current) return;
+        mark('working');
+        try {
+          const now = await invoke('set_harness', { path: choice.origin === 'own' ? choice.path : null });
+          const whose = now.origin === 'own' ? 'your' : 'the built-in';
+          line('note', `now on ${whose} ${harnessName(now)}${now.checked ? '' : '. Null was not checked with it'}`);
+        } catch (error) {
+          line('error', `could not change the harness: ${error}`);
+        }
+        mark('');
+      };
+
       // ── Signing in to a provider ───────────────────────────────────────
       //
       // The harness knows how each provider signs in. /login shows the harness's
@@ -1408,6 +1478,10 @@
           openSignin();
           return;
         }
+        if (text === '/harness') {
+          openHarness();
+          return;
+        }
         if (text === '/quit') {
           invoke('quit');
           return;
@@ -1434,7 +1508,7 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /new and /quit`);
+          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /new and /quit`);
           return;
         }
         if (busy) {
@@ -1561,7 +1635,7 @@
           signin.index = 0;
           drawSignin();
         }
-        if (picker && !picker.usage) {
+        if (picker && !picker.usage && !picker.harness) {
           picker.index = 0;
           drawPicker();
         }
@@ -1597,9 +1671,9 @@
             event.preventDefault();
             const step = event.key === 'ArrowDown' ? 1 : -1;
             picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
-            drawPicker();
+            (picker.harness ? drawHarness : drawPicker)();
           } else if (event.key === 'Enter' && !event.isComposing) {
-            chooseModel(picker.shown[picker.index]);
+            (picker.harness ? chooseHarness : chooseModel)(picker.shown[picker.index]);
           }
           return;
         }

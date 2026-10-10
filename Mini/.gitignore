@@ -1,3 +1,6 @@
 # Build output and files Tauri generates on every build.
 /target/
 /gen/
+
+# The Oh-my-pi that Scripts/engine fetches. Engine.toml says which one; the files stay out of git.
+/Engine/

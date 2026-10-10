@@ -72,6 +72,11 @@ Mini/
 │   ├── shortcut.rs      the Control+Space shortcut
 │   ├── harness.rs       ACP connection to the harness
 │   ├── translate.rs     protocol JSON to the box's events, model list, finding the CLI
+│   ├── access.rs        the one ask for Full Disk Access (item 8)
+│   ├── providers.rs     what each provider has left (`Providers.md`, item 4)
+│   ├── signin.rs        the harness's own sign-in, shown in the box (`Providers.md`, item 5)
+│   ├── backups.rs       the backup order, handed to the harness at start (`Providers.md`, item 7)
+│   ├── markdown.rs      a reply's Markdown read into its parts (`ConversationDisplay.md`, item 3)
 │   ├── settings.rs
 │   └── log.rs
 ├── Page/index.html      the box
@@ -364,6 +369,11 @@ Mini/
     alone. Add `NULL_MINI_SMOKE_MODEL=<id>` or `NULL_MINI_SMOKE_STOP_AFTER=<seconds>`.
   - `NULL_MINI_NO_SHORTCUT=1 NULL_MINI_SELFTEST='<message>' ./target/debug/null-mini`: types into
     the real page and logs what the page shows.
+  - Two switches came later, with `Providers.md`. `NULL_MINI_PROFILE=<name>` runs the harness
+    under that profile and keeps the app's own settings apart (`settings.<name>.json`), so a
+    check never touches the installed app's conversation or settings: use it for every check
+    that sends a message. `NULL_MINI_BACKUPS=<model ids with commas>` names a backup order for
+    one run.
 - Reading the results: the self-test reports "window height asked 0" when the screen is locked or
   the box is hidden, because the page sizes its window in `requestAnimationFrame`, which does not
   fire then. That is not a fault in the page.
