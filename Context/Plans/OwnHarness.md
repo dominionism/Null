@@ -8,7 +8,8 @@
 > Oh-my-pi and starts that one, and `/harness` chooses between it and the owner's own. Items 3, 4,
 > 5 and 10 are built and merged, and the owner's Mac runs them since 2026-10-10: what a harness
 > can do, the harness check, the first opening, and `/update`. The carried version is 18.8.7.
-> That installed build has not yet been checked by the owner's hand (see Verification). Item 6 is
+> On the installed build the owner has used `/harness` and `/update`; a message is still to be
+> sent (see Verification). Item 6 is
 > mostly done: GitHub builds a ready-made Null, Null 0.1.0 and 0.1.1 are released, and the owner's
 > Null was installed from each on 2026-10-10 with the one-line command, signed here and still
 > holding Full Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
@@ -754,7 +755,8 @@ where it is removed.
       a fetched program; whether `/update` also says that a newer Null is there (item 7).
     - Source: specified from user + inferred.
     - Status: In progress. Built, proven by script in the real app, merged and installed
-      (2026-10-09); not yet used by the owner
+      (2026-10-09); used by the owner on the installed Null 0.1.1 on 2026-10-10, where it
+      said "already on the newest checked Oh-my-pi, 18.8.7"
     - **Built:** `/update` in the page and `update_harness` in `engine.rs`. It reads the
       repository's `Engine.toml` with the Mac's own `curl`, and moves only when that names a
       version newer than the built-in one. The fetched program is kept in
@@ -782,12 +784,13 @@ where it is removed.
       and was answered. A build that carries 18.8.7 removed the fetched copy at start. The six
       lines the box can say, drawn and read back. `--to 18.8.7` with the signer check wrote
       exactly the `Engine.toml` that was there before.
-    - **Limits:** Null's own version is still 0.1.0 and nothing moves it yet, so the `null`
-      line guards nothing until Null has releases (items 6 and 7). `/update` reads `main`, so
+    - **Limits:** when this was built Null's own version was 0.1.0 and nothing moved it, so
+      the `null` line guarded nothing. Since 2026-10-10 Null has releases and is 0.1.1 (items 6
+      and 7). `/update` reads `main`, so
       it offers a version as soon as a change to `Engine.toml` is merged there. There is no way
       to stop a fetch once it has begun, short of quitting.
-    - **Not proven:** the installed app, by the owner's hand; a real newer version on `main`,
-      since none exists yet; the line said when the user is on "yours".
+    - **Not proven:** a real newer version on `main`, since none exists yet; the line said
+      when the user is on "yours".
 
 ## Verification
 
@@ -800,10 +803,13 @@ where it is removed.
 - By hand, the owner: after installing, a message is answered and the log names the built-in
   harness; skills, MCP servers and all four sign-ins are there; `omp update` in the terminal
   changes nothing in Null; `/harness` switches to the terminal's Oh-my-pi and back.
-- By hand, the owner, owed on the build installed 2026-10-09: one message answered; `/harness`
-  showing both rows as 18.8.7 with no "not checked" label, and the line "built in stays until
-  Null is updated. yours follows omp update" under the list; `/update` saying "already on the
-  newest checked Oh-my-pi, 18.8.7".
+- By hand, the owner, on the installed Null 0.1.1 (2026-10-10): `/harness` showed "built in"
+  and "yours", and the log shows the owner choosing the built-in one and then their own again,
+  each at 18.8.7; `/update` said "already on the newest checked Oh-my-pi, 18.8.7" and nothing
+  about a newer Null, as 0.1.1 is the newest. The owner did not say whether the line "built in
+  stays until Null is updated. yours follows omp update" was under the list.
+- By hand, the owner, still owed on that build: one message answered. The log holds no message
+  since Null 0.1.1 started.
 - By hand, the owner, once the first opening is installed: the box does not open by itself,
   and the log says "a provider is signed in, so there is no first opening". On a Mac user
   account that has never had Null: the box opens by itself with the sign-in list, a sign-in
