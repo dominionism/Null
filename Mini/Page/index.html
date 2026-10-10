@@ -2147,7 +2147,9 @@
         if (/^\/[\w:-]+$/.test(text)) {
           input.value = text;
           tint();
-          notice(`no such command: ${text}. the box has /model, /backup, /usage, /login, /harness, /update, /attach, /history, /pet, /new and /quit`);
+          // The line holds about 81 characters, and the commands alone are 78: a
+          // sentence around them would be cut off before the last of them.
+          notice(COMMANDS.join(' '));
           return;
         }
         if (busy) {
