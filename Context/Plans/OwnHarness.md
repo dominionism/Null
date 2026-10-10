@@ -9,9 +9,9 @@
 > 5 and 10 are built and merged, and the owner's Mac runs them since 2026-10-10: what a harness
 > can do, the harness check, the first opening, and `/update`. The carried version is 18.8.7.
 > That installed build has not yet been checked by the owner's hand (see Verification). Item 6 is
-> mostly done: GitHub builds a ready-made Null, Null 0.1.0 is released, and the owner's Null was
-> installed from it on 2026-10-10 with the one-line command, signed here and still holding Full
-> Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
+> mostly done: GitHub builds a ready-made Null, Null 0.1.0 and 0.1.1 are released, and the owner's
+> Null was installed from each on 2026-10-10 with the one-line command, signed here and still
+> holding Full Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
 > weekly check of new Oh-my-pi versions, is merged and waits for its first Monday. Item 9 is
 > done: the README, the decision record and the glossary. Item 7 is done as a typed command:
 > `/update` says when a newer Null is out. Nothing in this plan is unstarted. What is left is
@@ -565,6 +565,12 @@ where it is removed.
      `Engine.toml`; the login item reported it running; the new Null logged "Full Disk Access
      is on"; and the keychain list was as before. So a permission held across an update
      signed with a certificate that macOS had been told to trust.
+   - **A second release and a second install (2026-10-10):** Null 0.1.1, by the tag
+     `null-v0.1.1`, with the install command on its release page. The owner had not used the
+     box since the first install, so nothing was interrupted. The same one-line command, with
+     no version named, found 0.1.1 as the newest and installed it over 0.1.0: the same app to
+     macOS, "started, version 0.1.1", "Full Disk Access is on", and no second look at the
+     sign-ins, since the first opening looks once.
    - **Not proven:** npm itself as the carrier; a Mac user account that has never had Null;
      a permission holding across an update signed with an identity that was made at install
      and never trusted (decision 6).
@@ -649,7 +655,8 @@ where it is removed.
      with nothing made up, against the real repository and releases: "already on the newest
      checked Oh-my-pi, 18.8.7" and nothing more.
    - **Not proven:** a real newer release seen by an installed Null, since the first Null
-     that can look is 0.1.1 itself.
+     that can look is 0.1.1 itself. Null 0.1.1 is released and is what the owner's Mac runs,
+     so the next release will show it.
 
 8. **Keeping up without being asked**
    - What: not designed. Once a week a job takes the newest Oh-my-pi release, runs item 4, and
