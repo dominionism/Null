@@ -116,7 +116,13 @@ jobs:
           cat > "$RUNNER_TEMP/notes.md" <<NOTES
           Null $VERSION for Apple Silicon Macs, macOS 13 or later, with Oh-my-pi $CARRIED inside.
 
-          This file is what an installer fetches. macOS stops an app that was downloaded through a web browser and carries no Apple certificate, so it is not meant to be installed from this page. To install Null today, clone the repository and run \`Mini/Scripts/install\`, as the README says.
+          To install it, run this in Terminal:
+
+          \`\`\`sh
+          curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null | sh -s install $VERSION
+          \`\`\`
+
+          The file below is what that command fetches. macOS stops an app that was downloaded through a web browser and carries no Apple certificate, so it is not meant to be installed from this page.
           NOTES
           gh release create "$GITHUB_REF_NAME" \
             "$RUNNER_TEMP/out/$NAME.zip" "$RUNNER_TEMP/out/SHA256SUMS.txt" \

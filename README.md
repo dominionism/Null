@@ -25,7 +25,7 @@
 
 <a id="small-surface-real-agent"></a>
 <p align="center">
-  <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Press Control+Space from the app you are in: your tools, not just chat; your providers in one conversation; readable without getting bigger; today, a standalone macOS text app built from source." />
+  <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Press Control+Space from the app you are in: your tools, not just chat; your providers in one conversation; readable without getting bigger; today, a standalone macOS text app installed with one command." />
 </p>
 
 <a id="get-started"></a>
@@ -38,10 +38,17 @@
   <a href="https://github.com/can1357/oh-my-pi"><img src=".github/Readme/link-oh-my-pi.svg" height="30" alt="Oh-my-pi (opens https://github.com/can1357/oh-my-pi)" /></a>
 </p>
 
+<a id="step-2-install"></a>
 <a id="step-2-build-and-install"></a>
 <p align="center">
-  <img src=".github/Readme/step-build.svg" width="100%" alt="2. Build and install: an Apple Silicon Mac with macOS 13+, the Rust toolchain, Xcode Command Line Tools and Tauri CLI 2; xcode-select --install, cargo install tauri-cli, git clone, then Mini/Scripts/install, which fetches the Oh-my-pi named in Mini/Engine.toml, builds, and prints that Null.app is installed and Control+Space opens the box." />
+  <img src=".github/Readme/step-build.svg" width="100%" alt="2. Install: an Apple Silicon Mac with macOS 13 or later and nothing else; one command, curl piped into sh, fetches the newest released Null, checks it, signs it on your Mac, puts it in /Applications and starts it, printing that Null is installed and Control+Space opens the box. Or build it yourself: xcode-select --install, cargo install tauri-cli, git clone, then Mini/Scripts/install." />
 </p>
+
+To copy:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null | sh -s install
+```
 
 <p align="center">
   <a href="https://rustup.rs/"><img src=".github/Readme/link-rust.svg" height="30" alt="Rust toolchain (opens https://rustup.rs/)" /></a>
@@ -56,8 +63,14 @@
 
 <a id="uninstall"></a>
 <p align="center">
-  <img src=".github/Readme/uninstall.svg" width="100%" alt="Uninstall: Mini/Scripts/uninstall removes the app and its login item, leaving settings, workspace files and logs behind; OMP's own sign-ins and history are not removed." />
+  <img src=".github/Readme/uninstall.svg" width="100%" alt="Uninstall: the same command with uninstall in place of install, or Mini/Scripts/uninstall from a clone, removes the app and its login item, leaving settings, workspace files, logs and Null's signing identity behind; OMP's own sign-ins and history are not removed." />
 </p>
+
+To copy:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null | sh -s uninstall
+```
 
 <a id="use-null"></a>
 <p align="center">
