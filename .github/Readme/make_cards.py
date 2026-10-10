@@ -294,6 +294,7 @@ def step_build(c):
 
 
 def step_open(c):
+    c.row("First time", "With no provider signed in, the box opens by itself, once, and shows the sign-in list")
     c.row("Control+Space", "Open the box")
     c.row("/login", "Add a provider, if you need one")
     c.row("/model", "Choose one of its models")
@@ -363,7 +364,8 @@ def privacy(c):
     c.row("No listener", "Null has no HTTP listener and no database of its own; it starts the OMP it carries as a child process and talks over stdio")
     c.row("Credentials", "Your /login answers go to the local omp login process, are masked in the UI and are never written to Null's settings or log. OMP handles authentication; no Null account exists")
     c.row("Shortcut", "Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice")
-    c.row("Full Disk Access", "A separate choice, asked once with an explanation: macOS attributes the agent's file access to Null. It is broader file access, not a sandbox, and it does not replace OMP's approval rules. The box opens without it")
+    c.row("Approvals", "Null passes on OMP's approval setting and adds none of its own. OMP's own default lets the agent act without asking you first, and the first opening says so")
+    c.row("Full Disk Access", "A separate choice, asked once, after the first reply, with an explanation: macOS attributes the agent's file access to Null. It is broader file access, not a sandbox, and it does not replace OMP's approval rules. The box opens without it")
 
 
 def signing(c):
@@ -383,7 +385,7 @@ def signing(c):
 
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
-    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, backup order, and your own harness if you chose it")
+    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, and your own harness if you chose it")
     c.row("harness.yml", "Settings handed to OMP at every start: no update check, and your backup order when there is one. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
     c.note("Your own OMP settings are not modified. OMP "
@@ -424,10 +426,11 @@ def source_map(c):
         ("harness.rs, translate.rs", "ACP process and session lifecycle, approvals, events, protocol translation"),
         ("engine.rs", "Which Oh-my-pi runs: the carried one or your own, and /harness"),
         ("providers.rs, signin.rs", "Usage reports and harness-owned sign-in"),
+        ("welcome.rs", "The first opening: with no provider signed in, the box opens once with the sign-in list"),
         ("backups.rs", "The fallback order written for OMP, and the switch reporting it"),
         ("markdown.rs", "Reply text into structured parts, including partial streamed input"),
         ("settings.rs, access.rs, log.rs", "Persistence, the Full Disk Access check, and logging"),
-        ("check.rs", "The harness check: live tests of what Null relies on, against a stand-in provider"),
+        ("check.rs, standin.rs", "The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use"),
     ]:
         c.row(key, value)
 
