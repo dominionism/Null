@@ -503,6 +503,13 @@ fn earlier_conversations_are_listed_with_their_folders_and_one_loads_back_in_its
     let again = agent.conversations();
     assert_eq!(history::entries(&again, &Default::default(), &folder.work(), None).len(), 2, "continuing a conversation makes no new one: {again:?}");
 
+    // Asked for again while it is loaded, as when the conversation that is open
+    // is chosen from the list: all of it is replayed, the new message with it.
+    let before = agent.updates.len();
+    agent.request("session/load", json!({ "sessionId": there, "cwd": its_folder, "mcpServers": [] })).unwrap_or_else(|error| panic!("the conversation did not load a second time: {error}"));
+    let whole = history::replayed(&agent.updates[before..]);
+    assert_eq!(whole.iter().filter(|event| event["type"] == "user_message").count(), 2, "both messages are replayed: {whole:?}");
+
     // One the harness does not have is refused and not made up, which is how
     // the box knows to stay on the conversation it had.
     let missing = agent.request("session/load", json!({ "sessionId": "01a00000-0000-7000-8000-000000000000", "cwd": folder.work(), "mcpServers": [] }));
