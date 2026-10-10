@@ -10,7 +10,9 @@
 > built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
 > kept, the way back to the built-in one, and `omp update` in the terminal (to 18.8.7) changing
 > nothing in Null. Item 4, the harness check, is built and passes on 18.4.3 and on 18.8.7.
-> Item 3 is built and checked by script, and not yet installed. Not started: items 5 to 10.**
+> Item 3 is built and checked by script, and not yet installed. The carried version was then
+> moved to 18.8.7 through the check; that build is not installed either. Not started: items 5
+> to 10.**
 
 ## Goal
 
@@ -111,7 +113,12 @@ where it is removed.
    draft of this plan proposed an Apple Developer account; the owner rejected it.
 2. **The first version to carry: 18.4.3.** Everything Null does was checked against it.
    Recommended over 18.8.7; item 4 is what moves it forward safely. Built as recommended on
-   2026-10-09; the owner has not yet said, and changing it is one line of `Mini/Engine.toml`.
+   2026-10-09.
+   **Moved to 18.8.7 the same day, at the owner's word,** once item 4 existed:
+   `Mini/Scripts/engine --to 18.8.7` fetched it, all 15 checks passed, and `Engine.toml` was
+   written. The program is notarized and signed by the same author as 18.4.3. The built app is
+   204 MB with the new checksum inside. It is the version the owner's terminal runs since the
+   update, so "built in" and "yours" are the same version again. Not yet installed.
 3. **Apple Silicon first.** An Intel copy of the harness is another 226 MB. Recommended: Apple
    Silicon only until someone asks. Built as recommended on 2026-10-09; the owner has not yet
    said.
