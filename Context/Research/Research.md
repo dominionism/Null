@@ -510,7 +510,9 @@ this repository does not have. A plain `v` tag would set it off.
   feel and real account-limit behavior are not fully owner-proven. Existing fallback proof used
   stand-in providers; no real quota exhaustion is established.
 - The first opening is built and proven by script only (`OwnHarness.md`, item 5): no real sign-in
-  has gone through it and no fresh Mac account has seen it. No one-command install, `/logout`,
+  has gone through it and no fresh Mac account has seen it. A one-command install exists
+  (`Mini/Scripts/null`) and installed the owner's Null from the release on 2026-10-10; no npm
+  package wraps it, and the README does not offer it yet. No `/logout`,
   active-sign-in timeout, content policy, checked-in visual harness or public Null/provider setup
   documentation is complete. The input is masked during a sign-in, and `Mini/tests/keys.rs` proves
   that a typed key reaches neither Null's log nor its settings (`Providers.md`, item 9).

@@ -5,16 +5,15 @@
 > `Providers.md` and takes over its item 6, first run.
 >
 > Status: **Items 1 and 2 are built, installed and proven by the owner (2026-10-09): Null carries
-> Oh-my-pi and starts that one, and `/harness` chooses between it and the owner's own. Items 3, 4
-> and 10 are built, merged and installed (2026-10-09, about 20:06): what a harness can do, the
-> harness check, and `/update`. The carried version is 18.8.7. That installed build has not yet
-> been checked by the owner's hand (see Verification). Item 5, the first opening, is built and
-> proven by script, and not installed. Item 6 is begun: GitHub builds a ready-made Null, Null
-> 0.1.0 is released, and fetched from there it runs on this Mac with no warning; the install
-> command and the signing identity it makes are built and tried in trial folders, on branches,
-> and no real install has been made with them. Item 8, the weekly check of new Oh-my-pi
-> versions, is built and tried, on a branch. Item 9 is partly done: the README and the decision
-> record. Not started: item 7.**
+> Oh-my-pi and starts that one, and `/harness` chooses between it and the owner's own. Items 3, 4,
+> 5 and 10 are built and merged, and the owner's Mac runs them since 2026-10-10: what a harness
+> can do, the harness check, the first opening, and `/update`. The carried version is 18.8.7.
+> That installed build has not yet been checked by the owner's hand (see Verification). Item 6 is
+> mostly done: GitHub builds a ready-made Null, Null 0.1.0 is released, and the owner's Null was
+> installed from it on 2026-10-10 with the one-line command, signed here and still holding Full
+> Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
+> weekly check of new Oh-my-pi versions, is merged and waits for its first Monday. Item 9 is
+> partly done: the README and the decision record. Not started: item 7.**
 
 ## Goal
 
@@ -53,6 +52,12 @@ MCP servers go on being used and a technical person can still put their own Oh-m
   `cargo test -- --ignored` (`MiniApp.md`, and the pattern in `signin.rs` and `providers.rs`).
 - Folder names are capitalized (ADR 0001): new folders are `Mini/Engine/` and the like.
 - The owner's instruction for commits: never an em dash in a commit message.
+- **Verbatim (user, 2026-10-10):** "I will give you the driver's seat to do what is necessary. We
+  are on the same page." Said after the first release and the install, in answer to a request
+  for three hands-on checks, a decision on the README and a merge. The agent's reading, not the
+  owner's words: within this plan the agent merges, changes the README and settles what it had
+  recommended, without asking each time. It does not reach to the owner's own accounts (npm),
+  to a new Mac user account, or to the hands-on checks, which stay owed.
 
 ## What was established (2026-10-09)
 
@@ -127,10 +132,11 @@ where it is removed.
    update, so "built in" and "yours" are the same version again. Installed on 2026-10-09,
    about 20:06.
 3. **Apple Silicon first.** An Intel copy of the harness is another 226 MB. Recommended: Apple
-   Silicon only until someone asks. Built as recommended on 2026-10-09; the owner has not yet
-   said.
+   Silicon only until someone asks. Built as recommended on 2026-10-09. Never confirmed by
+   name; it stands on the owner's general word of 2026-10-10 (Constraints).
 4. **The name of the command** that shows and chooses the harness. Proposed: `/harness`. Built
-   under that name on 2026-10-09; the owner has not yet said.
+   under that name on 2026-10-09 and used by the owner since. Never confirmed by name; it
+   stands on the owner's general word of 2026-10-10 (Constraints).
 5. **This reverses decision 3 of `Providers.md`** ("It does not download or run an installer").
    The owner asked for it on 2026-10-09; written as
    `Context/ADR/0003-NullCarriesItsOwnHarness.md`.
@@ -139,9 +145,9 @@ where it is removed.
    unsigned, since macOS would then ask for everything again after every update. Still to
    work out: how to ask for that approval in words a person understands.
    **Built the same day with no approval at all** (item 6): on macOS 26.5.2 a certificate can
-   sign without macOS being told to trust it, so nothing is asked. The owner has not yet
-   said whether that stands; the approval remains the fallback if a grant turns out not to
-   hold across an update.
+   sign without macOS being told to trust it, so nothing is asked. Recommended to the owner
+   and standing on the general word of 2026-10-10 (Constraints); the approval remains the
+   fallback if a grant turns out not to hold across an update.
 7. **What a newcomer's Null may do without asking: settled by the owner on 2026-10-09.** It
    keeps Oh-my-pi's own default, `yolo`: Null passes the harness's setting on and adds no
    approval layer of its own (`MiniApp.md`). The first opening says so in one plain line, and
@@ -154,10 +160,12 @@ where it is removed.
    to `v` tags) is removed with the cleanup (item 6).
 10. **The first release: the owner gave the word on 2026-10-09, and it was published the same
     day.** Null 0.1.0, by the tag `null-v0.1.0` on `main` (item 6).
-11. **Whether GitHub's jobs may open pull requests in this repository.** Open. Today they may
-    not, so the weekly check (item 8) would open an issue with a link, and a person opens
-    the pull request with one click. Recommended: leave it off; it is one fewer thing a job
-    is allowed to do.
+11. **Whether GitHub's jobs may open pull requests in this repository.** Left off, as
+    recommended, on the owner's general word of 2026-10-10 (Constraints). The weekly check
+    (item 8) then opens an issue with a link, and a person opens the pull request with one
+    click. It is one fewer thing a job is allowed to do.
+12. **Whether the README offers the one-line install.** Yes, as recommended, on the same
+    word: the command installed the owner's own Null on 2026-10-10 (item 6).
 
 ## Work items
 
@@ -475,11 +483,13 @@ where it is removed.
      model before; a sign-in that failed; a harness that asks before acting (no line about
      acting freely); the user already busy when it arrives (the lines only); and `/login`
      later, with and without a new provider.
-   - **Not proven:** a real sign-in through the first opening; a report that holds an
-     account (unit-tested only, until the owner's own Null starts on this build and logs "a
-     provider is signed in, so there is no first opening"); the Full Disk Access question
-     after a reply, since the test build reads it as on here and only the rule is tested; a
-     fresh Mac user account; the installed app.
+   - **Proven on the installed app (2026-10-10):** the owner's Null, installed from the
+     release, read the report of the owner's real sign-ins at its first start and logged "a
+     provider is signed in, so there is no first opening". The box did not open by itself,
+     and the setting `welcomed` is now set.
+   - **Not proven:** a real sign-in through the first opening; the Full Disk Access question
+     after a reply, since Full Disk Access is on wherever it could be tried and only the
+     rule is tested; a fresh Mac user account.
 
 6. **One command to install** (decision 1)
    - What: two ways in, and the same Null at the end of both.
@@ -500,8 +510,9 @@ where it is removed.
      anything else in this item. The clone way does not have this risk: an app built on the Mac
      it runs on is that Mac's own.
    - Source: specified from user + inferred.
-   - Status: In progress. The ready-built Null and most of the spike are done (2026-10-09). Not
-     started: the npm package, the signing identity at install, and a first release
+   - Status: In progress. The ready-built Null, the release, the install command and the
+     signing identity it makes are done, and the owner's Null was installed with them
+     (2026-10-10). Not started: the npm package. Not tried: a Mac that has never had Null
    - **Built:** `.github/workflows/null-release.yml`. On a Mac runner it fetches the carried
      Oh-my-pi, builds `Null.app`, seals it with no certificate (the Oh-my-pi inside keeps its
      author's signature), and packs it as `Null-<version>-macos-arm64.zip` with a
@@ -541,10 +552,18 @@ where it is removed.
      that is not Null, an Oh-my-pi that is not its author's, a version that does not exist,
      and a word that is not a version. Afterwards the installed Null, its login item, what
      was running and the keychain list were as before.
-   - **Not proven:** the script's real path, which signs, replaces the app in `/Applications`
-     and writes the login item (those lines are the ones `Mini/Scripts/install` has used); npm
-     itself as the carrier; a Mac user account that has never had Null; a signing identity
-     made at install (decision 6).
+   - **A real install (2026-10-10, at the owner's word):** on the owner's Mac, with the line
+     other people would use, `curl … | sh -s install`, after checking that the script GitHub
+     serves is the one in the repository. It fetched Null 0.1.0, signed it with the identity
+     already on the Mac, replaced the Null in `/Applications`, wrote the login item and
+     started it. Afterwards the app was whole and had the designated requirement it had
+     before, so macOS knows it as the same app; the Oh-my-pi inside had the checksum of
+     `Engine.toml`; the login item reported it running; the new Null logged "Full Disk Access
+     is on"; and the keychain list was as before. So a permission held across an update
+     signed with a certificate that macOS had been told to trust.
+   - **Not proven:** npm itself as the carrier; a Mac user account that has never had Null;
+     a permission holding across an update signed with an identity that was made at install
+     and never trusted (decision 6).
    - **The signing identity at install (2026-10-09, decision 6):** `Mini/Scripts/null` makes
      one on a Mac that has none, and `Mini/Scripts/install` asks it to (`null identity`). A
      2048-bit key and a ten-year certificate that can only sign code, from `/usr/bin/openssl`,
@@ -614,8 +633,8 @@ where it is removed.
    - Depends on: 4.
    - Risk: several releases a day would drown the repo. Hence once a week.
    - Source: inferred.
-   - Status: In progress. Built and tried (2026-10-10), on the branch `weekly-engine-check`,
-     not merged. It does nothing until it is on `main`, and has not yet met a newer release
+   - Status: In progress. Built, tried and merged (2026-10-10). It runs by itself from the
+     next Monday, and has not yet met a newer release
    - **Built:** `Mini/Scripts/engine --to newest`, which takes whichever release of Oh-my-pi
      is the newest and treats it as a named version is treated. And
      `.github/workflows/null-engine.yml`, every Monday at 09:17 UTC or started by hand: it
@@ -640,9 +659,11 @@ where it is removed.
      trial run found the newest release and ended with "Null already carries the newest";
      the run before it, refused by the API, took the "could not be tried" way and, being a
      trial, opened nothing.
-   - **Not proven:** a real run, since the workflow has to be on `main` to run by the clock
-     or by hand: the branch it pushes, the pull request or issue it opens, and an issue for
-     a version that fails.
+   - **A real run (2026-10-10):** started by hand on `main` once it was merged. The newest
+     release was still the one Null carries, so it ended with "Null already carries the
+     newest" and opened nothing.
+   - **Not proven:** a run that meets a newer release: the branch it pushes, the pull request
+     or issue it opens, and an issue for a version that fails. And a run by the clock.
 
 9. **Say it**
    - What: the README's first step, from "Bring your harness" to what is true after item 2. An
