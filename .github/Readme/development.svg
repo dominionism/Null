@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 344" width="860" height="344" fill="none" role="img" aria-label="Development. $ Mini/Scripts/engine          # once: fetch the Oh-my-pi the build takes in $ cd Mini &amp;&amp; cargo test        # offline unit tests; live ones are ignored $ cargo build                  # local debug binary $ cargo tauri build            # app bundle, no installation Use cargo tauri, not bunx tauri: the latter names a different npm package. cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a stand-in provider, one of which reaches a real provider with a dummy key. NULL_MINI_ENGINE=&lt;path&gt; runs them on another Oh-my-pi, and Mini/Scripts/engine --to &lt;version&gt; moves Null to that version only if they pass. Repository CI checks the Voice frontend and web build, not Mini/.">
-  <title>Development. $ Mini/Scripts/engine          # once: fetch the Oh-my-pi the build takes in $ cd Mini &amp;&amp; cargo test        # offline unit tests; live ones are ignored $ cargo build                  # local debug binary $ cargo tauri build            # app bundle, no installation Use cargo tauri, not bunx tauri: the latter names a different npm package. cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a stand-in provider, one of which reaches a real provider with a dummy key. NULL_MINI_ENGINE=&lt;path&gt; runs them on another Oh-my-pi, and Mini/Scripts/engine --to &lt;version&gt; moves Null to that version only if they pass. Repository CI checks the Voice frontend and web build, not Mini/.</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 363" width="860" height="363" fill="none" role="img" aria-label="Development. $ Mini/Scripts/engine          # once: fetch the Oh-my-pi the build takes in $ cd Mini &amp;&amp; cargo test        # offline unit tests; live ones are ignored $ cargo build                  # local debug binary $ cargo tauri build            # app bundle, no installation Use cargo tauri, not bunx tauri: the latter names a different npm package. cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a stand-in provider, one of which reaches a real provider with a dummy key. NULL_MINI_ENGINE=&lt;path&gt; runs them on another Oh-my-pi, and Mini/Scripts/engine --to &lt;version&gt; moves Null to that version only if they pass. Repository CI runs both on a Mac runner whenever Mini/ changes, beside the Voice frontend typecheck and web build.">
+  <title>Development. $ Mini/Scripts/engine          # once: fetch the Oh-my-pi the build takes in $ cd Mini &amp;&amp; cargo test        # offline unit tests; live ones are ignored $ cargo build                  # local debug binary $ cargo tauri build            # app bundle, no installation Use cargo tauri, not bunx tauri: the latter names a different npm package. cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a stand-in provider, one of which reaches a real provider with a dummy key. NULL_MINI_ENGINE=&lt;path&gt; runs them on another Oh-my-pi, and Mini/Scripts/engine --to &lt;version&gt; moves Null to that version only if they pass. Repository CI runs both on a Mac runner whenever Mini/ changes, beside the Voice frontend typecheck and web build.</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -19,9 +19,9 @@
     .c3 { opacity: 0; transform: translateX(452.4px); animation: c3 3.190s steps(58, end) 13.325s both, hold 16.765s linear both; }
     @keyframes c3 { from { transform: translateX(0); } }
   </style>
-  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="343" rx="12"/></clipPath>
+  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="362" rx="12"/></clipPath>
   <g clip-path="url(#win)">
-  <rect width="860" height="344" fill="#0D1117"/>
+  <rect width="860" height="363" fill="#0D1117"/>
   <rect width="860" height="30" fill="#161B22"/>
   <path d="M0 29.5H860" stroke="#21262D"/>
   <circle cx="20" cy="15.0" r="5.5" fill="#FF5F57"/>
@@ -60,11 +60,12 @@
   <text x="24" y="232.0" font-size="12.5" fill="#8B949E">is the harness check: live tests on the carried Oh-my-pi with a stand-in provider, one of which</text>
   <text x="24" y="251.0" font-size="12.5" fill="#8B949E">reaches a real provider with a dummy key. NULL_MINI_ENGINE=&lt;path&gt; runs them on another Oh-my-pi,</text>
   <text x="24" y="270.0" font-size="12.5" fill="#8B949E">and Mini/Scripts/engine --to &lt;version&gt; moves Null to that version only if they pass. Repository CI</text>
-  <text x="24" y="289.0" font-size="12.5" fill="#8B949E">checks the Voice frontend and web build, not Mini/.</text>
+  <text x="24" y="289.0" font-size="12.5" fill="#8B949E">runs both on a Mac runner whenever Mini/ changes, beside the Voice frontend typecheck and web</text>
+  <text x="24" y="308.0" font-size="12.5" fill="#8B949E">build.</text>
   <g class="fade" style="animation-delay:17.215s">
-    <text x="24.0" y="318" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="318" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="318" font-size="13" fill="#8B949E">$</text>
-    <rect class="blink" x="187.8" y="306" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
+    <text x="24.0" y="337" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="337" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="337" font-size="13" fill="#8B949E">$</text>
+    <rect class="blink" x="187.8" y="325" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
   </g>
   </g>
-  <rect x="0.5" y="0.5" width="859" height="343" rx="12" stroke="#21262D"/>
+  <rect x="0.5" y="0.5" width="859" height="362" rx="12" stroke="#21262D"/>
 </svg>

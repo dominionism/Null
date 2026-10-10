@@ -410,7 +410,7 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 | Frontend checks | `bun run typecheck`, `bun run check`, `bun run ci` |
 | Backend checks | `just test`, `just check-python` or venv pytest/Ruff |
 
-CI currently runs frontend typecheck and web build only, not Mini/Rust/Python behavior. Voice has no
+CI runs the frontend typecheck and web build, and since 2026-10-09 Null's unit tests and harness check on a Mac runner whenever `Mini/` changes (`.github/workflows/null.yml`). Python behavior is not run. Voice has no
 frontend behavioral suite and only a manual system-audio Rust integration test. Python tests mix
 isolated tests with live-server/model/download checks. Mini's ignored tests are the harness check:
 they execute OMP in throwaway folders against a stand-in provider, and one reaches DeepSeek with a
