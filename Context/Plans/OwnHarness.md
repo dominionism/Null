@@ -131,6 +131,9 @@ where it is removed.
    `Context/ADR/0003-NullCarriesItsOwnHarness.md`.
 6. **How other people get a signing identity at install.** Open. Recommended: the install
    makes one on each Mac, with one approval (item 6).
+7. **What a newcomer's Null may do without asking.** Open. Oh-my-pi's default is `yolo`, and
+   Null passes the harness's setting on (item 5). Recommended: the first opening says so in
+   one plain line, and the README too.
 
 ## Work items
 
@@ -370,6 +373,20 @@ where it is removed.
      two older live checks (the sign-in list and the usage report) still use the profile
      `null-probe` under `~/.omp`, not a throwaway folder, and the sign-in one still reaches
      DeepSeek with a dummy key.
+   - **Added (2026-10-09):** the stand-in provider is now
+     `Mini/src/standin.rs`, moved word for word out of the check, so that the app itself can
+     use it. Two switches: `NULL_MINI_FOLDER` runs the app on a folder of its own (the
+     harness's folder, its MCP servers, Null's own files and the log are all under it), and
+     `NULL_MINI_STANDIN` offers the stand-in's models there. This replaces the scratch
+     stand-in on port 18431 and the profile `null-probe`. The stand-in refuses to start
+     without a folder and never overwrites a `models.yml` it did not write.
+   - **Proven without a person:** 64 unit tests and the 15 live checks. The app on new
+     folders: a message answered by `standin-anthropic/ok`; a second start loading the
+     conversation back; a used-up limit marked ("reply ended: completed, with nothing from
+     the model"); a message typed into the real page and "pong" read back from it; the
+     stand-in without a folder refused; somebody's own `models.yml` left alone. The owner's
+     settings, harness settings, `~/.omp/profiles` and harness config were the same
+     afterwards, and a run added no line to the owner's log.
 
 5. **First opening, for someone who has never used it**
    - What: takes over item 6 of `Providers.md`. When no provider reports and the model list has
@@ -385,6 +402,18 @@ where it is removed.
      without a local model.
    - Source: specified from user + `Providers.md`.
    - Status: Not started
+   - **Seen (2026-10-09), on new folders of their own (`NULL_MINI_FOLDER`, item 4):**
+     - This Mac runs Ollama, so a folder with nothing signed in still offers one model,
+       `ollama/llama3.2:latest`. A message was answered by it after 33 seconds, with
+       nonsense. So "nothing signed in" on this Mac is the "only a local model" case. The
+       case with no model at all needs Ollama stopped, or the harness kept from this Mac's
+       ports as `Folder::behind` does in the check.
+     - The local model is not always in the first list. With the stand-in offered, a first
+       start listed 12 models without it and a later start 13 with it.
+     - Oh-my-pi's own default for approvals is `yolo`: a new folder, with the home folder
+       elsewhere too, answers `tools.approvalMode` with `yolo`. Null passes the harness's
+       setting on, so a newcomer's Null lets the agent do everything without asking
+       (decision 7).
 
 6. **One command to install** (decision 1)
    - What: two ways in, and the same Null at the end of both.

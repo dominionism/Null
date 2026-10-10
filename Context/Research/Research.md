@@ -15,7 +15,8 @@
 > it, the source files and the commands. Nothing else was traced again.
 
 > Fourth addition, 2026-10-09: one sentence that still said `/update` was not built was corrected,
-> and ADR 0003 was added to the list. Nothing else was traced again.
+> and how the app is run by script was added under the commands table, with the two switches and
+> the file (`standin.rs`) that were added the same day. Nothing else was traced again.
 
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
@@ -252,11 +253,12 @@ not produced by a run made for this section.
 
 ### The files in `Mini/src/`, and what each decides
 
-Twelve when this section was written; `engine.rs` and `check.rs` came with `OwnHarness.md`.
+Twelve when this section was written; `engine.rs`, `check.rs` and `standin.rs` came with
+`OwnHarness.md`.
 
 | Module | Owns | Decides / does not decide |
 |---|---|---|
-| `main.rs` | Wiring: two plugins, state init, 24 `invoke_handler` commands, six dev switches | Nothing else |
+| `main.rs` | Wiring: two plugins, state init, 24 `invoke_handler` commands, eight dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
 | `harness.rs` | The ACP connection: one thread, one `omp … acp` process, one conversation, a 5,000-event ring, pending approval responders | What the harness reported; never what a provider is or whether a model is good |
@@ -264,6 +266,7 @@ Twelve when this section was written; `engine.rs` and `check.rs` came with `OwnH
 | `backups.rs` | The fallback order, in the form of the harness's settings | The order, not the switching — the harness moves on and re-sends by itself |
 | `engine.rs` | Which Oh-my-pi runs: the built-in one (beside Null's executable, or a newer checked one that `/update` fetched into the support folder), or the user's own by the `harness` setting; the commands `harnesses`, `set_harness` and `update_harness` | Which program, never what it does |
 | `check.rs` | Test-only: the harness check, with a stand-in provider and a throwaway folder (`cargo test -- --ignored`) | Whether a version answers as Null needs; nothing at run time |
+| `standin.rs` | The stand-in provider: a server on this Mac that answers by the model's name (`ok`, `limit`, `auth`, `noaccess`) in three ways of talking; used by the check, and by a scripted run of the app with `NULL_MINI_STANDIN` | What a provider would send; never a real provider, and never a file among the user's own |
 | `providers.rs` | `omp usage --json --redact` (15 s limit, 60 s cache) set beside the model list | What is left; never an account name |
 | `signin.rs` | `omp login` on ordinary pipes: its list, its lines, its questions in, answers out | Nothing about provider semantics and nothing about steps having run |
 | `access.rs` | Full Disk Access: a file only it unlocks, one ask, then the user's decision | That macOS asks folder by folder, not whether the user agrees |
@@ -414,6 +417,21 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 | Voice build | `bun run build`, `bun run build:web` |
 | Frontend checks | `bun run typecheck`, `bun run check`, `bun run ci` |
 | Backend checks | `just test`, `just check-python` or venv pytest/Ruff |
+
+**Scripted runs of the app itself.** `NULL_MINI_FOLDER=<path>` runs the app on a folder of its
+own, made if missing: the harness's folder (`agent/`), its MCP definitions, Null's own files and
+the log (`null/`) are all under it, no `--profile` is passed, and removing the folder removes the
+run. A new one is a Mac with nothing signed in. `NULL_MINI_STANDIN=1` offers the stand-in provider
+(`Mini/src/standin.rs`, the one the harness check uses) in that folder, on a free port, as
+`standin-<anthropic|openai|codex>/<ok|limit|auth|noaccess>`. It refuses to start without a folder
+and never overwrites a `models.yml` it did not write. Then `NULL_MINI_SMOKE` with
+`NULL_MINI_SMOKE_MODEL` (the harness alone), `NULL_MINI_SELFTEST` (the real page; choose the model
+beforehand with `{"model":"standin-anthropic/ok"}` in the folder's `null/settings.json`) or
+`NULL_MINI_UPDATES=file://…` (a made-up `Engine.toml` for `/update`). The older
+`NULL_MINI_PROFILE=null-probe` still works and still reads the owner's MCP definitions.
+`NULL_MINI_SELFTEST` waits for a reply, so a typed command such as `/update` never ends it: start
+the app in the background, wait for the log line, and stop it by its process id. A local model
+server on the Mac is still found on a folder of its own: here, Ollama's `llama3.2`.
 
 CI runs the frontend typecheck and web build, and since 2026-10-09 Null's unit tests and harness check on a Mac runner whenever `Mini/` changes (`.github/workflows/null.yml`). Python behavior is not run. Voice has no
 frontend behavioral suite and only a manual system-audio Rust integration test. Python tests mix
