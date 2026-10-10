@@ -165,7 +165,9 @@ where it is removed.
     (item 8) then opens an issue with a link, and a person opens the pull request with one
     click. It is one fewer thing a job is allowed to do.
 12. **Whether the README offers the one-line install.** Yes, as recommended, on the same
-    word: the command installed the owner's own Null on 2026-10-10 (item 6).
+    word: the command installed the owner's own Null on 2026-10-10 (item 6). Done the same day:
+    the README's second step is now "Install", with the command as text to copy under the
+    card, building from a clone beside it, and the release page gives the command too.
 
 ## Work items
 
