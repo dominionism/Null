@@ -4,6 +4,13 @@
 # already there and right are left alone, so this is safe to run before every build.
 #
 #   Mini/Scripts/engine
+#
+# Or move Null to another version of Oh-my-pi. That version is fetched and asked what
+# Null depends on (the harness check, Mini/src/check.rs), beside the version Null carries
+# now. Only when every question passes is Engine.toml written and the new program put
+# in place. Otherwise nothing changes.
+#
+#   Mini/Scripts/engine --to 18.8.7
 set -eu
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -11,18 +18,29 @@ toml="$here/Engine.toml"
 engine="$here/Engine"
 releases="https://github.com/can1357/oh-my-pi/releases/download"
 
-# What Engine.toml says for one name: the version, or a file's checksum.
+# What Engine.toml says for one name: the version, or a file's checksum. A second
+# word names another copy of the file to read.
 pinned() {
-	sed -n "s/^\"\{0,1\}$1\"\{0,1\}[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$toml" | head -n 1
+	sed -n "s/^\"\{0,1\}$1\"\{0,1\}[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "${2:-$toml}" | head -n 1
 }
 
 checksum() {
 	shasum -a 256 "$1" | cut -d ' ' -f 1
 }
 
-# Fetch one file of the release, under the name the build wants, unless the right one is
-# already there. The checksum it has to match is the one in Engine.toml, never one that
-# was downloaded beside it.
+# Fetch one file of a release: the version, its name there, and where to put it.
+download() {
+	echo "Fetching $2 from Oh-my-pi $1"
+	# shellcheck disable=SC2086 # one option per word
+	if ! curl --fail --location --retry 3 $progress --output "$3" "$releases/v$1/$2"; then
+		echo "Oh-my-pi $1 has no $2 to fetch." >&2
+		exit 1
+	fi
+}
+
+# Fetch one file of the version Null carries, under the name the build wants, unless
+# the right one is already there. The checksum it has to match is the one in
+# Engine.toml, never one that was downloaded beside it.
 fetch() {
 	want=$(pinned "$1")
 	if [ -z "$want" ]; then
@@ -32,9 +50,7 @@ fetch() {
 	if [ -f "$engine/$2" ] && [ "$(checksum "$engine/$2")" = "$want" ]; then
 		return
 	fi
-	echo "Fetching $1 from Oh-my-pi $version"
-	# shellcheck disable=SC2086 # one option per word
-	curl --fail --location --retry 3 $progress --output "$engine/$2.part" "$releases/v$version/$1"
+	download "$version" "$1" "$engine/$2.part"
 	got=$(checksum "$engine/$2.part")
 	if [ "$got" != "$want" ]; then
 		rm -f "$engine/$2.part"
@@ -45,6 +61,73 @@ fetch() {
 	fi
 	mv "$engine/$2.part" "$engine/$2"
 }
+
+# Write one line of Engine.toml again: a name, and the value it has now.
+rewrite() {
+	sed "s/^\(\"\{0,1\}$1\"\{0,1\} = \)\"[^\"]*\"/\1\"$2\"/" "$toml.next" > "$toml.line"
+	mv "$toml.line" "$toml.next"
+}
+
+# Try another version, and move Null to it only if it passes the harness check.
+move_to() {
+	next=${1#v}
+	if [ "$next" = "$version" ]; then
+		echo "Null already carries Oh-my-pi $version."
+		return
+	fi
+	trial="$engine/Trial"
+	rm -rf "$trial"
+	mkdir -p "$trial"
+	for name in SHA256SUMS.txt LICENSE THIRD-PARTY-NOTICES.txt "$published"; do
+		download "$next" "$name" "$trial/$name"
+	done
+	# A download that is not the file its own release lists is never run.
+	for name in LICENSE THIRD-PARTY-NOTICES.txt "$published"; do
+		listed=$(sed -n "s/^\([0-9a-f]\{64\}\)[[:space:]]\{1,\}$name\$/\1/p" "$trial/SHA256SUMS.txt")
+		if [ "$listed" != "$(checksum "$trial/$name")" ]; then
+			echo "$name is not the file the release of Oh-my-pi $next lists, so that version was not tried." >&2
+			exit 1
+		fi
+	done
+	chmod +x "$trial/$published"
+
+	echo "Asking Oh-my-pi $next what Null depends on"
+	if ! (cd "$here" && NULL_MINI_ENGINE="$trial/$published" cargo test -- --ignored); then
+		echo "Oh-my-pi $next did not pass the harness check, so Null stays on $version." >&2
+		echo "The version that was tried is in $trial." >&2
+		exit 1
+	fi
+
+	cp "$toml" "$toml.next"
+	rewrite version "$next"
+	for name in LICENSE THIRD-PARTY-NOTICES.txt "$published"; do
+		rewrite "$name" "$(checksum "$trial/$name")"
+		if [ "$(pinned "$name" "$toml.next")" != "$(checksum "$trial/$name")" ]; then
+			rm -f "$toml.next"
+			echo "$toml has no line for $name to write the new checksum on, so nothing was changed." >&2
+			exit 1
+		fi
+	done
+	mv "$toml.next" "$toml"
+	mv "$trial/$published" "$engine/$program"
+	mv "$trial/LICENSE" "$trial/THIRD-PARTY-NOTICES.txt" "$engine/"
+	rm -rf "$trial"
+	echo "Null now carries Oh-my-pi $next: Engine.toml names it. Build and install to use it."
+}
+
+case "${1:-}" in
+"") ;;
+--to)
+	if [ -z "${2:-}" ]; then
+		echo "--to needs a version, as in: Mini/Scripts/engine --to 18.8.7" >&2
+		exit 1
+	fi
+	;;
+*)
+	echo "usage: Mini/Scripts/engine [--to <version>]" >&2
+	exit 1
+	;;
+esac
 
 version=$(pinned version)
 if [ -z "$version" ]; then
@@ -78,4 +161,8 @@ chmod +x "$engine/$program"
 fetch LICENSE LICENSE
 fetch THIRD-PARTY-NOTICES.txt THIRD-PARTY-NOTICES.txt
 
-echo "Oh-my-pi $version is in $engine."
+if [ "${1:-}" = "--to" ]; then
+	move_to "$2"
+else
+	echo "Oh-my-pi $version is in $engine."
+fi
