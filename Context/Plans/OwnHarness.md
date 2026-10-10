@@ -8,8 +8,8 @@
 > Oh-my-pi and starts that one, and `/harness` chooses between it and the owner's own. Items 3, 4,
 > 5 and 10 are built and merged, and the owner's Mac runs them since 2026-10-10: what a harness
 > can do, the harness check, the first opening, and `/update`. The carried version is 18.8.7.
-> On the installed build the owner has used `/harness` and `/update`; a message is still to be
-> sent (see Verification). Item 6 is
+> On the installed Null 0.1.1 the owner has sent a message and used `/harness` and `/update`
+> (see Verification). Item 6 is
 > mostly done: GitHub builds a ready-made Null, Null 0.1.0 and 0.1.1 are released, and the owner's
 > Null was installed from each on 2026-10-10 with the one-line command, signed here and still
 > holding Full Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
@@ -288,8 +288,9 @@ where it is removed.
    - Risk: a check that is itself wrong hides a feature that works. Know it by: unit tests on the
      noting, and item 4 running the same questions against two real versions.
    - Source: inferred from codebase (`translate::reply_failed`, `providers.rs`, `signin.rs`).
-   - Status: In progress. Built, checked by script, merged and installed (2026-10-09); not yet
-     checked by the owner's hand
+   - Status: Complete (2026-10-10). Built, checked by script, merged and installed; on the
+     installed Null 0.1.1 the owner's message started their own Oh-my-pi and the log carried
+     the line about what that harness can do
    - **Built:** `translate::abilities`, and one line in the log at the first conversation of
      each harness version met in a run: "what this harness can do: a list of 19 models; says
      which model is in use when asked through thinking; loads a conversation back". Whatever
@@ -327,8 +328,7 @@ where it is removed.
      bad sign-in as the very first reply is marked. The 15 live checks still pass. `/harness`
      drawn again with its line of explanation, which goes when the list is put away.
    - **Not proven:** a harness that really lacks one of these, since none exists to try and
-     the unit tests stand in for it; the `/usage` line on such a harness; the installed app,
-     by the owner's hand.
+     the unit tests stand in for it; the `/usage` line on such a harness.
 
 4. **The harness check**
    - What: `Mini/tests/harness.rs`, run with `cargo test -- --ignored` against the built-in
@@ -808,8 +808,12 @@ where it is removed.
   each at 18.8.7; `/update` said "already on the newest checked Oh-my-pi, 18.8.7" and nothing
   about a newer Null, as 0.1.1 is the newest. The owner did not say whether the line "built in
   stays until Null is updated. yours follows omp update" was under the list.
-- By hand, the owner, still owed on that build: one message answered. The log holds no message
-  since Null 0.1.1 started.
+- By hand, the owner, on the same build a little later (2026-10-10, 01:18): one message, answered.
+  The log: "starting the user's own harness", "harness ready: omp 18.8.7", "what this harness
+  can do: a list of 82 models; says which model is in use when asked through thinking; loads a
+  conversation back", the earlier conversation loaded back, and "reply ended: completed". The
+  setting was on "yours", so the owner's own Oh-my-pi answered. On this build the built-in one
+  has answered only in the scripted runs.
 - By hand, the owner, once the first opening is installed: the box does not open by itself,
   and the log says "a provider is signed in, so there is no first opening". On a Mac user
   account that has never had Null: the box opens by itself with the sign-in list, a sign-in
