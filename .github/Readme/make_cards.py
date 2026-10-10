@@ -441,8 +441,8 @@ def development(c):
            "cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a "
            "stand-in provider, one of which reaches a real provider with a dummy key. "
            "NULL_MINI_ENGINE=<path> runs them on another Oh-my-pi, and Mini/Scripts/engine --to "
-           "<version> moves Null to that version only if they pass. Repository CI checks the Voice "
-           "frontend and web build, not Mini/.")
+           "<version> moves Null to that version only if they pass. Repository CI runs both on a Mac "
+           "runner whenever Mini/ changes, beside the Voice frontend typecheck and web build.")
 
 
 def dev_switches(c):
