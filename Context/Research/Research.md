@@ -262,7 +262,7 @@ Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and 
 
 | Module | Owns | Decides / does not decide |
 |---|---|---|
-| `main.rs` | Wiring: two plugins, state init, 24 `invoke_handler` commands, eight dev switches | Nothing else |
+| `main.rs` | Wiring: two plugins, state init, 24 `invoke_handler` commands, nine dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
 | `harness.rs` | The ACP connection: one thread, one `omp … acp` process, one conversation, a 5,000-event ring, pending approval responders | What the harness reported; never what a provider is or whether a model is good |
