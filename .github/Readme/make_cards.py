@@ -443,7 +443,9 @@ def development(c):
     c.command("cargo tauri build            # app bundle, no installation")
     c.note("Use cargo tauri, not bunx tauri: the latter names a different npm package. "
            "cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a "
-           "stand-in provider, one of which reaches a real provider with a dummy key. "
+           "stand-in provider, one of which reaches a real provider with a dummy key. With them "
+           "runs the key check, which opens the box for a few seconds, signs in with a marked "
+           "dummy key and searches Null's log and settings for it. "
            "NULL_MINI_ENGINE=<path> runs them on another Oh-my-pi, and Mini/Scripts/engine --to "
            "<version> moves Null to that version only if they pass. Repository CI runs both on a Mac "
            "runner whenever Mini/ changes, beside the Voice frontend typecheck and web build.")
@@ -454,7 +456,7 @@ def dev_switches(c):
         ("EXIT_WHEN_READY=1", "Exit after the page loads; no prompt is sent"),
         ("NO_SHORTCUT=1", "Show at startup without claiming Control+Space"),
         ("SMOKE=\"<text>\"", "Send a real harness prompt, log the reply, exit without a window; also SMOKE_MODEL and SMOKE_STOP_AFTER (seconds)"),
-        ("SELFTEST=\"<text>\"", "Send through the real page, log its output, exit"),
+        ("SELFTEST=\"<text>\"", "Type into the real page, a line at a time, each once the page has stopped working: a message, a command, a choice from a list, an answer to a sign-in. Then log what the page shows and exit"),
         ("PROFILE=<name>", "Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files"),
         ("BACKUPS=\"m/one,m/two\"", "Override the backup order for this run without changing the saved order"),
         ("UPDATES=<address>", "Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address"),

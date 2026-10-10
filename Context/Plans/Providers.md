@@ -9,8 +9,9 @@
 > and the harness can move to another model by itself, which is now the design (decision 4). That
 > is built and installed (item 7): `/backup` sets the order, a switch and a failed reply are said
 > in the box, and the owner's order is Claude Opus 5.5, then DeepSeek V4.1 Flash. `/usage` is
-> built and installed too (item 8). No real limit has been seen yet. Not started: first run, and
-> the rest.**
+> built and installed too (item 8). No real limit has been seen yet. The first run moved to
+> `OwnHarness.md`, item 5, and is built there. Item 9, keys, is proven by a test (2026-10-09). Not
+> started: saying it for other people (item 10).**
 
 ## Goal
 
@@ -476,7 +477,32 @@ then let's go with that." Each recommendation was looked at again against the de
    - Risk: a key reaching the log or the settings file. Know it by: a test that searches both after
      a sign-in with a marked dummy key.
    - Source: specified from user + decision 1.
-   - Status: Not started
+   - Status: Complete (2026-10-09), on the branch `key-proof`, not merged. Nothing is built for a
+     key that is only in the environment, and nothing is needed (below)
+   - **The field:** already there since item 5. While a sign-in is at its steps the field hides
+     what is typed, and nothing typed then is drawn in the box.
+   - **The proof:** `Mini/tests/keys.rs`, run with the live checks (`cargo test -- --ignored`).
+     It starts the real app on a folder of its own, has it type `/login`, choose DeepSeek and
+     type a marked key that is no key, which DeepSeek refuses. Then it searches everything Null
+     printed, which is also its log and what the page showed, and every file Null keeps (the
+     log, the settings, the settings it hands the harness) for the mark. It opens the box on
+     the screen for a few seconds and reaches DeepSeek once.
+   - **What made it possible:** `NULL_MINI_SELFTEST` now types into the real page a line at a
+     time, each once the page has stopped working, so a command, a choice from a list and an
+     answer to a sign-in can follow one another. Before, it sent one message and waited for a
+     reply, so a typed command never ended it.
+   - **Proven:** the test passes. With a line put into `signin_answer` on purpose that logged
+     what was typed, it failed with "the key is in what Null printed", and the line was taken
+     out again. By hand, the same run printed the harness's own lines ("Paste your DeepSeek API
+     key (sk-...):", "Validating API key...") and the mark was in no file under the run's
+     folder.
+   - **A key only in the environment:** seen on 2026-10-09 with a made-up `ANTHROPIC_API_KEY`:
+     the harness then lists that provider's models, with no account in its usage report. Null
+     passes its own environment on to the harness and does nothing else with it. A Null started
+     at login does not have the variables of a terminal, so such a key reaches it only if the
+     person puts it in the harness's own settings. Nothing in Null reads, shows or keeps it.
+   - **Not covered:** a sign-in that succeeds, since that needs a real key; a browser sign-in's
+     pasted code, which takes the same path as a key.
 
 10. **Say it for other people**
     - What: a README section on what Null needs (Oh-my-pi), how sign-in works, that sign-ins live
