@@ -19,6 +19,9 @@ pub struct Settings {
     pub session: Option<String>,
     /// Whether Null has already sent the user to switch on Full Disk Access. It asks once.
     pub asked_full_disk: bool,
+    /// Whether Null has looked, at a start, at whether any provider is signed in, and
+    /// opened by itself to say so when none was. It does that once.
+    pub welcomed: bool,
     /// The models to carry on with when the one in use stops answering, in the order to try them.
     pub backups: Vec<String>,
     /// The user's own Oh-my-pi, by its path, when they chose it over the one Null carries
@@ -150,6 +153,7 @@ mod tests {
             model: Some("a/b".into()),
             session: Some("s1".into()),
             asked_full_disk: true,
+            welcomed: true,
             backups: vec!["c/d".into()],
             harness: Some("/opt/own/omp".into()),
             counts_tokens: Some("18.8.7".into()),
