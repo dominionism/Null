@@ -25,9 +25,14 @@ pub const LABEL: &str = "mini";
 // Sizing contract with Page/index.html. The window is the box plus the
 // transparent margin its shadow is drawn in: 16 px each side, 8 px above, 24 px
 // below. The page measures its box and asks for `box height + 32`. Change the
-// `.box` margin or any height in the page's CSS and these three must follow.
+// `.box` margin or any height in the page's CSS and these must follow. With the
+// pet beside the box the window is wider on its left, by `LANE`.
 /// The 584 px box plus 16 px each side.
 const WIDTH: f64 = 616.0;
+/// What the pet adds to the window, on its left: with the pet the box starts
+/// 62 px in (4 px, the pet's 48, and 10 between them) where it otherwise starts
+/// 16 px in.
+const LANE: f64 = 46.0;
 /// The idle box (44 px) plus 8 px above and 24 px below.
 const HEIGHT: f64 = 76.0;
 /// The tallest the box gets (2 border + 42 row + 212 transcript + 26 notice = 282) plus 32.
@@ -48,11 +53,52 @@ fn reachable(position: (i32, i32), screens: &[Screen]) -> bool {
     })
 }
 
+/// How much wider the window is for the pet: `LANE` while it shows, nothing when
+/// it has been put away.
+fn lane(app: &AppHandle) -> f64 {
+    if settings::get(app).pet.unwrap_or(true) {
+        LANE
+    } else {
+        0.0
+    }
+}
+
+// The remembered position is the corner the window has without the pet, which is
+// what it was before there was one. So the box stands where it was left whether
+// the pet shows or not, and a position saved by an older Null still means the
+// same place. These two go between that corner and the window's own.
+
+/// Where the window's corner goes for the box to stand at the remembered `corner`.
+fn with_lane(corner: (i32, i32), lane: f64, scale: f64) -> (i32, i32) {
+    (corner.0 - (lane * scale).round() as i32, corner.1)
+}
+
+/// The corner to remember for a window whose own corner is at `window`.
+fn without_lane(window: (i32, i32), lane: f64, scale: f64) -> (i32, i32) {
+    (window.0 + (lane * scale).round() as i32, window.1)
+}
+
+/// How many physical pixels a logical one is on the screen that holds `position`.
+fn scale_at(window: &WebviewWindow, position: (i32, i32)) -> f64 {
+    window
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .find(|monitor| {
+            let (x, y, size) = (monitor.position().x, monitor.position().y, monitor.size());
+            position.0 >= x && position.0 < x + size.width as i32 && position.1 >= y && position.1 < y + size.height as i32
+        })
+        .map(|monitor| monitor.scale_factor())
+        .or_else(|| window.scale_factor().ok())
+        .unwrap_or(1.0)
+}
+
 /// Build the window, hidden, and turn it into a non-activating panel.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
+    let lane = lane(app);
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("Null")
-        .inner_size(WIDTH, HEIGHT)
+        .inner_size(WIDTH + lane, HEIGHT)
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
@@ -67,7 +113,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .visible(false)
         .build()?;
 
-    place(&window, settings::get(app).position);
+    place(&window, settings::get(app).position, lane);
 
     match window.to_panel() {
         Ok(panel) => {
@@ -102,8 +148,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Put the window where it was left, or centred a little above the middle of the screen.
-fn place(window: &WebviewWindow, saved: Option<(i32, i32)>) {
+/// Put the box where it was left, or centred a little above the middle of the screen.
+/// The pet's `lane` is to the left of that.
+fn place(window: &WebviewWindow, saved: Option<(i32, i32)>, lane: f64) {
     let screens: Vec<Screen> = window
         .available_monitors()
         .unwrap_or_default()
@@ -111,11 +158,14 @@ fn place(window: &WebviewWindow, saved: Option<(i32, i32)>) {
         .map(|monitor| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height))
         .collect();
     if let Some(position) = saved.filter(|position| reachable(*position, &screens)) {
-        let _ = window.set_position(PhysicalPosition::new(position.0, position.1));
+        let corner = with_lane(position, lane, scale_at(window, position));
+        let _ = window.set_position(PhysicalPosition::new(corner.0, corner.1));
         return;
     }
     if let (Ok(Some(monitor)), Ok(outer)) = (window.current_monitor(), window.outer_size()) {
-        let x = monitor.position().x + (monitor.size().width as i32 - outer.width as i32) / 2;
+        // The box is what is centred, not the box and the pet together.
+        let lane = (lane * monitor.scale_factor()).round() as i32;
+        let x = monitor.position().x + (monitor.size().width as i32 - (outer.width as i32 - lane)) / 2 - lane;
         let y = monitor.position().y + (monitor.size().height as f64 * 0.28) as i32;
         let _ = window.set_position(PhysicalPosition::new(x, y));
     }
@@ -158,8 +208,11 @@ pub fn hide(app: &AppHandle, why: &'static str) {
             return;
         }
         // Remember where the user left the box.
-        if let Some(position) = handle.get_webview_window(LABEL).and_then(|window| window.outer_position().ok()) {
-            settings::update(&handle, |settings| settings.position = Some((position.x, position.y)));
+        if let Some(window) = handle.get_webview_window(LABEL) {
+            if let Ok(position) = window.outer_position() {
+                let corner = without_lane((position.x, position.y), lane(&handle), window.scale_factor().unwrap_or(1.0));
+                settings::update(&handle, |settings| settings.position = Some(corner));
+            }
         }
         panel.order_out(None);
         log!("hidden ({why})");
@@ -190,11 +243,37 @@ pub fn hide_box(app: AppHandle) {
 
 /// The page grows with the reply. Keep the top-left corner where it is.
 #[tauri::command]
-pub fn resize(window: WebviewWindow, height: f64) {
+pub fn resize(app: AppHandle, window: WebviewWindow, height: f64) {
     let position = window.outer_position();
-    let _ = window.set_size(LogicalSize::new(WIDTH, height.clamp(HEIGHT, MAX_HEIGHT)));
+    let _ = window.set_size(LogicalSize::new(WIDTH + lane(&app), height.clamp(HEIGHT, MAX_HEIGHT)));
     if let Ok(position) = position {
         let _ = window.set_position(position);
+    }
+}
+
+/// Whether the pet shows. The page asks when it loads.
+#[tauri::command]
+pub fn pet(app: AppHandle) -> bool {
+    settings::get(&app).pet.unwrap_or(true)
+}
+
+/// `/pet` in the box: show the pet or put it away. The window grows or shrinks on
+/// its left, so the box stays where it is.
+#[tauri::command]
+pub fn set_pet(app: AppHandle, window: WebviewWindow, on: bool) {
+    let before = lane(&app);
+    settings::update(&app, |settings| settings.pet = Some(on));
+    let after = lane(&app);
+    log!("the pet is {}", if on { "shown" } else { "put away" });
+    if after == before {
+        return;
+    }
+    let scale = window.scale_factor().unwrap_or(1.0);
+    if let (Ok(position), Ok(size)) = (window.outer_position(), window.inner_size()) {
+        let corner = with_lane(without_lane((position.x, position.y), before, scale), after, scale);
+        let height = (size.height as f64 / scale).clamp(HEIGHT, MAX_HEIGHT);
+        let _ = window.set_size(LogicalSize::new(WIDTH + after, height));
+        let _ = window.set_position(PhysicalPosition::new(corner.0, corner.1));
     }
 }
 
@@ -237,6 +316,16 @@ mod tests {
     fn a_position_left_on_a_screen_that_is_gone_is_not_kept() {
         assert!(!reachable((-1500, 300), &[LAPTOP]));
         assert!(!reachable((3000, 300), &[LAPTOP]));
+    }
+
+    #[test]
+    fn the_box_stands_where_it_was_left_with_the_pet_or_without() {
+        // A position an older Null saved, on a screen with two pixels to the point.
+        let saved = (958, 322);
+        let window = with_lane(saved, LANE, 2.0);
+        assert_eq!(window, (866, 322), "the window starts further left, by the pet's lane");
+        assert_eq!(without_lane(window, LANE, 2.0), saved, "and the same place is remembered");
+        assert_eq!(with_lane(saved, 0.0, 2.0), saved, "with the pet put away the window is as it always was");
     }
 
     #[test]

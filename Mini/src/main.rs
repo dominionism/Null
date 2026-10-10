@@ -104,6 +104,8 @@ fn main() {
             quit,
             panel::hide_box,
             panel::resize,
+            panel::pet,
+            panel::set_pet,
             harness::send,
             harness::interrupt,
             harness::respond,
