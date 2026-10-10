@@ -25,7 +25,7 @@
 
 <a id="small-surface-real-agent"></a>
 <p align="center">
-  <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Press Control+Space from the app you are in: your tools, not just chat; your providers in one conversation; readable without getting bigger; today, a standalone macOS text app installed with one command." />
+  <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Press Control+Space from the app you are in: your tools, not just chat; your providers in one conversation; readable without getting bigger; today, a standalone macOS text app with a small pet beside it, installed with one command." />
 </p>
 
 <a id="get-started"></a>
@@ -74,12 +74,12 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="use-null"></a>
 <p align="center">
-  <img src=".github/Readme/use-null.svg" width="100%" alt="Use Null: Control+Space shows or hides the box, Enter sends or chooses, Esc closes or hides, Ctrl+C stops the reply or quits when idle, the up arrow recalls the last prompt, dragging moves the box." />
+  <img src=".github/Readme/use-null.svg" width="100%" alt="Use Null: Control+Space shows or hides the box, Enter sends or chooses, Esc closes or hides, Ctrl+C stops the reply or quits when idle, the up arrow recalls the last prompt, dragging moves the box, and the pet beside the box shows what the agent is doing." />
 </p>
 
 <a id="commands"></a>
 <p align="center">
-  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /new and /quit, with what each does and what an unknown command does." />
+  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /attach, /history, /pet, /new and /quit, with what each does and what an unknown command does." />
 </p>
 
 <a id="when-a-provider-stops-answering"></a>
@@ -89,7 +89,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="privacy-and-permissions"></a>
 <p align="center">
-  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, the shortcut needs no Accessibility permission, Null passes on OMP's approval setting, whose default lets the agent act without asking, and Full Disk Access is a separate choice asked after the first reply." />
+  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, an attached file travels as its path and Null reads none of its content, the shortcut needs no Accessibility permission, Null passes on OMP's approval setting, whose default lets the agent act without asking, and Full Disk Access is a separate choice asked after the first reply." />
 </p>
 
 <a id="signing-and-permission-persistence"></a>
@@ -99,7 +99,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="what-null-keeps"></a>
 <p align="center">
-  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
+  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, history.json with a title for each conversation made in the box, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
 </p>
 
 <a id="under-the-hood"></a>
@@ -109,7 +109,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="source-map"></a>
 <p align="center">
-  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
+  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
 </p>
 
 <p align="center">

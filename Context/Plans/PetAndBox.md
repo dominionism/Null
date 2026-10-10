@@ -441,12 +441,37 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
    - What: `/grill` for the new words (pet, attach, history). The README's commands. The
      research map (`Research.md`): the new modules, commands and events.
    - Depends on: 6.
-   - Status: Not started
+   - Status: In progress. The README is done (2026-10-10); the glossary and the research map
+     are not
+   - **Done, the README:** its cards now say the three commands and what a mistyped one gets,
+     the pet, that an attached file travels as its path and that Null reads none of its
+     content, the titles Null keeps in `history.json`, and the two new source files. The pet,
+     attaching and history moved from "planned" to "available", with the note that they still
+     wait for hands-on use.
    - **Known to be behind once this lands:** `Research.md` (24 commands become 32; the events
      `conversation_opened` and `mini:attached`; 15 live tests become 18; `history.json` among
      the files Null keeps; the modules `attach.rs` and `history.rs`; the window's width). The
      glossary's Conversation line, by decision 7. The line about what a harness can do, quoted
      in `OwnHarness.md` item 3, which now also says "lists earlier conversations".
+
+8. **Null 0.2.0: tried by the owner first, then released**
+   - What, in this order, as the owner agreed on 2026-10-10 ("Go", to the order below):
+     1. The version is set to 0.2.0 in `Mini/Cargo.toml` and `Mini/tauri.conf.json`, and the
+        README is brought up to date (item 7). The number publishes nothing; only a tag does.
+     2. `main` is built on the owner's Mac and installed over Null 0.1.1 with
+        `Mini/Scripts/install`. The owner uses it.
+     3. Whatever the owner's hands and eyes find is mended on `main`.
+     4. The tag `null-v0.2.0` is pushed on `main`. GitHub builds and publishes the release, and
+        the owner installs from it, so as to end on what everyone else gets.
+   - Why: nobody has used these four things by hand, four decisions wait for the owner's eye
+     (3, 4, 6 and 7), and a release is public. 0.2.0 and not 0.1.2, since it adds a pet and two
+     features.
+   - Depends on: 6.
+   - Risk: what the owner tries is built on this Mac, not by GitHub. Know it by: step 4, which
+     ends on GitHub's build. Also, an installed 0.2.0 will not see `/update` say that 0.2.0 is
+     out, so that proof (`OwnHarness.md`, item 7) waits for the release after this one.
+   - Source: specified from user.
+   - Status: In progress. Step 1 is done (2026-10-10)
 
 ## Verification
 
