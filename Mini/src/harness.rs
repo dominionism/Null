@@ -34,7 +34,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
-use crate::{backups, panel, providers, settings};
+use crate::{access, backups, panel, providers, settings};
 
 /// The harness this app drives. One for now; the name is also its CLI.
 pub const HARNESS: &str = "omp";
@@ -330,14 +330,19 @@ pub fn extra_args() -> Vec<String> {
     }
 }
 
-/// Carry the approval mode the user set for the terminal into the protocol, which ignores it.
-fn launch_args(binary: &Path) -> Vec<String> {
+/// What the harness is set to do about approvals: "always-ask", "write", or
+/// "yolo", which lets the agent act without asking. None when it does not say.
+pub fn approval_mode(binary: &Path) -> Option<String> {
     let output = std::process::Command::new(binary).args(extra_args()).args(["config", "get", "tools.approvalMode"]).output();
     let mode = output.ok().map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string()).unwrap_or_default();
-    if matches!(mode.as_str(), "always-ask" | "write" | "yolo") {
-        vec!["--approval-mode".into(), mode]
-    } else {
-        Vec::new()
+    matches!(mode.as_str(), "always-ask" | "write" | "yolo").then_some(mode)
+}
+
+/// Carry the approval mode the user set for the terminal into the protocol, which ignores it.
+fn launch_args(binary: &Path) -> Vec<String> {
+    match approval_mode(binary) {
+        Some(mode) => vec!["--approval-mode".into(), mode],
+        None => Vec::new(),
     }
 }
 
@@ -493,6 +498,10 @@ impl Conversation<'_> {
                                 publish(&app, &shared, json!({ "type": "status_change", "status": "ready", "reason": null }));
                                 publish(&app, &shared, json!({ "type": "message_done", "stop_reason": reason }));
                                 finish(&shared);
+                                // The user has now seen Null answer: the moment to ask for Full Disk Access.
+                                if !failed && reason == "completed" {
+                                    access::after_reply(&app);
+                                }
                                 let _ = order(&app.state::<Harness>(), Command::CheckModel);
                             }
                             Err(error) => fail_reply(&app, &shared, error_event(&error)),

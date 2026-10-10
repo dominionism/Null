@@ -301,6 +301,7 @@ pub fn signin_providers(app: AppHandle) -> Result<Vec<Provider>, String> {
     if providers.is_empty() {
         return Err(format!("{} did not list any providers", harness::HARNESS_NAME));
     }
+    log!("the sign-in list was read: {} providers", providers.len());
     Ok(providers)
 }
 

@@ -51,7 +51,7 @@
 
 <a id="step-3-open-the-box"></a>
 <p align="center">
-  <img src=".github/Readme/step-open.svg" width="100%" alt="3. Open the box: Control+Space opens it, /login adds a provider, /model chooses one of its models, then type your request; no terminal has to stay running." />
+  <img src=".github/Readme/step-open.svg" width="100%" alt="3. Open the box: the first time, with no provider signed in, it opens by itself with the sign-in list; Control+Space opens it, /login adds a provider, /model chooses one of its models, then type your request; no terminal has to stay running." />
 </p>
 
 <a id="uninstall"></a>
@@ -76,7 +76,7 @@
 
 <a id="privacy-and-permissions"></a>
 <p align="center">
-  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, the shortcut needs no Accessibility permission, and Full Disk Access is a separate choice." />
+  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, the shortcut needs no Accessibility permission, Null passes on OMP's approval setting, whose default lets the agent act without asking, and Full Disk Access is a separate choice asked after the first reply." />
 </p>
 
 <a id="signing-and-permission-persistence"></a>
@@ -96,7 +96,7 @@
 
 <a id="source-map"></a>
 <p align="center">
-  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, engine.rs, providers.rs, signin.rs and backups.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs, each with what it owns." />
+  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
 </p>
 
 <p align="center">

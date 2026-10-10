@@ -18,6 +18,10 @@
 > and how the app is run by script was added under the commands table, with the two switches and
 > the file (`standin.rs`) that were added the same day. Nothing else was traced again.
 
+> Fifth addition, 2026-10-09: the first opening (`welcome.rs`, the event `mini:welcome`, the setting
+> `welcomed`) and Full Disk Access moving to after the first reply were written in where they belong,
+> by the session that built them.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -253,7 +257,7 @@ not produced by a run made for this section.
 
 ### The files in `Mini/src/`, and what each decides
 
-Twelve when this section was written; `engine.rs`, `check.rs` and `standin.rs` came with
+Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and `welcome.rs` came with
 `OwnHarness.md`.
 
 | Module | Owns | Decides / does not decide |
@@ -269,7 +273,8 @@ Twelve when this section was written; `engine.rs`, `check.rs` and `standin.rs` c
 | `standin.rs` | The stand-in provider: a server on this Mac that answers by the model's name (`ok`, `limit`, `auth`, `noaccess`) in three ways of talking; used by the check, and by a scripted run of the app with `NULL_MINI_STANDIN` | What a provider would send; never a real provider, and never a file among the user's own |
 | `providers.rs` | `omp usage --json --redact` (15 s limit, 60 s cache) set beside the model list | What is left; never an account name |
 | `signin.rs` | `omp login` on ordinary pipes: its list, its lines, its questions in, answers out | Nothing about provider semantics and nothing about steps having run |
-| `access.rs` | Full Disk Access: a file only it unlocks, one ask, then the user's decision | That macOS asks folder by folder, not whether the user agrees |
+| `access.rs` | Full Disk Access: a file only it unlocks, one ask after the first reply that ended well, then the user's decision | That macOS asks folder by folder, not whether the user agrees |
+| `welcome.rs` | The first opening: at a start, once (`welcomed`), it reads the usage report, and with no account in it opens the box and sends `mini:welcome` | Whether anyone is signed in, by the harness's report alone; never which provider, and not whether a model is local |
 | `settings.rs` | `settings.json` in the app config dir; `NULL_MINI_PROFILE` suffixes the app's own file names | Only where the box was and what was last open |
 | `markdown.rs` | Markdown → the JSON tree the `layout` command returns | Part kinds, not drawing |
 | `log.rs` | One line per event, to stderr and `~/Library/Logs/Null/mini.log` | Nothing |
@@ -316,7 +321,9 @@ Events: `mini:event` carries `user_message`, `text_delta` (`{text, thinking}`), 
 `status_change` (`running` / `needs_input` / `ready` / `blocked`), `approval_request`,
 `message_done`, `model_changed`, `model_switched`, `reply_failed`, `error`, each with a running `seq`
 so a reloaded page catches up through `events_since`. `mini:signin` carries the sign-in's lines,
-questions and `done`; `mini:shown` means focus and catch up; `mini:notice` carries the
+questions and `done`; `mini:welcome` (`{freely}`) is the first opening: the page says no provider is
+signed in, opens the sign-in list, and when that is over says whether the agent acts without asking;
+`mini:shown` means focus and catch up; `mini:notice` carries the
 shortcut-unavailable line or the Full Disk Access line, sent from `page_ready` because the page loads
 after the app has already tried both.
 
@@ -359,7 +366,8 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
   and account access. Null does not need a new harness for each model vendor.
 - **Null conversation:** OMP transcript + saved session ID; one active turn, bounded in-memory UI
   events. Not a Voice `Capture`, not a narration session, not a herdr pane.
-- **Null settings:** position, chosen model, session ID, one-time Full Disk Access ask, backup order,
+- **Null settings:** position, chosen model, session ID, one-time Full Disk Access ask, whether the
+  first opening has happened, backup order,
   the user's own harness when chosen, and the harness version last seen to count tokens.
   Stored under the bundle's application-support directory; profile-specific settings/overlay names
   isolate development state. OMP remains transcript/credential owner.
@@ -431,7 +439,11 @@ beforehand with `{"model":"standin-anthropic/ok"}` in the folder's `null/setting
 `NULL_MINI_PROFILE=null-probe` still works and still reads the owner's MCP definitions.
 `NULL_MINI_SELFTEST` waits for a reply, so a typed command such as `/update` never ends it: start
 the app in the background, wait for the log line, and stop it by its process id. A local model
-server on the Mac is still found on a folder of its own: here, Ollama's `llama3.2`.
+server on the Mac is still found on a folder of its own: here, Ollama's `llama3.2`. A new folder has
+no account, so the first opening happens on it; put `"welcomed": true` in the folder's
+`null/settings.json` to run without it. The page's states are drawn and read back with a scratch
+tool that loads `Page/index.html` in a web view with the app's commands replaced by stand-ins; that
+tool is not in the repo (`ConversationDisplay.md`, item 1).
 
 CI runs the frontend typecheck and web build, and since 2026-10-09 Null's unit tests and harness check on a Mac runner whenever `Mini/` changes (`.github/workflows/null.yml`). Python behavior is not run. Voice has no
 frontend behavioral suite and only a manual system-audio Rust integration test. Python tests mix
@@ -481,8 +493,10 @@ profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.j
 - `/login` has owner-reported success. `/backup`, `/usage`, latest layout/selection/sideways-scroll
   feel and real account-limit behavior are not fully owner-proven. Existing fallback proof used
   stand-in providers; no real quota exhaustion is established.
-- No first-run installation/sign-in guidance, `/logout`, active-sign-in timeout, content policy,
-  checked-in visual harness or public Null/provider setup documentation is complete. The input is
+- The first opening is built and proven by script only (`OwnHarness.md`, item 5): no real sign-in
+  has gone through it and no fresh Mac account has seen it. No one-command install, `/logout`,
+  active-sign-in timeout, content policy, checked-in visual harness or public Null/provider setup
+  documentation is complete. The input is
   already masked; `Providers.md` item 9's remaining secret-residue proof must not be mistaken for
   absence of the mask.
 - Full terminal parity is an objective, not a theorem: the original ACP spike reported a skills

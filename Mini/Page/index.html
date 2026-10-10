@@ -583,6 +583,7 @@
       let picker = null; // { models, current, shown, index, backups, spent, left } while a list is open; usage or harness says which other list
       const running = new Set(); // the tool calls under way
       let signin = null; // { stage: 'choose' | 'steps', providers, shown, index, before, cancelled } during /login
+      let welcome = null; // { freely } from the first opening until its sign-in is over
       const toolLines = new Map(); // call id → { row, block }
 
       // ── Display ────────────────────────────────────────────────────────
@@ -1357,6 +1358,17 @@
         fit();
       };
 
+      // The first opening is over, however its sign-in went: say what a newcomer
+      // has to know before the agent does anything for them.
+      const endWelcome = (signedIn) => {
+        if (!welcome) return;
+        const { freely } = welcome;
+        welcome = null;
+        unnotice();
+        if (!signedIn) line('note', 'no provider is signed in. /login signs in');
+        if (freely) line('note', 'the agent may act without asking you first');
+      };
+
       const endSignin = () => {
         signin = null;
         input.type = 'text';
@@ -1372,6 +1384,7 @@
       const cancelSignin = () => {
         if (signin.stage === 'choose') {
           endSignin();
+          endWelcome(false);
           return;
         }
         signin.cancelled = true;
@@ -1387,6 +1400,7 @@
         } catch (error) {
           line('error', `could not start a sign-in: ${error}`);
           mark('');
+          endWelcome(false);
           return;
         }
         signin = { stage: 'choose', providers, shown: [], index: 0, before: null, cancelled: false };
@@ -1398,11 +1412,17 @@
         drawSignin();
       };
 
-      // The providers whose models the box can reach now, or null when that cannot be told.
+      // The providers whose models the box can reach now, and the provider of the
+      // model in use. Null when that cannot be told.
       const reachable = async () => {
         try {
           const listed = await invoke('models');
-          return new Set(listed.models.map((model) => model.provider).filter(Boolean));
+          const inUse = listed.models.find((model) => model.id === listed.current);
+          return {
+            providers: new Set(listed.models.map((model) => model.provider).filter(Boolean)),
+            current: listed.current || null,
+            currentProvider: (inUse && inUse.provider) || null,
+          };
         } catch (error) {
           return null;
         }
@@ -1415,6 +1435,7 @@
         pick.textContent = '';
         input.value = '';
         input.type = 'password';
+        if (welcome) unnotice(); // the first opening's words were about choosing
         line('note', `signing in to ${provider.label}. esc cancels`);
         mark('working');
         const before = await reachable();
@@ -1473,18 +1494,40 @@
         // Over. When it failed, the harness has already said why.
         const { before, cancelled } = signin;
         endSignin();
+        let added = [];
+        let after = null;
         if (cancelled) {
           line('note', 'sign-in cancelled');
         } else if (said.ok) {
           // Check the result, not the steps: is the provider's model list there now?
           mark('working');
-          const after = await reachable();
+          after = await reachable();
           mark(busy ? 'working' : '');
-          const added = before && after ? [...after].filter((provider) => !before.has(provider)) : [];
-          if (added.length) line('note', `signed in. new under /model: ${added.join(', ')}`);
-          else if (before && after) line('note', 'the sign-in finished, but no new provider appeared under /model');
-          else line('note', 'the sign-in finished');
+          added = before && after ? [...after.providers].filter((provider) => !before.providers.has(provider)) : [];
+          const names = added.join(', ');
+          if (!added.length) line('note', before && after ? 'the sign-in finished, but no new provider appeared under /model' : 'the sign-in finished');
+          else if (!after.current) line('note', `signed in to ${names}`);
+          else if (added.includes(after.currentProvider)) line('note', `signed in to ${names}. now on ${after.current}`);
+          // The harness keeps a conversation on the model it had, which may be a small local one.
+          else line('note', `signed in to ${names}. still on ${after.current}. /model changes it`);
         }
+        const first = !!welcome;
+        endWelcome(added.length > 0);
+        // A newcomer who had only a local model is still on it. Show the new provider's models.
+        if (first && added.length && after.current && !added.includes(after.currentProvider)) openPicker(added[0]);
+      });
+
+      // The first opening. Nothing is signed in, so the app has opened the box by
+      // itself, this once: say so, and show the harness's sign-in list.
+      listen('mini:welcome', (message) => {
+        welcome = { freely: !!(message.payload && message.payload.freely) };
+        // The user got there first and is in the middle of something: only say it.
+        if (signin || picker || busy) {
+          endWelcome(false);
+          return;
+        }
+        notice('no provider is signed in. choose one, or esc for later', true);
+        openSignin();
       });
 
       const send = async (text) => {

@@ -42,6 +42,7 @@ mod shortcut;
 mod signin;
 mod standin;
 mod translate;
+mod welcome;
 
 use log::log;
 use tauri::Emitter;
@@ -50,6 +51,7 @@ use tauri::Emitter;
 #[tauri::command]
 fn page_ready(app: tauri::AppHandle) {
     log!("page ready");
+    welcome::page_ready();
     if std::env::var_os("NULL_MINI_EXIT_WHEN_READY").is_some() {
         app.exit(0);
     }
@@ -135,15 +137,20 @@ fn main() {
                 return Ok(());
             }
             panel::create(handle)?;
-            if std::env::var_os("NULL_MINI_NO_SHORTCUT").is_some() {
+            let no_shortcut = std::env::var_os("NULL_MINI_NO_SHORTCUT").is_some();
+            if no_shortcut {
                 log!("Control+Space is off for this run (NULL_MINI_NO_SHORTCUT)");
                 panel::show(handle);
             } else {
                 shortcut::start(handle);
-                // Not on a scripted start-up check, which must leave the user's settings alone.
-                if std::env::var_os("NULL_MINI_EXIT_WHEN_READY").is_none() {
-                    access::check(handle);
-                }
+            }
+            // The first opening and the Full Disk Access question belong to a person's
+            // run. A scripted one leaves the user's settings alone, unless it has a
+            // folder of its own, where both can be tried.
+            let startup_check = std::env::var_os("NULL_MINI_EXIT_WHEN_READY").is_some();
+            if !startup_check && (!no_shortcut || settings::own_folder().is_some()) {
+                welcome::check(handle);
+                access::at_start(handle);
             }
             Ok(())
         })

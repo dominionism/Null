@@ -165,7 +165,7 @@ fn remembered(app: &AppHandle) -> Option<Vec<ProviderState>> {
 
 /// Run the harness's usage report and read it. None when there is no report to
 /// read; nothing of what the harness printed is logged.
-fn read_report(binary: &Path, extra: &[String]) -> Option<Vec<ProviderState>> {
+pub fn read_report(binary: &Path, extra: &[String]) -> Option<Vec<ProviderState>> {
     let mut command = Command::new(binary);
     command.args(extra).args(["usage", "--json", "--redact"]);
     let printed = signin::run_briefly(command, REPORT_TIME_LIMIT).ok()?;
