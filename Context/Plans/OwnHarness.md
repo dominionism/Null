@@ -4,8 +4,12 @@
 > `Context/Plans/Providers.md` (sign-in, limits and backups). It reverses decision 3 of
 > `Providers.md` and takes over its item 6, first run.
 >
-> Status: **Not started. Planned from facts checked on this Mac and on Oh-my-pi's release page
-> the same day; they are listed below.**
+> Status: **Items 1 and 2 are built and installed (2026-10-09), and pass their scripted checks:
+> Null carries Oh-my-pi 18.4.3 and starts that one, and `/harness` chooses between it and the
+> owner's own. Proven by the owner on the installed app the same day: messages answered by the
+> built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
+> kept. Still owed: the way back to the built-in one, and `omp update` in the terminal changing
+> nothing in Null. Not started: items 3 to 9.**
 
 ## Goal
 
@@ -52,7 +56,8 @@ was touched; the two-version test used throwaway folders.
 
 | Question | Finding |
 |---|---|
-| How Oh-my-pi is published | Tagged releases, each with a ready-made program for every system (`omp-darwin-arm64` is 190 MB, `omp-darwin-x64` 200 MB), a `SHA256SUMS.txt`, a `LICENSE` and third-party notices |
+| How Oh-my-pi is published | Tagged releases, each with a ready-made program for every system, a `SHA256SUMS.txt`, a `LICENSE` and third-party notices. For 18.4.3, `omp-darwin-arm64` is 214 MB and `omp-darwin-x64` 226 MB (corrected 2026-10-09 from the release page; 18.8.7's `omp-darwin-arm64` is 200 MB) |
+| Who signed the Mac program | Its author, with an Apple Developer ID, and Apple has notarized it (`spctl`: "Notarized Developer ID", Can Boluk). Found 2026-10-09 while building item 1 |
 | How often | Several releases a day: 18.8.7 on 2026-10-09, 18.8.5 and 18.8.6 the day before. Older versions stay available; 18.4.3 is still there |
 | Licence | MIT. Shipping a copy is allowed with its licence and notices |
 | The Oh-my-pi on this Mac | Byte for byte the published 18.4.3 Mac program: its checksum matches the release's |
@@ -102,10 +107,13 @@ where it is removed.
    one `npm install`. No download from a web page, no store, and no Apple account. An earlier
    draft of this plan proposed an Apple Developer account; the owner rejected it.
 2. **The first version to carry: 18.4.3.** Everything Null does was checked against it.
-   Recommended over 18.8.7; item 4 is what moves it forward safely.
-3. **Apple Silicon first.** An Intel copy of the harness is another 200 MB. Recommended: Apple
-   Silicon only until someone asks.
-4. **The name of the command** that shows and chooses the harness. Proposed: `/harness`.
+   Recommended over 18.8.7; item 4 is what moves it forward safely. Built as recommended on
+   2026-10-09; the owner has not yet said, and changing it is one line of `Mini/Engine.toml`.
+3. **Apple Silicon first.** An Intel copy of the harness is another 226 MB. Recommended: Apple
+   Silicon only until someone asks. Built as recommended on 2026-10-09; the owner has not yet
+   said.
+4. **The name of the command** that shows and chooses the harness. Proposed: `/harness`. Built
+   under that name on 2026-10-09; the owner has not yet said.
 5. **This reverses decision 3 of `Providers.md`** ("It does not download or run an installer").
    The owner asked for it on 2026-10-09; to be written as an ADR (item 9).
 
@@ -124,7 +132,30 @@ where it is removed.
      program. Know it by: the installed app starting the built-in harness and answering.
    - Source: researched (the releases, checksums and licence above) + codebase
      (`Mini/Scripts/install`, `tauri.conf.json`).
-   - Status: Not started
+   - Status: Complete (2026-10-09)
+   - **Proven by the owner (2026-10-09):** two messages sent in the installed app were answered.
+     The log: "starting the built-in harness: /Applications/Null.app/Contents/MacOS/omp",
+     "harness ready: omp 18.4.3", and both replies ended `completed`. Afterwards the inner
+     program still had the checksum of `Engine.toml` and the app still verified.
+   - **Built:** `Mini/Engine.toml` (the version, and a checksum for the program, the licence and
+     the notices); `Mini/Scripts/engine`; `Mini/Engine/` ignored by `Mini/.gitignore`;
+     `bundle.externalBin` and `bundle.resources` in `tauri.conf.json`; `Mini/Scripts/install`
+     runs the script first.
+   - **Added to the plan's "What":** `Mini/build.rs` stops a build that has no program in
+     `Mini/Engine/` and says to run `Mini/Scripts/engine`. Without it Tauri says only that a
+     path does not exist. So `cargo build` and `cargo test` in `Mini/` need the script run once.
+   - **Proven without a person:** the script fetched the three files in 9 seconds, and the
+     program is byte for byte the published one and the one in `~/.omp/bin`. A second run
+     fetches nothing. In a scratch copy: a wrong checksum is refused and the file not kept; a
+     program changed on disk is replaced; a file with no checksum line stops the script. The
+     built app is 217 MB and holds `Contents/MacOS/omp` with the checksum of `Engine.toml`, and
+     the licence and notices under `Contents/Resources/Engine/`.
+   - **The risk, as it turned out:** Tauri and the install script both leave the inner program
+     as published, with its author's signature (see the table above); the install script signs
+     the outer app only, and its seal then covers the inner program. On the installed app
+     (2026-10-09): signed by "Null Local Signing", `codesign --verify --deep --strict` passes,
+     the inner program has the checksum of `Engine.toml` and runs, and Full Disk Access is
+     still on.
 
 2. **Run the built-in harness, and let a technical person choose their own**
    - What: `harness::installed()` looks first beside Null's own program, then in `Mini/Engine/`
@@ -141,7 +172,39 @@ where it is removed.
    - Risk: the built-in harness replacing itself. It looks for updates by default. Know it by:
      item 4 checks that the program's checksum is the same after a run.
    - Source: specified from user + codebase + verified locally.
-   - Status: Not started
+   - Status: In progress. Built, installed and used by the owner (2026-10-09); the way back to
+     the built-in harness and the `omp update` check are still to be seen
+   - **Proven by the owner (2026-10-09):** `/harness` in the installed app listed "built in" and
+     "yours". Choosing "yours" let the built-in harness go; the log then shows "the harness is
+     now /Users/abdulwahid/.omp/bin/omp, version 18.4.3", "starting the user's own harness",
+     the same conversation loaded back, and a reply that ended `completed`. `harness.yml` held
+     the update check off and the owner's backup order, and `backups.yml` was gone.
+   - **Built:** `Mini/src/engine.rs` decides which program runs: the owner's own when the
+     setting `harness` holds a path that can be run, else the one beside Null's own program,
+     else, with a line in the log, one found where it was looked for before. It reads the
+     version Null carries from `Engine.toml` and asks each program for its own. The commands
+     `harnesses` and `set_harness`, and `/harness` in the page: "built in" and "yours" with the
+     version, the path of the owner's own, and "not checked with Null" for any version other
+     than the carried one; choosing says so in one line. `harness.rs` writes `harness.yml`
+     (the update check off, then the backup order) at every start and removes the old
+     `backups.yml`. The log says "starting the built-in harness" or "starting the user's own
+     harness".
+   - **Deviation:** nothing looks in `Mini/Engine/` for a development run. The build already
+     puts the program beside the debug app (`target/debug/omp`). Only the tests look there,
+     because a test is a program in another folder.
+   - **Deviation:** the live checks (`cargo test -- --ignored`) run the carried program and no
+     longer the one in `~/.omp/bin`.
+   - **Proven without a person:** 56 unit tests and 3 live checks. The app itself, under the
+     probe profile against the stand-in provider of `Providers.md` item 2: the built-in harness
+     started and answered; with the setting naming a downloaded 18.8.7, that one started and
+     answered; back on the built-in 18.4.3, the conversation 18.8.7 had made was loaded back
+     and answered. `harness.yml` held the update check off, alone and beside a backup order.
+     The program's checksum was the same after a run. A message typed into the real page of
+     the debug app was answered through the built-in harness. Nine states of `/harness` drawn
+     in the app's web engine with stand-in data and read back.
+   - **Not proven:** choosing "built in" again from the owner's own (the log of 2026-10-09 ends
+     on the owner's own, and the setting still names it); `omp update` in the terminal changing
+     nothing in Null.
 
 3. **Find out what the harness can do, and lose one feature at a time**
    - What: at the first start of a harness Null notes, in the log and in memory: its version;
@@ -268,8 +331,8 @@ where it is removed.
   the two versions were four small steps apart. If versions far apart cannot share a folder, the
   owner's fallback is a folder of Null's own: one more sign-in, with skills and MCP servers still
   there.
-- What this plan costs: Null grows from 12 MB to about 200 MB, and Null takes on moving the
-  harness forward. Item 4 is what makes that safe and item 8 is what makes it cheap.
+- What this plan costs: Null grows from 12 MB to 217 MB (measured 2026-10-09), and Null takes
+  on moving the harness forward. Item 4 is what makes that safe and item 8 is what makes it cheap.
 
 ## Out of scope
 
