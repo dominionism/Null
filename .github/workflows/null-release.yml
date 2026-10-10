@@ -107,8 +107,18 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/null-v')
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          NAME: ${{ steps.version.outputs.name }}
+          CARRIED: ${{ steps.pack.outputs.carried }}
+        # The page says what the file is for: someone who downloads it with a browser is
+        # stopped by macOS, and should know why and what to do.
         run: |
+          cat > "$RUNNER_TEMP/notes.md" <<NOTES
+          Null $VERSION for Apple Silicon Macs, macOS 13 or later, with Oh-my-pi $CARRIED inside.
+
+          This file is what an installer fetches. macOS stops an app that was downloaded through a web browser and carries no Apple certificate, so it is not meant to be installed from this page. To install Null today, clone the repository and run \`Mini/Scripts/install\`, as the README says.
+          NOTES
           gh release create "$GITHUB_REF_NAME" \
-            "$RUNNER_TEMP/out/${{ steps.version.outputs.name }}.zip" "$RUNNER_TEMP/out/SHA256SUMS.txt" \
-            --title "Null ${{ steps.version.outputs.version }}" \
-            --notes "Null ${{ steps.version.outputs.version }} for Apple Silicon Macs, macOS 13 or later, with Oh-my-pi ${{ steps.pack.outputs.carried }} inside."
+            "$RUNNER_TEMP/out/$NAME.zip" "$RUNNER_TEMP/out/SHA256SUMS.txt" \
+            --title "Null $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md"
