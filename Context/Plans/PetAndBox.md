@@ -471,7 +471,30 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
      ends on GitHub's build. Also, an installed 0.2.0 will not see `/update` say that 0.2.0 is
      out, so that proof (`OwnHarness.md`, item 7) waits for the release after this one.
    - Source: specified from user.
-   - Status: In progress. Step 1 is done (2026-10-10)
+   - Status: In progress. Steps 1 and 2 are done (2026-10-10); the owner's own use is next
+   - **Step 1:** pull request #34. `main` says 0.2.0 and the README is up to date. The unit
+     tests, the harness check and the page check passed on it.
+   - **Step 2, the install:** `Mini/Scripts/install` on `main` at `94b4f39`. The owner had quit
+     Null from the box a little before, so no reply was cut off. Afterwards: the app in
+     `/Applications` says 0.2.0; its seal holds and it has the designated requirement it had
+     before, so macOS knows it as the same app; the Oh-my-pi inside has the checksum of
+     `Engine.toml`; the login item reports it running; the log says "started, version 0.2.0"
+     and "Full Disk Access is on"; and the keychain list is as it was.
+   - **Not proven by the install:** anything the owner has to see or do, starting with whether
+     the box stands where it was left now that the pet has its room beside it.
+   - **Step 3, what the owner's use turned up:**
+     - **A row's highlight, from edge to edge** (owner, 2026-10-10: "when I am hovering over an
+       item, would it be possible if the lightish highlight goes all the way through left and
+       right instead of noticable border-radiused container over the hovered item?"). Built the
+       same day: in every list the highlight, under the pointer or chosen with the keys, is a
+       band from the box's left edge to its right, measured at both (63 and 645 px of the
+       window, which are the box's own inner edges). The words of a row start where they did.
+       One thing followed from it: a list long enough to scroll kept a lane for its scroll bar,
+       which stopped the band 10 px short. So lists draw no scroll bar now and fade at the end
+       where there is more, as the conversation does, and the chosen row is kept clear of the
+       fade. That mended an older fault on the way: the chosen row was scrolled to before the
+       rows after it were drawn, so with the keys it always came to rest against the list's
+       very end. Decided by the agent, and the owner may want the scroll bar back.
 
 ## Verification
 
