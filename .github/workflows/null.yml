@@ -1,0 +1,53 @@
+name: Null
+
+# Null's own tests, whenever Null changes: on any branch that is pushed, so that each pushed
+# version says whether it works, and on pull requests from forks, which a push here does not cover.
+on:
+  push:
+    paths:
+      - "Mini/**"
+      - ".github/workflows/null.yml"
+  pull_request:
+    paths:
+      - "Mini/**"
+      - ".github/workflows/null.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    # A branch of this repository is already tested by its push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    # Null is a macOS app, and the Oh-my-pi it carries is fetched for Apple Silicon.
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./Mini -> target"
+
+      - name: Keep the carried Oh-my-pi between runs
+        uses: actions/cache@v4
+        with:
+          path: Mini/Engine
+          key: null-engine-${{ hashFiles('Mini/Engine.toml') }}
+
+      # The build takes Oh-my-pi into the app, so nothing compiles without it. The script
+      # keeps a file only if its checksum is the one in Mini/Engine.toml.
+      - name: Fetch the Oh-my-pi that Null carries
+        run: Mini/Scripts/engine
+
+      - name: Unit tests
+        working-directory: Mini
+        run: cargo test
+
+      # The live checks start the real Oh-my-pi against a stand-in provider. A hosted
+      # runner has few cores, so they take turns four at a time.
+      - name: Harness check
+        working-directory: Mini
+        run: cargo test -- --ignored --test-threads=4
