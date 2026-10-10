@@ -18,6 +18,11 @@
     "active": true,
     "targets": ["app"],
     "icon": ["Icons/32x32.png", "Icons/128x128.png", "Icons/128x128@2x.png", "Icons/icon.icns"],
+    "externalBin": ["Engine/omp"],
+    "resources": {
+      "Engine/LICENSE": "Engine/LICENSE",
+      "Engine/THIRD-PARTY-NOTICES.txt": "Engine/THIRD-PARTY-NOTICES.txt"
+    },
     "macOS": {
       "minimumSystemVersion": "13.0"
     }

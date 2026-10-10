@@ -1,0 +1,81 @@
+#!/bin/sh
+# Bring the Oh-my-pi that Null carries into Mini/Engine/, where the build takes it from.
+# Mini/Engine.toml names the version and the checksum of each file. Files that are
+# already there and right are left alone, so this is safe to run before every build.
+#
+#   Mini/Scripts/engine
+set -eu
+
+here=$(cd "$(dirname "$0")/.." && pwd)
+toml="$here/Engine.toml"
+engine="$here/Engine"
+releases="https://github.com/can1357/oh-my-pi/releases/download"
+
+# What Engine.toml says for one name: the version, or a file's checksum.
+pinned() {
+	sed -n "s/^\"\{0,1\}$1\"\{0,1\}[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$toml" | head -n 1
+}
+
+checksum() {
+	shasum -a 256 "$1" | cut -d ' ' -f 1
+}
+
+# Fetch one file of the release, under the name the build wants, unless the right one is
+# already there. The checksum it has to match is the one in Engine.toml, never one that
+# was downloaded beside it.
+fetch() {
+	want=$(pinned "$1")
+	if [ -z "$want" ]; then
+		echo "$toml has no checksum for $1." >&2
+		exit 1
+	fi
+	if [ -f "$engine/$2" ] && [ "$(checksum "$engine/$2")" = "$want" ]; then
+		return
+	fi
+	echo "Fetching $1 from Oh-my-pi $version"
+	# shellcheck disable=SC2086 # one option per word
+	curl --fail --location --retry 3 $progress --output "$engine/$2.part" "$releases/v$version/$1"
+	got=$(checksum "$engine/$2.part")
+	if [ "$got" != "$want" ]; then
+		rm -f "$engine/$2.part"
+		echo "$1 is not the file Null chose, so it was not kept." >&2
+		echo "  checksum in Engine.toml: $want" >&2
+		echo "  checksum of the download: $got" >&2
+		exit 1
+	fi
+	mv "$engine/$2.part" "$engine/$2"
+}
+
+version=$(pinned version)
+if [ -z "$version" ]; then
+	echo "$toml names no version." >&2
+	exit 1
+fi
+
+# Oh-my-pi's name for this Mac's program, and the name the build looks for: Tauri wants
+# a program it takes into the app to end in Rust's name for the kind of Mac.
+case "$(uname -s) $(uname -m)" in
+"Darwin arm64")
+	published="omp-darwin-arm64"
+	program="omp-aarch64-apple-darwin"
+	;;
+*)
+	echo "Null carries Oh-my-pi for Apple Silicon Macs only, for now." >&2
+	exit 1
+	;;
+esac
+
+# A bar for a person watching, nothing but errors otherwise.
+if [ -t 2 ]; then
+	progress="--progress-bar"
+else
+	progress="--silent --show-error"
+fi
+
+mkdir -p "$engine"
+fetch "$published" "$program"
+chmod +x "$engine/$program"
+fetch LICENSE LICENSE
+fetch THIRD-PARTY-NOTICES.txt THIRD-PARTY-NOTICES.txt
+
+echo "Oh-my-pi $version is in $engine."
