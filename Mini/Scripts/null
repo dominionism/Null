@@ -1,0 +1,191 @@
+#!/bin/sh
+# Null, for people who do not build it. Fetch the Null that was built for a release, check
+# it, sign it if this Mac has Null's signing identity, put it in /Applications, make it start
+# at login, and start it. And take it away again.
+#
+#   null install          the newest release
+#   null install 0.1.0    that release
+#   null uninstall
+#
+# It needs nothing but macOS: no Rust, no developer tools, no Node. An Apple Silicon Mac with
+# macOS 13 or later. From a clone it is Mini/Scripts/null; without one:
+#
+#   curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null | sh -s install
+#
+# Two switches are for trying it, and change nothing on the Mac but one folder:
+#   NULL_TRY_IN=<folder>     put the app there, not in /Applications, and leave the login
+#                            item, the signing and any Null that is running alone
+#   NULL_RELEASES=<address>  where releases are fetched from, in place of GitHub: a folder,
+#                            as a file:// address, that holds null-v<version>/ with the files
+set -eu
+
+repo="dominionism/Null"
+app="Null.app"
+identifier="io.github.dominionism.null-mini"
+agent="$HOME/Library/LaunchAgents/$identifier.plist"
+releases="${NULL_RELEASES:-https://github.com/$repo/releases/download}"
+try_in="${NULL_TRY_IN:-}"
+
+# macOS ties the permissions it gives an app (Full Disk Access, its questions about folders)
+# to who signed it. Signed with one certificate that stays on this Mac, the answers hold from
+# one Null to the next. The certificate is kept in a keychain file of its own, beside the
+# password that opens it. Without that keychain the app is installed as it was fetched.
+identity="Null Local Signing"
+keychain="$HOME/Library/Application Support/Null Signing/signing.keychain-db"
+
+# What the Oh-my-pi inside the app has to be: signed with a Developer ID that Apple issued,
+# as its author publishes it. Null itself has no such certificate.
+developer_id='anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
+newline='
+'
+
+fail() {
+	echo "$1" >&2
+	exit 1
+}
+
+# Put the keychain search list back as it was, and lock the signing keychain.
+restore_keychains() {
+	old=$IFS
+	IFS=$newline
+	set -f
+	# shellcheck disable=SC2086 # one keychain per line
+	security list-keychains -d user -s $searched
+	set +f
+	IFS=$old
+	security lock-keychain "$keychain" 2>/dev/null || true
+}
+
+# codesign only looks in keychains on the search list, so the signing keychain is on it while
+# this runs and off it again afterwards, whatever happens.
+sign() {
+	searched=$(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"[[:space:]]*$//')
+	if [ -z "$searched" ]; then
+		echo "The keychain search list is empty, so it could not be put back; not signing." >&2
+		return 1
+	fi
+	trap 'restore_keychains; rm -rf "$work"' EXIT
+	old=$IFS
+	IFS=$newline
+	set -f
+	# shellcheck disable=SC2086 # one keychain per line
+	security list-keychains -d user -s $searched "$keychain"
+	set +f
+	IFS=$old
+	security unlock-keychain -p "$(cat "$(dirname "$keychain")/password")" "$keychain"
+	codesign --force --sign "$identity" --keychain "$keychain" "$1"
+	restore_keychains
+	trap 'rm -rf "$work"' EXIT
+}
+
+# The newest release of Null. The repository may hold releases of other things, so the tag
+# has to be one of Null's.
+newest() {
+	curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=50" | sed -n 's/^ *"tag_name": "null-v\(.*\)",$/\1/p' | head -1
+}
+
+install() {
+	[ "$(uname -s)" = "Darwin" ] || fail "Null is a macOS app."
+	[ "$(uname -m)" = "arm64" ] || fail "This Null is built for Apple Silicon Macs; this Mac is $(uname -m)."
+	system=$(sw_vers -productVersion)
+	[ "${system%%.*}" -ge 13 ] || fail "Null needs macOS 13 or later; this Mac has $system."
+
+	version="${1:-}"
+	if [ -z "$version" ]; then
+		[ -z "${NULL_RELEASES:-}" ] || fail "With NULL_RELEASES, say which version: null install 0.1.0"
+		version=$(newest) || fail "Could not ask GitHub which Null is the newest. Say which one: null install 0.1.0"
+		[ -n "$version" ] || fail "GitHub lists no release of Null."
+	fi
+	case "$version" in
+	*[!0-9.]* | "") fail "\"$version\" is not a version. As in: null install 0.1.0" ;;
+	esac
+
+	name="Null-$version-macos-arm64"
+	from="$releases/null-v$version"
+	work=$(mktemp -d)
+	trap 'rm -rf "$work"' EXIT
+
+	# The checksum first: it is small, and without it there is no such release.
+	curl -fsSL -o "$work/SHA256SUMS.txt" "$from/SHA256SUMS.txt" 2> /dev/null || fail "There is no Null $version to fetch at $from."
+	echo "Fetching Null $version, about 100 MB."
+	curl -fL --progress-bar -o "$work/$name.zip" "$from/$name.zip" || fail "Null $version could not be fetched from $from."
+
+	# What was fetched has to be what was published, and what is inside has to be Null with
+	# the Oh-my-pi its author published. Anything else is not kept.
+	(cd "$work" && shasum -a 256 -c SHA256SUMS.txt > /dev/null 2>&1) || fail "What was fetched is not the Null $version that was published, so it was not kept."
+	ditto -x -k "$work/$name.zip" "$work"
+	[ -d "$work/$app" ] || fail "What was fetched holds no $app, so it was not kept."
+	codesign --verify --deep --strict "$work/$app" 2> /dev/null || fail "The app that was fetched is not as it was sealed, so it was not kept."
+	codesign -dv "$work/$app" 2>&1 | grep -q "^Identifier=$identifier\$" || fail "The app that was fetched is not Null, so it was not kept."
+	codesign --verify --strict -R="$developer_id" "$work/$app/Contents/MacOS/omp" 2> /dev/null || fail "The Oh-my-pi inside the app does not carry its author's signature, so the app was not kept."
+
+	if [ -n "$try_in" ]; then
+		mkdir -p "$try_in"
+		rm -rf "$try_in/$app"
+		ditto "$work/$app" "$try_in/$app"
+		echo "Null $version is in $try_in, as it was fetched. Nothing else on this Mac was changed."
+		return
+	fi
+
+	if [ -f "$keychain" ]; then
+		sign "$work/$app"
+	else
+		echo "This Mac has no signing identity for Null, so Null is installed as it was fetched."
+		echo "macOS will then ask again for what it was allowed, each time Null is updated."
+	fi
+
+	# Stop the copy that is running, if any, before replacing it.
+	launchctl bootout "gui/$(id -u)" "$agent" 2> /dev/null || true
+	pkill -x null-mini 2> /dev/null || true
+
+	installed="/Applications/$app"
+	rm -rf "$installed"
+	ditto "$work/$app" "$installed"
+
+	# Start at login.
+	mkdir -p "$(dirname "$agent")"
+	cat > "$agent" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$identifier</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$installed/Contents/MacOS/null-mini</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+</dict>
+</plist>
+PLIST
+	launchctl bootstrap "gui/$(id -u)" "$agent"
+
+	echo "Installed Null $version in /Applications and started it. Control+Space opens the box."
+	echo "If nothing happens, look in ~/Library/Logs/Null/mini.log."
+}
+
+# Stop Null, remove it from /Applications and stop it starting at login. Its settings and
+# logs are left in place.
+uninstall() {
+	if [ -n "$try_in" ]; then
+		rm -rf "$try_in/$app"
+		echo "Null is removed from $try_in."
+		return
+	fi
+	launchctl bootout "gui/$(id -u)" "$agent" 2> /dev/null || true
+	pkill -x null-mini 2> /dev/null || true
+	rm -f "$agent"
+	rm -rf "/Applications/$app"
+	echo "Null is removed. Settings stay in ~/Library/Application Support/$identifier."
+}
+
+case "${1:-}" in
+install)
+	shift
+	install "$@"
+	;;
+uninstall) uninstall ;;
+*) fail "usage: null install [version] | null uninstall" ;;
+esac
