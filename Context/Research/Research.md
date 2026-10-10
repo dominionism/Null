@@ -314,8 +314,6 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 - **`ConversationDisplay.md` items 1, 8 and 9 are not started:** the look-check harness
   (`Mini/Scripts/Look/`), the note that tells the agent about the box, and more room (which would
   move `MAX_HEIGHT` and the page's height sums).
-- **`MiniApp.md`'s file and switch lists trail the code:** they lack `providers.rs`, `signin.rs`,
-  `backups.rs`, `markdown.rs` and the fifth switch `NULL_MINI_PROFILE`.
 - **Mini has no task-runner entry.** No `justfile` recipe, and it is outside the bun workspaces
   (Rust crate only); `cargo test` in `Mini/` is manual and was run in neither pass.
 - **No other repo code depends on `Mini/`.** Outside it the only references are the plans, the
