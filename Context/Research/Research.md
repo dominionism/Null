@@ -459,8 +459,8 @@ profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.j
   lacks a durable resume index entirely. Do not use either as proof of background-task persistence.
 - Upstream Voicebox updater/branding remains in the Voice host. Root README describes Voicebox, not
   current Null; its preserved-history statement is not evidence of imported upstream history.
-- Cleanup remains unmerged. Its explicit handoff deltas still need promotion into
-  `CapitalFolders.md`; no cleanup/rebase/switch/service mutation was done during this research.
+- Cleanup remains unmerged; `CapitalFolders.md` holds its state as of 2026-10-09. No
+  cleanup/rebase/switch/service mutation was done during this research.
 
 ### Observed runtime, 2026-10-09
 
