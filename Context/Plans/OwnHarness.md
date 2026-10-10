@@ -14,8 +14,9 @@
 > holding Full Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
 > weekly check of new Oh-my-pi versions, is merged and waits for its first Monday. Item 9 is
 > done: the README, the decision record and the glossary. Item 7 is done as a typed command:
-> `/update` says when a newer Null is out. Nothing in this plan is unstarted. What is left is
-> the npm package, and what only the owner's hands and a Mac that never had Null can show.**
+> `/update` says when a newer Null is out. The npm package is deferred by the owner
+> (decision 13). What is left is what only the owner's hands and a Mac that never had Null can
+> show.**
 
 ## Goal
 
@@ -170,6 +171,10 @@ where it is removed.
     word: the command installed the owner's own Null on 2026-10-10 (item 6). Done the same day:
     the README's second step is now "Install", with the command as text to copy under the
     card, building from a clone beside it, and the release page gives the command too.
+13. **The npm package: deferred by the owner on 2026-10-10.** "Would it be possible if we
+    deferred npm for now? I have bigger things to take care of". Null is usable by other
+    people without it, through the one-line install, which needs nothing but macOS. The
+    owner has no npm account, and makes one when the npm way is wanted (item 6).
 
 ## Work items
 
@@ -516,7 +521,8 @@ where it is removed.
    - Source: specified from user + inferred.
    - Status: In progress. The ready-built Null, the release, the install command and the
      signing identity it makes are done, and the owner's Null was installed with them
-     (2026-10-10). Not started: the npm package. Not tried: a Mac that has never had Null
+     (2026-10-10). Deferred by the owner: the npm package (decision 13). Not tried: a Mac
+     that has never had Null
    - **Built:** `.github/workflows/null-release.yml`. On a Mac runner it fetches the carried
      Oh-my-pi, builds `Null.app`, seals it with no certificate (the Oh-my-pi inside keeps its
      author's signature), and packs it as `Null-<version>-macos-arm64.zip` with a
@@ -601,6 +607,14 @@ where it is removed.
      Access and its folder answers across an update when the certificate was never trusted.
      Only a person can show it: give Null a permission, install again, and see whether it is
      still there. Also not seen: macOS 13 to 15, where `codesign` may behave differently.
+   - **The npm package, for when it is taken up (not built, decision 13):** a package
+     `@dominionism/null` whose `null` command is `Mini/Scripts/null`, for Apple Silicon Macs
+     only (`os` darwin, `cpu` arm64), with an install step that runs `null install`, and a
+     `SHA256SUMS.txt` beside the script that the script trusts in place of the one it
+     fetches, which is what would vouch for the checksum. It can be proven without
+     publishing: `npm pack`, then `npm install -g --prefix <scratch>` under `NULL_TRY_IN`.
+     npm accounts are made with a username, an email address and a password; npm's own
+     documentation lists no sign-in with GitHub (read 2026-10-10).
    - **Not settled:** what vouches for the published checksum. It is fetched from the same
      release as the app, so it proves the transfer and not who published. An npm package
      would carry the checksum itself; the script trusts GitHub and the repository, as a clone
