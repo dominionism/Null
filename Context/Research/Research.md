@@ -14,6 +14,9 @@
 > in place by the session that built them: where the harness comes from, the settings file handed to
 > it, the source files and the commands. Nothing else was traced again.
 
+> Fourth addition, 2026-10-09: one sentence that still said `/update` was not built was corrected,
+> and ADR 0003 was added to the list. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -42,7 +45,8 @@ sign-in or API key is the distribution goal.
 - `OwnHarness.md` reverses one decision of `Providers.md`: **Null carries Oh-my-pi inside the app, at
   one version named in `Mini/Engine.toml`, and starts that one.** The user's own copy is used only
   when chosen with `/harness`. A newer version is let in by the harness check (`Mini/src/check.rs`,
-  `Mini/Scripts/engine --to`). Its items 5 to 10 (first opening, one-command install, `/update`) are
+  `Mini/Scripts/engine --to`), and `/update` fetches the newest checked version from the box.
+  Its items 5 to 8 (first opening, one-command install, the next Null, the weekly job) are
   not built.
 - `ConversationDisplay.md` defines the current presentation: compact black-and-white box, SF Mono,
   one reading edge, null sign beside user messages, no left-side rules, no boxes around code or
@@ -442,6 +446,9 @@ profile args, **but MCP config still comes from the ordinary `~/.omp/agent/mcp.j
 - **0002, Null Mini is its own app:** independent window, shortcut and harness connection. Voice's
   Python harness and `/mini` routes remain for prospective voice use. Its fn+Space wording predates
   the later Control+Space choice.
+- **0003, Null carries its own harness:** Oh-my-pi is inside the app at one version named in
+  `Mini/Engine.toml`, moved only after the harness check passes. It reverses decision 3 of
+  `Providers.md`.
 - Provider credential ownership and provider-agnostic presentation are settled in `Providers.md`,
   but their proposed ADRs/glossary entries are not written. Research does not create new decisions.
 

@@ -4,15 +4,12 @@
 > `Context/Plans/Providers.md` (sign-in, limits and backups). It reverses decision 3 of
 > `Providers.md` and takes over its item 6, first run.
 >
-> Status: **Items 1 and 2 are built and installed (2026-10-09), and pass their scripted checks:
-> Null carries Oh-my-pi 18.4.3 and starts that one, and `/harness` chooses between it and the
-> owner's own. Proven by the owner on the installed app the same day: messages answered by the
-> built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
-> kept, the way back to the built-in one, and `omp update` in the terminal (to 18.8.7) changing
-> nothing in Null. Item 4, the harness check, is built and passes on 18.4.3 and on 18.8.7.
-> Item 3 is built and checked by script, and not yet installed. The carried version was then
-> moved to 18.8.7 through the check; that build is not installed either. Not started: items 5
-> to 10.**
+> Status: **Items 1 and 2 are built, installed and proven by the owner (2026-10-09): Null carries
+> Oh-my-pi and starts that one, and `/harness` chooses between it and the owner's own. Items 3, 4
+> and 10 are built, merged and installed (2026-10-09, about 20:06): what a harness can do, the
+> harness check, and `/update`. The carried version is 18.8.7. That installed build has not yet
+> been checked by the owner's hand (see Verification). Item 9 is partly done: the README and the
+> decision record. Not started: items 5 to 8.**
 
 ## Goal
 
@@ -111,6 +108,10 @@ where it is removed.
 1. **How other people get Null: settled by the owner on 2026-10-09.** They clone the repo or run
    one `npm install`. No download from a web page, no store, and no Apple account. An earlier
    draft of this plan proposed an Apple Developer account; the owner rejected it.
+   **The npm package is `@dominionism/null`** (owner, 2026-10-09). The plain name `null` is taken
+   on npm by an unrelated package. Seen the same day: nothing is published under `@dominionism`
+   and this Mac is not signed in to npm. Whether that scope already belongs to an account could
+   not be seen without a sign-in; the owner needs an npm account or organisation of that name.
 2. **The first version to carry: 18.4.3.** Everything Null does was checked against it.
    Recommended over 18.8.7; item 4 is what moves it forward safely. Built as recommended on
    2026-10-09.
@@ -118,14 +119,18 @@ where it is removed.
    `Mini/Scripts/engine --to 18.8.7` fetched it, all 15 checks passed, and `Engine.toml` was
    written. The program is notarized and signed by the same author as 18.4.3. The built app is
    204 MB with the new checksum inside. It is the version the owner's terminal runs since the
-   update, so "built in" and "yours" are the same version again. Not yet installed.
+   update, so "built in" and "yours" are the same version again. Installed on 2026-10-09,
+   about 20:06.
 3. **Apple Silicon first.** An Intel copy of the harness is another 226 MB. Recommended: Apple
    Silicon only until someone asks. Built as recommended on 2026-10-09; the owner has not yet
    said.
 4. **The name of the command** that shows and chooses the harness. Proposed: `/harness`. Built
    under that name on 2026-10-09; the owner has not yet said.
 5. **This reverses decision 3 of `Providers.md`** ("It does not download or run an installer").
-   The owner asked for it on 2026-10-09; to be written as an ADR (item 9).
+   The owner asked for it on 2026-10-09; written as
+   `Context/ADR/0003-NullCarriesItsOwnHarness.md`.
+6. **How other people get a signing identity at install.** Open. Recommended: the install
+   makes one on each Mac, with one approval (item 6).
 
 ## Work items
 
@@ -238,7 +243,8 @@ where it is removed.
    - Risk: a check that is itself wrong hides a feature that works. Know it by: unit tests on the
      noting, and item 4 running the same questions against two real versions.
    - Source: inferred from codebase (`translate::reply_failed`, `providers.rs`, `signin.rs`).
-   - Status: In progress. Built and checked by script (2026-10-09); not yet installed
+   - Status: In progress. Built, checked by script, merged and installed (2026-10-09); not yet
+     checked by the owner's hand
    - **Built:** `translate::abilities`, and one line in the log at the first conversation of
      each harness version met in a run: "what this harness can do: a list of 19 models; says
      which model is in use when asked through thinking; loads a conversation back". Whatever
@@ -276,7 +282,8 @@ where it is removed.
      bad sign-in as the very first reply is marked. The 15 live checks still pass. `/harness`
      drawn again with its line of explanation, which goes when the list is put away.
    - **Not proven:** a harness that really lacks one of these, since none exists to try and
-     the unit tests stand in for it; the `/usage` line on such a harness; the installed app.
+     the unit tests stand in for it; the `/usage` line on such a harness; the installed app,
+     by the owner's hand.
 
 4. **The harness check**
    - What: `Mini/tests/harness.rs`, run with `cargo test -- --ignored` against the built-in
@@ -357,6 +364,12 @@ where it is removed.
      usage report of a real account; a folder with real sign-ins; versions further apart than
      18.4.3 and 18.8.7; the stand-in set beside a real limit (the risk above still stands);
      `--to` on a version that fails, whose "nothing changes" branch has only been read.
+   - **Added (2026-10-09):** `.github/workflows/null.yml` runs the unit tests and the harness
+     check on GitHub, on a Mac, whenever `Mini/` changes. It passed on `main` at `89f960d`.
+   - **Small things left:** `--to` takes a version number only; there is no `--to latest`. The
+     two older live checks (the sign-in list and the usage report) still use the profile
+     `null-probe` under `~/.omp`, not a throwaway folder, and the sign-in one still reaches
+     DeepSeek with a dummy key.
 
 5. **First opening, for someone who has never used it**
    - What: takes over item 6 of `Providers.md`. When no provider reports and the model list has
@@ -385,7 +398,7 @@ where it is removed.
      - First a spike, on a Mac user account that has never had Null: an app that arrives through
        npm opens with no warning from macOS. The warning is attached by web browsers to what
        they download; git and npm do not attach it. That is known in outline and unproven here.
-     - To check: whether the name `null` is free on npm, or the package needs another.
+     - The package's name is `@dominionism/null` (decision 1). The plain name `null` is taken.
    - Why: the larger half of the friction (the table above), in the two ways the owner named.
    - Depends on: 1, 2.
    - Risk: macOS refusing a ready-built app that npm put there. Know it by: the spike, before
@@ -393,6 +406,13 @@ where it is removed.
      it runs on is that Mac's own.
    - Source: specified from user + inferred.
    - Status: Not started
+   - **Gap found (2026-10-09), the owner's decision, open:** `Mini/Scripts/install` signs the
+     app only when a signing keychain is already on the Mac, and nothing makes one for someone
+     else. Their Null would be installed unsigned, and macOS ties Full Disk Access and its
+     folder answers to that exact build, so every update would ask again. Recommended: the
+     install makes a local signing identity on each Mac, with one approval. Open: how to do
+     that without a prompt the person will not understand. To try on the same fresh Mac
+     account as the spike.
 
 7. **Getting the next Null**
    - What: no mechanism of Null's own. The next version comes the way the first did: `npm update`,
@@ -400,6 +420,10 @@ where it is removed.
      once item 6 exists: the box saying, once, that a newer Null is there.
    - **Amended (owner, 2026-10-09):** the harness alone can also move forward from the box, with
      `/update` (item 10). A new Null still comes the way the first did.
+   - **Gap found (2026-10-09):** Null is version 0.1.0 everywhere and has no releases. Until
+     its version moves, the box cannot say that a newer Null is there, and the `null` line in
+     `Engine.toml` guards nothing (item 10, Limits). Not designed. The npm way of item 6
+     already needs a build for each release.
    - Depends on: 6.
    - Status: Not started
 
@@ -420,7 +444,9 @@ where it is removed.
      `Providers.md` and why. Glossary entries for harness, provider, backup and sign-in
      (`/grill`). `Providers.md` already points here from its decision 3 and its item 6.
    - Depends on: 2 for the README.
-   - Status: Not started
+   - Status: In progress. The README is done (2026-10-09, pull request #11) and the decision
+     record is written (`Context/ADR/0003-NullCarriesItsOwnHarness.md`). The glossary is not
+     written; "engine" or "harness" is the first word to settle (`/grill`)
 
 10. **`/update`: the newest checked harness, from the box**
     - **Decided (owner, 2026-10-09):** "Let's provide add a command that helps update the latest
@@ -447,8 +473,8 @@ where it is removed.
     - Open: how `Engine.toml` says which Null a version was checked with; what `/harness` calls
       a fetched program; whether `/update` also says that a newer Null is there (item 7).
     - Source: specified from user + inferred.
-    - Status: In progress. Built and proven by script in the real app (2026-10-09); not
-      installed, and not yet used by the owner
+    - Status: In progress. Built, proven by script in the real app, merged and installed
+      (2026-10-09); not yet used by the owner
     - **Built:** `/update` in the page and `update_harness` in `engine.rs`. It reads the
       repository's `Engine.toml` with the Mac's own `curl`, and moves only when that names a
       version newer than the built-in one. The fetched program is kept in
@@ -480,8 +506,8 @@ where it is removed.
       line guards nothing until Null has releases (items 6 and 7). `/update` reads `main`, so
       it offers a version as soon as a change to `Engine.toml` is merged there. There is no way
       to stop a fetch once it has begun, short of quitting.
-    - **Not proven:** the installed app; a real newer version on `main`, since none exists
-      yet; the line said when the user is on "yours".
+    - **Not proven:** the installed app, by the owner's hand; a real newer version on `main`,
+      since none exists yet; the line said when the user is on "yours".
 
 ## Verification
 
@@ -494,11 +520,15 @@ where it is removed.
 - By hand, the owner: after installing, a message is answered and the log names the built-in
   harness; skills, MCP servers and all four sign-ins are there; `omp update` in the terminal
   changes nothing in Null; `/harness` switches to the terminal's Oh-my-pi and back.
+- By hand, the owner, owed on the build installed 2026-10-09: one message answered; `/harness`
+  showing both rows as 18.8.7 with no "not checked" label, and the line "built in stays until
+  Null is updated. yours follows omp update" under the list; `/update` saying "already on the
+  newest checked Oh-my-pi, 18.8.7".
 
 ## Validation
 
 - No ADR is contradicted. One recorded decision is reversed on purpose, at the owner's word:
-  decision 3 of `Providers.md`. Item 9 writes that down.
+  decision 3 of `Providers.md`. ADR 0003 records it.
 - The rules of `Providers.md` hold: no credential rests in Null, since the folder is the
   harness's; Null still knows nothing about any one provider.
 - The order holds. Items 1 to 5 need nothing from the owner but decisions 2 to 4.
