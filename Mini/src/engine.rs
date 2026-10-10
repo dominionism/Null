@@ -21,7 +21,7 @@ use std::process::Command;
 use std::sync::Once;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 use crate::harness::{self, HARNESS, HARNESS_NAME};
 use crate::log::log;
@@ -116,7 +116,7 @@ pub fn under_test() -> PathBuf {
 /// Where a version that `/update` fetched is kept: a folder of its own in Null's
 /// support folder.
 fn fetched_dir(app: &AppHandle, version: &str) -> Option<PathBuf> {
-    Some(app.path().app_config_dir().ok()?.join(settings::folder_name("Engine")).join(version))
+    Some(settings::dir(app)?.join(settings::folder_name("Engine")).join(version))
 }
 
 /// The version `/update` fetched, and its program, while that is the built-in

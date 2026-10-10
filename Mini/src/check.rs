@@ -11,215 +11,24 @@
 //! provider. Each question gets a folder of its own, thrown away afterwards,
 //! and the provider is a stand-in on this Mac that answers by the name of the
 //! model asked for: `ok` replies, `limit` is used up, `auth` is a bad sign-in
-//! and `noaccess` is a model the account may not use. Its answers are close
-//! copies of what the three kinds of provider the owner uses send, not
-//! recordings, so the first real limit is still worth setting beside them.
+//! and `noaccess` is a model the account may not use (`standin.rs`).
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
+use crate::standin::StandIn;
 use crate::{backups, engine, harness, translate};
 
 /// How long one answer from the harness is waited for. It tries a provider that
 /// refuses several times before it gives up, which takes a quarter of a minute.
 const PATIENCE: Duration = Duration::from_secs(90);
-
-// ── The stand-in provider ─────────────────────────────────────────────────
-
-/// The three ways of talking the owner's providers use: the name in a stand-in
-/// address, and what the harness calls that way of talking.
-const KINDS: [(&str, &str); 3] = [("anthropic", "anthropic-messages"), ("openai", "openai-completions"), ("codex", "openai-codex-responses")];
-const ANSWERS: [&str; 4] = ["ok", "limit", "auth", "noaccess"];
-
-struct StandIn {
-    port: u16,
-    /// Every model a message was sent to, in order, as `kind/answer`.
-    asked: Arc<Mutex<Vec<String>>>,
-    /// Every address a harness tried to reach through the stand-in, when it was
-    /// set as that harness's way out (`Folder::behind`). Nothing is let through.
-    reached: Arc<Mutex<Vec<String>>>,
-}
-
-impl StandIn {
-    fn start() -> StandIn {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("a free port on this Mac");
-        let port = listener.local_addr().expect("the port it was given").port();
-        let (asked, reached) = (Arc::new(Mutex::new(Vec::new())), Arc::new(Mutex::new(Vec::new())));
-        let record = (asked.clone(), reached.clone());
-        std::thread::spawn(move || {
-            for stream in listener.incoming().flatten() {
-                let record = record.clone();
-                std::thread::spawn(move || answer(stream, &record.0, &record.1));
-            }
-        });
-        StandIn { port, asked, reached }
-    }
-
-    /// The file that offers the stand-in's models to a harness, as `standin-<kind>/<answer>`.
-    fn models_yml(&self) -> String {
-        let mut text = String::from("providers:\n");
-        for (kind, api) in KINDS {
-            let path = if kind == "openai" { "openai/v1" } else { kind };
-            text.push_str(&format!("  standin-{kind}:\n    baseUrl: http://127.0.0.1:{}/{path}\n    api: {api}\n    apiKey: standin-not-a-key\n    models:\n", self.port));
-            for answer in ANSWERS {
-                text.push_str(&format!("      - {{ id: {answer}, name: Stand-in {answer}, contextWindow: 128000, maxTokens: 8192 }}\n"));
-            }
-        }
-        text
-    }
-
-    fn asked(&self) -> Vec<String> {
-        self.asked.lock().unwrap().clone()
-    }
-
-    fn reached(&self) -> Vec<String> {
-        self.reached.lock().unwrap().clone()
-    }
-}
-
-/// Read one request: its method, its path and its body.
-fn read_request(stream: &mut TcpStream) -> Option<(String, String, Vec<u8>)> {
-    stream.set_read_timeout(Some(Duration::from_secs(10))).ok()?;
-    let mut reader = BufReader::new(stream);
-    let mut first = String::new();
-    reader.read_line(&mut first).ok()?;
-    let mut words = first.split_whitespace();
-    let (method, path) = (words.next()?.to_string(), words.next()?.to_string());
-    let (mut length, mut in_pieces) = (0, false);
-    loop {
-        let mut header = String::new();
-        reader.read_line(&mut header).ok()?;
-        let Some((name, value)) = header.trim_end().split_once(':') else { break };
-        match name.to_ascii_lowercase().as_str() {
-            "content-length" => length = value.trim().parse().ok()?,
-            "transfer-encoding" => in_pieces = value.to_ascii_lowercase().contains("chunked"),
-            _ => {}
-        }
-    }
-    let mut body = vec![0; length];
-    if !in_pieces {
-        reader.read_exact(&mut body).ok()?;
-        return Some((method, path, body));
-    }
-    loop {
-        let mut size = String::new();
-        reader.read_line(&mut size).ok()?;
-        let size = usize::from_str_radix(size.trim().split(';').next()?, 16).ok()?;
-        if size == 0 {
-            return Some((method, path, body));
-        }
-        let mut piece = vec![0; size + 2]; // the piece, and the line end after it
-        reader.read_exact(&mut piece).ok()?;
-        body.extend_from_slice(&piece[..size]);
-    }
-}
-
-fn answer(mut stream: TcpStream, asked: &Mutex<Vec<String>>, reached: &Mutex<Vec<String>>) {
-    let Some((method, path, body)) = read_request(&mut stream) else { return };
-    // Asked to pass a request on to somewhere else: write down where, and refuse.
-    if method == "CONNECT" || path.starts_with("http") {
-        reached.lock().unwrap().push(path);
-        let _ = stream.write_all(b"HTTP/1.1 502 Bad Gateway\r\nconnection: close\r\ncontent-length: 0\r\n\r\n");
-        return;
-    }
-    let kind = path.split('/').nth(1).unwrap_or_default();
-    let model = serde_json::from_slice::<Value>(&body).ok().and_then(|body| Some(body.get("model")?.as_str()?.to_string())).unwrap_or_default();
-    let which = model.rsplit('/').next().unwrap_or_default();
-    let (status, headers, body) = match (method.as_str(), which) {
-        ("POST", "ok" | "limit" | "auth" | "noaccess") => {
-            asked.lock().unwrap().push(format!("{kind}/{which}"));
-            reply(kind, which, &model)
-        }
-        _ => (404, Vec::new(), json!({ "error": { "message": "stand-in: nothing here", "type": "not_found" } }).to_string()),
-    };
-    let reason = match status {
-        200 => "OK",
-        401 => "Unauthorized",
-        403 => "Forbidden",
-        429 => "Too Many Requests",
-        _ => "Not Found",
-    };
-    let kind_of_body = if status == 200 { "text/event-stream" } else { "application/json" };
-    let mut head = format!("HTTP/1.1 {status} {reason}\r\nconnection: close\r\ncontent-type: {kind_of_body}\r\ncontent-length: {}\r\n", body.len());
-    for (name, value) in headers {
-        head.push_str(&format!("{name}: {value}\r\n"));
-    }
-    let _ = stream.write_all(format!("{head}\r\n{body}").as_bytes());
-}
-
-/// What a provider of this kind sends back for this answer: the status, the
-/// headers that say when to come back, and the body.
-fn reply(kind: &str, which: &str, model: &str) -> (u16, Vec<(&'static str, String)>, String) {
-    let soon = |seconds: u64| (SystemTime::now().duration_since(UNIX_EPOCH).map(|now| now.as_secs()).unwrap_or(0) + seconds).to_string();
-    let anthropic = |kind_of_error: &str, message: &str| json!({ "type": "error", "error": { "type": kind_of_error, "message": message }, "request_id": "req_standin" }).to_string();
-    let openai = |message: String, kind_of_error: &str, code: &str| json!({ "error": { "message": message, "type": kind_of_error, "param": null, "code": code } }).to_string();
-    let events = |frames: &[(&str, Value)]| frames.iter().map(|(event, data)| format!("event: {event}\ndata: {data}\n\n")).collect::<String>();
-    match (kind, which) {
-        ("anthropic", "ok") => (
-            200,
-            Vec::new(),
-            events(&[
-                ("message_start", json!({ "type": "message_start", "message": { "id": "msg_standin", "type": "message", "role": "assistant", "model": model, "content": [], "stop_reason": null, "stop_sequence": null, "usage": { "input_tokens": 10, "output_tokens": 1 } } })),
-                ("content_block_start", json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "text", "text": "" } })),
-                ("content_block_delta", json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "text_delta", "text": "pong" } })),
-                ("content_block_stop", json!({ "type": "content_block_stop", "index": 0 })),
-                ("message_delta", json!({ "type": "message_delta", "delta": { "stop_reason": "end_turn", "stop_sequence": null }, "usage": { "output_tokens": 1 } })),
-                ("message_stop", json!({ "type": "message_stop" })),
-            ]),
-        ),
-        ("anthropic", "limit") => (
-            429,
-            vec![
-                ("retry-after", "5400".into()),
-                ("anthropic-ratelimit-unified-status", "rejected".into()),
-                ("anthropic-ratelimit-unified-reset", soon(5400)),
-                ("anthropic-ratelimit-unified-5h-reset", soon(5400)),
-                ("anthropic-ratelimit-unified-7d-reset", soon(4 * 86400)),
-                ("anthropic-ratelimit-unified-representative-claim", "five_hour".into()),
-            ],
-            anthropic("rate_limit_error", "This request would exceed your account's rate limit. Please try again later."),
-        ),
-        ("anthropic", "auth") => (401, Vec::new(), anthropic("authentication_error", "invalid x-api-key")),
-        ("anthropic", _) => (403, Vec::new(), anthropic("permission_error", "Your account does not have access to this model.")),
-        ("openai", "ok") => {
-            let piece = |delta: Value, finish: Value| json!({ "id": "chatcmpl-standin", "object": "chat.completion.chunk", "created": 0, "model": model, "choices": [{ "index": 0, "delta": delta, "finish_reason": finish }] });
-            let mut last = piece(json!({}), json!("stop"));
-            last["usage"] = json!({ "prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11 });
-            (200, Vec::new(), format!("data: {}\n\ndata: {last}\n\ndata: [DONE]\n\n", piece(json!({ "role": "assistant", "content": "pong" }), Value::Null)))
-        }
-        ("openai", "limit") => (429, Vec::new(), openai("You exceeded your current quota, please check your plan and billing details.".into(), "insufficient_quota", "insufficient_quota")),
-        ("openai", "auth") => (401, Vec::new(), openai("Incorrect API key provided.".into(), "invalid_request_error", "invalid_api_key")),
-        ("openai", _) => (403, Vec::new(), openai(format!("You do not have access to model {model}."), "invalid_request_error", "model_not_found")),
-        ("codex", "limit") => (
-            429,
-            vec![
-                ("x-codex-primary-used-percent", "100".into()),
-                ("x-codex-primary-window-minutes", "300".into()),
-                ("x-codex-primary-reset-at", soon(5400)),
-                ("x-codex-secondary-used-percent", "43".into()),
-                ("x-codex-secondary-window-minutes", "10080".into()),
-                ("x-codex-secondary-reset-at", soon(4 * 86400)),
-            ],
-            json!({ "error": { "type": "usage_limit_reached", "message": "The usage limit has been reached", "plan_type": "plus", "resets_at": soon(5400).parse::<u64>().unwrap_or(0) } }).to_string(),
-        ),
-        ("codex", "auth") => (
-            401,
-            Vec::new(),
-            json!({ "error": { "message": "Your authentication token has been invalidated. Please try signing in again.", "type": "invalid_request_error", "code": "token_invalidated" } }).to_string(),
-        ),
-        // The ChatGPT sign-in has no stand-in that replies: only its refusals differ from the others.
-        _ => (403, Vec::new(), json!({ "detail": format!("The '{model}' model is not available on your plan.") }).to_string()),
-    }
-}
 
 // ── A harness, started as Null starts it ──────────────────────────────────
 

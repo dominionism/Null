@@ -302,7 +302,7 @@ pub fn own_settings(backups: Option<Value>) -> Value {
 /// the user's own Oh-my-pi settings are not touched. The text is JSON, which the
 /// harness's settings format accepts.
 fn settings_args(app: &AppHandle, binary: &Path) -> Vec<String> {
-    let Ok(dir) = app.path().app_config_dir() else { return Vec::new() };
+    let Some(dir) = settings::dir(app) else { return Vec::new() };
     let path = dir.join(settings::file_name("harness", "yml"));
     let _ = std::fs::create_dir_all(&dir);
     // The file had another name while the backup order was all it held.
@@ -318,8 +318,12 @@ fn settings_args(app: &AppHandle, binary: &Path) -> Vec<String> {
 
 /// Arguments every run of the harness gets. `NULL_MINI_PROFILE` names an isolated
 /// harness profile, so that sign-in and first-run behaviour can be checked
-/// without touching the user's real sign-ins.
+/// without touching the user's real sign-ins. A run on a folder of its own
+/// (`NULL_MINI_FOLDER`) names no profile: the folder is what keeps it apart.
 pub fn extra_args() -> Vec<String> {
+    if settings::own_folder().is_some() {
+        return Vec::new();
+    }
     match std::env::var("NULL_MINI_PROFILE") {
         Ok(profile) if !profile.is_empty() => vec!["--profile".into(), profile],
         _ => Vec::new(),
@@ -339,8 +343,12 @@ fn launch_args(binary: &Path) -> Vec<String> {
 
 /// The MCP servers the harness loads in a terminal, in the form `session/new` accepts.
 fn mcp_servers(capabilities: &Value) -> Vec<Value> {
-    let Some(home) = std::env::var_os("HOME") else { return Vec::new() };
-    let path = PathBuf::from(home).join(".omp/agent/mcp.json");
+    // A run on a folder of its own reads that folder's servers: none, unless a check put some there.
+    let path = match (settings::harness_folder(), std::env::var_os("HOME")) {
+        (Some(folder), _) => folder.join("mcp.json"),
+        (None, Some(home)) => PathBuf::from(home).join(".omp/agent/mcp.json"),
+        (None, None) => return Vec::new(),
+    };
     let Some(config) = std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str::<Value>(&text).ok()) else {
         return Vec::new();
     };
@@ -356,7 +364,11 @@ fn mcp_servers(capabilities: &Value) -> Vec<Value> {
 
 /// Where a conversation works: a folder of its own under the app's support directory.
 fn workspace(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("Workspace");
+    let dir = match settings::own_folder() {
+        Some(folder) => folder.join("null"),
+        None => app.path().app_data_dir().map_err(|e| e.to_string())?,
+    }
+    .join("Workspace");
     std::fs::create_dir_all(&dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     Ok(dir)
 }

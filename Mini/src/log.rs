@@ -9,6 +9,10 @@ static FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 fn file() -> Option<&'static PathBuf> {
     FILE.get_or_init(|| {
+        // A run on a folder of its own keeps its log there too, and out of the user's.
+        if let Some(folder) = crate::settings::own_folder() {
+            return Some(folder.join("null/mini.log"));
+        }
         let home = std::env::var_os("HOME")?;
         let dir = PathBuf::from(home).join("Library/Logs/Null");
         std::fs::create_dir_all(&dir).ok()?;
