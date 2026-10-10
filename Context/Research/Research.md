@@ -39,6 +39,19 @@ workspace selection, hands-free conversation in the user's cloned voice, and an 
 later phases. Personal use comes first; making it usable by other people with their own provider
 sign-in or API key is the distribution goal.
 
+### Deferred by the owner: name these at every recall
+
+Two tasks are put off on purpose, and the owner asked to be reminded of them at every recall,
+whichever plan is active. An agent that resumes this project names both in its orientation, until
+the owner says one is done or dropped. Their home is `Context/Plans/OwnHarness.md`, "Deferred by
+the owner".
+
+- **The npm package** (deferred 2026-10-10). Null installs with one line without it. It waits for
+  the owner to make an npm account.
+- **The trial on a Mac user account that has never had Null** (deferred 2026-10-10). Not a threat
+  to the project: every thing it would show has a fallback. Best done before many people are told
+  about Null.
+
 ### Product direction and authoritative plans
 
 - `MiniApp.md` defines the independent app, now called **Null**, opened by **Control+Space**.

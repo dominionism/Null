@@ -15,9 +15,34 @@
 > holding Full Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
 > weekly check of new Oh-my-pi versions, is merged and waits for its first Monday. Item 9 is
 > done: the README, the decision record and the glossary. Item 7 is done as a typed command:
-> `/update` says when a newer Null is out. The npm package is deferred by the owner
-> (decision 13). What is left is what only the owner's hands and a Mac that never had Null can
-> show.**
+> `/update` says when a newer Null is out. Two things are deferred by the owner, and are to be
+> named at every recall (see "Deferred by the owner"): the npm package, and the trial on a Mac
+> user account that has never had Null. Nothing else in this plan is left to build.**
+
+## Deferred by the owner
+
+Two things are put off on purpose, not forgotten. An agent that resumes this project names both
+to the owner at the start, every time, until the owner says one is done or dropped. They are kept
+here and in `Context/Research/Research.md`, which every recall reads, because the owner asked for
+a reminder "every time I perform a recall", in the plan or research artifacts and "not a random
+markdown file that is all caps on my root directory".
+
+1. **The npm package** (decision 13, item 6). Deferred on 2026-10-10: "Would it be possible if we
+   deferred npm for now? I have bigger things to take care of". Nothing depends on it: the
+   one-line install needs nothing but macOS. To take it up, the owner makes an npm account with
+   the username `dominionism` (a username, an email address and a password; npm has no sign-in
+   with GitHub), and the package is built and proven as item 6 describes.
+2. **The trial on a Mac user account that has never had Null** (decision 14, items 5 and 6).
+   Deferred on 2026-10-10: "Yes, let's defer it for later". It is not a threat to the project:
+   the install, the checks on what is fetched, the app starting and the harness answering are
+   proven and do not depend on the account, and each thing the trial would show has a fallback.
+   An install that cannot sign leaves Null unsigned and running. A permission that does not
+   hold is asked for again after an update. A box that does not open by itself leaves `/login`
+   to be typed. A Full Disk Access question that does not come leaves macOS asking folder by
+   folder. To take it up, the owner adds a user account (System Settings, Users & Groups),
+   signs in to it and runs the one-line install there; what to watch is listed under
+   Verification. About half an hour of the owner's time, and best done before many people are
+   told about Null.
 
 ## Goal
 
@@ -176,6 +201,9 @@ where it is removed.
     deferred npm for now? I have bigger things to take care of". Null is usable by other
     people without it, through the one-line install, which needs nothing but macOS. The
     owner has no npm account, and makes one when the npm way is wanted (item 6).
+14. **The trial on a Mac user account that has never had Null: deferred by the owner on
+    2026-10-10.** "Yes, let's defer it for later", after asking whether leaving it undone
+    would make Null unusable. It would not ("Deferred by the owner", above).
 
 ## Work items
 
