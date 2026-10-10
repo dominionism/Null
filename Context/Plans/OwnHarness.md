@@ -13,7 +13,9 @@
 > installed from it on 2026-10-10 with the one-line command, signed here and still holding Full
 > Disk Access. Left in item 6: the npm package, and a Mac that has never had Null. Item 8, the
 > weekly check of new Oh-my-pi versions, is merged and waits for its first Monday. Item 9 is
-> partly done: the README and the decision record. Not started: item 7.**
+> done: the README, the decision record and the glossary. Item 7 is done as a typed command:
+> `/update` says when a newer Null is out. Nothing in this plan is unstarted. What is left is
+> the npm package, and what only the owner's hands and a Mac that never had Null can show.**
 
 ## Goal
 
@@ -624,7 +626,30 @@ where it is removed.
      the version the files name. The first is `null-v0.1.0`. Nothing moves the number yet,
      and nothing in the box looks for a newer Null.
    - Depends on: 6.
-   - Status: Not started
+   - Status: Complete (2026-10-10), as far as a typed command goes. The box never says it by
+     itself
+   - **Built:** `/update` now also says when a newer Null is out: "Null 0.2.0 is out, and this
+     is Null 0.1.1. to get it, run this in Terminal:", and under it the install line, which
+     can be selected and copied. Null does not replace itself; the next Null comes the way the
+     first did. It learns the newest by following the page of the newest release to the
+     release it sends on to, and reading the tag from that address; only a tag `null-v…`
+     counts, and when GitHub cannot be asked the box says nothing about it.
+   - **How the number moves:** by hand. `Mini/Cargo.toml` and `Mini/tauri.conf.json` are set to
+     the new version (the release workflow stops if they differ, or if the tag names
+     another), and the tag `null-v<version>` is pushed on `main`. First done for 0.1.1.
+   - **Decided by the agent on the owner's general word of 2026-10-10 (Constraints):** the
+     box looks only when `/update` is typed, and never at a start, since everything the box
+     does is a typed command and a look at a start would be a request to GitHub nobody asked
+     for. The plan's "saying, once" by itself is therefore not built.
+   - **Proven without a person:** 69 unit tests, one new: a release of Null is known by its
+     tag, and a release of something else, or a page that is no release, is not. The real
+     app on folders of their own, with made-up addresses: a newer Null (both lines shown,
+     with the install line); the newest being this one (nothing said); the newest release
+     being of something else (nothing said); and no answer (nothing said, and no error). And
+     with nothing made up, against the real repository and releases: "already on the newest
+     checked Oh-my-pi, 18.8.7" and nothing more.
+   - **Not proven:** a real newer release seen by an installed Null, since the first Null
+     that can look is 0.1.1 itself.
 
 8. **Keeping up without being asked**
    - What: not designed. Once a week a job takes the newest Oh-my-pi release, runs item 4, and

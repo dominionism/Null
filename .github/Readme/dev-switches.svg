@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 761" width="860" height="761" fill="none" role="img" aria-label="Development switches and smoke checks. NULL_MINI_EXIT_WHEN_READY=1: Exit after the page loads; no prompt is sent NULL_MINI_NO_SHORTCUT=1: Show at startup without claiming Control+Space NULL_MINI_SMOKE=&quot;&lt;text&gt;&quot;: Send a real harness prompt, log the reply, exit without a window; also SMOKE_MODEL and SMOKE_STOP_AFTER (seconds) NULL_MINI_SELFTEST=&quot;&lt;text&gt;&quot;: Type into the real page, a line at a time, each once the page has stopped working: a message, a command, a choice from a list, an answer to a sign-in. Then log what the page shows and exit NULL_MINI_PROFILE=&lt;name&gt;: Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files NULL_MINI_BACKUPS=&quot;m/one,m/two&quot;: Override the backup order for this run without changing the saved order NULL_MINI_UPDATES=&lt;address&gt;: Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address NULL_MINI_FOLDER=&lt;path&gt;: Run on that folder in place of yours, made if missing: OMP&#x27;s folder, its MCP definitions and Null&#x27;s own files are all under it, so a new one is a Mac with nothing signed in NULL_MINI_STANDIN=1: Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and the same for openai and codex; needs FOLDER $ NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \ $   NULL_MINI_PROFILE=null-probe ./target/debug/null-mini $ NULL_MINI_FOLDER=/tmp/null-run NULL_MINI_STANDIN=1 NULL_MINI_SMOKE=ping \ $   NULL_MINI_SMOKE_MODEL=standin-anthropic/ok ./target/debug/null-mini Profile isolation does not isolate MCP: definitions still come from the normal ~/.omp/agent/mcp.json, and smoke or self-test prompts can call those servers and run real tools. The startup-only check above sends no prompt. A run on a folder of its own reads none of that and leaves nothing behind but the folder; a local model server on this Mac, such as Ollama, is still found.">
-  <title>Development switches and smoke checks. NULL_MINI_EXIT_WHEN_READY=1: Exit after the page loads; no prompt is sent NULL_MINI_NO_SHORTCUT=1: Show at startup without claiming Control+Space NULL_MINI_SMOKE=&quot;&lt;text&gt;&quot;: Send a real harness prompt, log the reply, exit without a window; also SMOKE_MODEL and SMOKE_STOP_AFTER (seconds) NULL_MINI_SELFTEST=&quot;&lt;text&gt;&quot;: Type into the real page, a line at a time, each once the page has stopped working: a message, a command, a choice from a list, an answer to a sign-in. Then log what the page shows and exit NULL_MINI_PROFILE=&lt;name&gt;: Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files NULL_MINI_BACKUPS=&quot;m/one,m/two&quot;: Override the backup order for this run without changing the saved order NULL_MINI_UPDATES=&lt;address&gt;: Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address NULL_MINI_FOLDER=&lt;path&gt;: Run on that folder in place of yours, made if missing: OMP&#x27;s folder, its MCP definitions and Null&#x27;s own files are all under it, so a new one is a Mac with nothing signed in NULL_MINI_STANDIN=1: Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and the same for openai and codex; needs FOLDER $ NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \ $   NULL_MINI_PROFILE=null-probe ./target/debug/null-mini $ NULL_MINI_FOLDER=/tmp/null-run NULL_MINI_STANDIN=1 NULL_MINI_SMOKE=ping \ $   NULL_MINI_SMOKE_MODEL=standin-anthropic/ok ./target/debug/null-mini Profile isolation does not isolate MCP: definitions still come from the normal ~/.omp/agent/mcp.json, and smoke or self-test prompts can call those servers and run real tools. The startup-only check above sends no prompt. A run on a folder of its own reads none of that and leaves nothing behind but the folder; a local model server on this Mac, such as Ollama, is still found.</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 806" width="860" height="806" fill="none" role="img" aria-label="Development switches and smoke checks. NULL_MINI_EXIT_WHEN_READY=1: Exit after the page loads; no prompt is sent NULL_MINI_NO_SHORTCUT=1: Show at startup without claiming Control+Space NULL_MINI_SMOKE=&quot;&lt;text&gt;&quot;: Send a real harness prompt, log the reply, exit without a window; also SMOKE_MODEL and SMOKE_STOP_AFTER (seconds) NULL_MINI_SELFTEST=&quot;&lt;text&gt;&quot;: Type into the real page, a line at a time, each once the page has stopped working: a message, a command, a choice from a list, an answer to a sign-in. Then log what the page shows and exit NULL_MINI_PROFILE=&lt;name&gt;: Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files NULL_MINI_BACKUPS=&quot;m/one,m/two&quot;: Override the backup order for this run without changing the saved order NULL_MINI_UPDATES=&lt;address&gt;: Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address NULL_MINI_RELEASE=&lt;address&gt;: Where /update learns which Null is the newest, in place of GitHub: a made-up address whose last part is a tag, null-v0.2.0 NULL_MINI_FOLDER=&lt;path&gt;: Run on that folder in place of yours, made if missing: OMP&#x27;s folder, its MCP definitions and Null&#x27;s own files are all under it, so a new one is a Mac with nothing signed in NULL_MINI_STANDIN=1: Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and the same for openai and codex; needs FOLDER $ NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \ $   NULL_MINI_PROFILE=null-probe ./target/debug/null-mini $ NULL_MINI_FOLDER=/tmp/null-run NULL_MINI_STANDIN=1 NULL_MINI_SMOKE=ping \ $   NULL_MINI_SMOKE_MODEL=standin-anthropic/ok ./target/debug/null-mini Profile isolation does not isolate MCP: definitions still come from the normal ~/.omp/agent/mcp.json, and smoke or self-test prompts can call those servers and run real tools. The startup-only check above sends no prompt. A run on a folder of its own reads none of that and leaves nothing behind but the folder; a local model server on this Mac, such as Ollama, is still found.">
+  <title>Development switches and smoke checks. NULL_MINI_EXIT_WHEN_READY=1: Exit after the page loads; no prompt is sent NULL_MINI_NO_SHORTCUT=1: Show at startup without claiming Control+Space NULL_MINI_SMOKE=&quot;&lt;text&gt;&quot;: Send a real harness prompt, log the reply, exit without a window; also SMOKE_MODEL and SMOKE_STOP_AFTER (seconds) NULL_MINI_SELFTEST=&quot;&lt;text&gt;&quot;: Type into the real page, a line at a time, each once the page has stopped working: a message, a command, a choice from a list, an answer to a sign-in. Then log what the page shows and exit NULL_MINI_PROFILE=&lt;name&gt;: Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files NULL_MINI_BACKUPS=&quot;m/one,m/two&quot;: Override the backup order for this run without changing the saved order NULL_MINI_UPDATES=&lt;address&gt;: Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address NULL_MINI_RELEASE=&lt;address&gt;: Where /update learns which Null is the newest, in place of GitHub: a made-up address whose last part is a tag, null-v0.2.0 NULL_MINI_FOLDER=&lt;path&gt;: Run on that folder in place of yours, made if missing: OMP&#x27;s folder, its MCP definitions and Null&#x27;s own files are all under it, so a new one is a Mac with nothing signed in NULL_MINI_STANDIN=1: Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and the same for openai and codex; needs FOLDER $ NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \ $   NULL_MINI_PROFILE=null-probe ./target/debug/null-mini $ NULL_MINI_FOLDER=/tmp/null-run NULL_MINI_STANDIN=1 NULL_MINI_SMOKE=ping \ $   NULL_MINI_SMOKE_MODEL=standin-anthropic/ok ./target/debug/null-mini Profile isolation does not isolate MCP: definitions still come from the normal ~/.omp/agent/mcp.json, and smoke or self-test prompts can call those servers and run real tools. The startup-only check above sends no prompt. A run on a folder of its own reads none of that and leaves nothing behind but the folder; a local model server on this Mac, such as Ollama, is still found.</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -19,9 +19,9 @@
     .c3 { opacity: 0; transform: translateX(538.2px); animation: c3 3.795s steps(69, end) 12.555s both, hold 16.600s linear both; }
     @keyframes c3 { from { transform: translateX(0); } }
   </style>
-  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="760" rx="12"/></clipPath>
+  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="805" rx="12"/></clipPath>
   <g clip-path="url(#win)">
-  <rect width="860" height="761" fill="#0D1117"/>
+  <rect width="860" height="806" fill="#0D1117"/>
   <rect width="860" height="30" fill="#161B22"/>
   <path d="M0 29.5H860" stroke="#21262D"/>
   <circle cx="20" cy="15.0" r="5.5" fill="#FF5F57"/>
@@ -48,51 +48,54 @@
   <text x="24" y="334.0" font-size="12.5" font-weight="700" fill="#3FB950">NULL_MINI_UPDATES=&lt;address&gt;</text>
   <text x="267.75" y="334.0" font-size="12.5" fill="#C9D1D9">Where /update reads which Oh-my-pi is checked, in place of the</text>
   <text x="267.75" y="353.0" font-size="12.5" fill="#C9D1D9">repository: a made-up file as a file:// address</text>
-  <text x="24" y="379.0" font-size="12.5" font-weight="700" fill="#3FB950">NULL_MINI_FOLDER=&lt;path&gt;</text>
-  <text x="267.75" y="379.0" font-size="12.5" fill="#C9D1D9">Run on that folder in place of yours, made if missing: OMP&#x27;s folder,</text>
-  <text x="267.75" y="398.0" font-size="12.5" fill="#C9D1D9">its MCP definitions and Null&#x27;s own files are all under it, so a new</text>
-  <text x="267.75" y="417.0" font-size="12.5" fill="#C9D1D9">one is a Mac with nothing signed in</text>
-  <text x="24" y="443.0" font-size="12.5" font-weight="700" fill="#3FB950">NULL_MINI_STANDIN=1</text>
-  <text x="267.75" y="443.0" font-size="12.5" fill="#C9D1D9">Offer a stand-in provider in that folder, so a message is answered or</text>
-  <text x="267.75" y="462.0" font-size="12.5" fill="#C9D1D9">refused with no real sign-in: standin-anthropic/ok, /limit, /auth,</text>
-  <text x="267.75" y="481.0" font-size="12.5" fill="#C9D1D9">/noaccess, and the same for openai and codex; needs FOLDER</text>
-  <text x="24.0" y="512" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="512" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="512" font-size="13" fill="#8B949E">$</text>
-  <text x="187.8" y="512" font-size="13" fill="#E6EDF3" textLength="413.4" lengthAdjust="spacing" xml:space="preserve">NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \</text>
-  <clipPath id="c0-clip"><rect x="187.8" y="499" width="421.2" height="18"/></clipPath>
+  <text x="24" y="379.0" font-size="12.5" font-weight="700" fill="#3FB950">NULL_MINI_RELEASE=&lt;address&gt;</text>
+  <text x="267.75" y="379.0" font-size="12.5" fill="#C9D1D9">Where /update learns which Null is the newest, in place of GitHub: a</text>
+  <text x="267.75" y="398.0" font-size="12.5" fill="#C9D1D9">made-up address whose last part is a tag, null-v0.2.0</text>
+  <text x="24" y="424.0" font-size="12.5" font-weight="700" fill="#3FB950">NULL_MINI_FOLDER=&lt;path&gt;</text>
+  <text x="267.75" y="424.0" font-size="12.5" fill="#C9D1D9">Run on that folder in place of yours, made if missing: OMP&#x27;s folder,</text>
+  <text x="267.75" y="443.0" font-size="12.5" fill="#C9D1D9">its MCP definitions and Null&#x27;s own files are all under it, so a new</text>
+  <text x="267.75" y="462.0" font-size="12.5" fill="#C9D1D9">one is a Mac with nothing signed in</text>
+  <text x="24" y="488.0" font-size="12.5" font-weight="700" fill="#3FB950">NULL_MINI_STANDIN=1</text>
+  <text x="267.75" y="488.0" font-size="12.5" fill="#C9D1D9">Offer a stand-in provider in that folder, so a message is answered or</text>
+  <text x="267.75" y="507.0" font-size="12.5" fill="#C9D1D9">refused with no real sign-in: standin-anthropic/ok, /limit, /auth,</text>
+  <text x="267.75" y="526.0" font-size="12.5" fill="#C9D1D9">/noaccess, and the same for openai and codex; needs FOLDER</text>
+  <text x="24.0" y="557" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="557" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="557" font-size="13" fill="#8B949E">$</text>
+  <text x="187.8" y="557" font-size="13" fill="#E6EDF3" textLength="413.4" lengthAdjust="spacing" xml:space="preserve">NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \</text>
+  <clipPath id="c0-clip"><rect x="187.8" y="544" width="421.2" height="18"/></clipPath>
   <g clip-path="url(#c0-clip)"><g class="c0">
-    <rect x="187.8" y="499" width="413.4" height="18" fill="#0D1117"/>
-    <rect x="187.8" y="500" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
+    <rect x="187.8" y="544" width="413.4" height="18" fill="#0D1117"/>
+    <rect x="187.8" y="545" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
   </g></g>
-  <text x="24.0" y="543" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="543" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="543" font-size="13" fill="#8B949E">$</text>
-  <text x="187.8" y="543" font-size="13" fill="#E6EDF3" textLength="429.0" lengthAdjust="spacing" xml:space="preserve">  NULL_MINI_PROFILE=null-probe ./target/debug/null-mini</text>
-  <clipPath id="c1-clip"><rect x="187.8" y="530" width="436.8" height="18"/></clipPath>
+  <text x="24.0" y="588" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="588" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="588" font-size="13" fill="#8B949E">$</text>
+  <text x="187.8" y="588" font-size="13" fill="#E6EDF3" textLength="429.0" lengthAdjust="spacing" xml:space="preserve">  NULL_MINI_PROFILE=null-probe ./target/debug/null-mini</text>
+  <clipPath id="c1-clip"><rect x="187.8" y="575" width="436.8" height="18"/></clipPath>
   <g clip-path="url(#c1-clip)"><g class="c1">
-    <rect x="187.8" y="530" width="429.0" height="18" fill="#0D1117"/>
-    <rect x="187.8" y="531" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
+    <rect x="187.8" y="575" width="429.0" height="18" fill="#0D1117"/>
+    <rect x="187.8" y="576" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
   </g></g>
-  <text x="24.0" y="574" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="574" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="574" font-size="13" fill="#8B949E">$</text>
-  <text x="187.8" y="574" font-size="13" fill="#E6EDF3" textLength="569.4" lengthAdjust="spacing" xml:space="preserve">NULL_MINI_FOLDER=/tmp/null-run NULL_MINI_STANDIN=1 NULL_MINI_SMOKE=ping \</text>
-  <clipPath id="c2-clip"><rect x="187.8" y="561" width="577.2" height="18"/></clipPath>
+  <text x="24.0" y="619" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="619" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="619" font-size="13" fill="#8B949E">$</text>
+  <text x="187.8" y="619" font-size="13" fill="#E6EDF3" textLength="569.4" lengthAdjust="spacing" xml:space="preserve">NULL_MINI_FOLDER=/tmp/null-run NULL_MINI_STANDIN=1 NULL_MINI_SMOKE=ping \</text>
+  <clipPath id="c2-clip"><rect x="187.8" y="606" width="577.2" height="18"/></clipPath>
   <g clip-path="url(#c2-clip)"><g class="c2">
-    <rect x="187.8" y="561" width="569.4" height="18" fill="#0D1117"/>
-    <rect x="187.8" y="562" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
+    <rect x="187.8" y="606" width="569.4" height="18" fill="#0D1117"/>
+    <rect x="187.8" y="607" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
   </g></g>
-  <text x="24.0" y="605" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="605" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="605" font-size="13" fill="#8B949E">$</text>
-  <text x="187.8" y="605" font-size="13" fill="#E6EDF3" textLength="538.2" lengthAdjust="spacing" xml:space="preserve">  NULL_MINI_SMOKE_MODEL=standin-anthropic/ok ./target/debug/null-mini</text>
-  <clipPath id="c3-clip"><rect x="187.8" y="592" width="546.0" height="18"/></clipPath>
+  <text x="24.0" y="650" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="650" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="650" font-size="13" fill="#8B949E">$</text>
+  <text x="187.8" y="650" font-size="13" fill="#E6EDF3" textLength="538.2" lengthAdjust="spacing" xml:space="preserve">  NULL_MINI_SMOKE_MODEL=standin-anthropic/ok ./target/debug/null-mini</text>
+  <clipPath id="c3-clip"><rect x="187.8" y="637" width="546.0" height="18"/></clipPath>
   <g clip-path="url(#c3-clip)"><g class="c3">
-    <rect x="187.8" y="592" width="538.2" height="18" fill="#0D1117"/>
-    <rect x="187.8" y="593" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
+    <rect x="187.8" y="637" width="538.2" height="18" fill="#0D1117"/>
+    <rect x="187.8" y="638" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
   </g></g>
-  <text x="24" y="630.0" font-size="12.5" fill="#8B949E">Profile isolation does not isolate MCP: definitions still come from the normal</text>
-  <text x="24" y="649.0" font-size="12.5" fill="#8B949E">~/.omp/agent/mcp.json, and smoke or self-test prompts can call those servers and run real tools.</text>
-  <text x="24" y="668.0" font-size="12.5" fill="#8B949E">The startup-only check above sends no prompt. A run on a folder of its own reads none of that and</text>
-  <text x="24" y="687.0" font-size="12.5" fill="#8B949E">leaves nothing behind but the folder; a local model server on this Mac, such as Ollama, is still</text>
-  <text x="24" y="706.0" font-size="12.5" fill="#8B949E">found.</text>
+  <text x="24" y="675.0" font-size="12.5" fill="#8B949E">Profile isolation does not isolate MCP: definitions still come from the normal</text>
+  <text x="24" y="694.0" font-size="12.5" fill="#8B949E">~/.omp/agent/mcp.json, and smoke or self-test prompts can call those servers and run real tools.</text>
+  <text x="24" y="713.0" font-size="12.5" fill="#8B949E">The startup-only check above sends no prompt. A run on a folder of its own reads none of that and</text>
+  <text x="24" y="732.0" font-size="12.5" fill="#8B949E">leaves nothing behind but the folder; a local model server on this Mac, such as Ollama, is still</text>
+  <text x="24" y="751.0" font-size="12.5" fill="#8B949E">found.</text>
   <g class="fade" style="animation-delay:17.050s">
-    <text x="24.0" y="735" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="735" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="735" font-size="13" fill="#8B949E">$</text>
-    <rect class="blink" x="187.8" y="723" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
+    <text x="24.0" y="780" font-size="13" fill="#3FB950" textLength="124.8" lengthAdjust="spacing">dominionism@null</text><text x="156.6" y="780" font-size="13" fill="#58A6FF">~</text><text x="172.2" y="780" font-size="13" fill="#8B949E">$</text>
+    <rect class="blink" x="187.8" y="768" width="7.8" height="16" fill="#E6EDF3" opacity=".85"/>
   </g>
   </g>
-  <rect x="0.5" y="0.5" width="859" height="760" rx="12" stroke="#21262D"/>
+  <rect x="0.5" y="0.5" width="859" height="805" rx="12" stroke="#21262D"/>
 </svg>

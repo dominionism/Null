@@ -1325,6 +1325,11 @@
           if (did.outcome === 'updated') line('note', `the built-in Oh-my-pi is now ${did.version}${did.on_own ? '. you are on yours: /harness switches' : ''}`);
           else if (did.outcome === 'needs_null') line('note', `Oh-my-pi ${did.version} needs Null ${did.null} or newer, and this is Null ${did.this_null}. update Null, then /update again`);
           else line('note', `already on the newest checked Oh-my-pi, ${did.version}`);
+          // Null does not replace itself: it says a newer one is out, and what gets it.
+          if (did.newer_null) {
+            line('note', `Null ${did.newer_null} is out, and this is Null ${did.this_null}. to get it, run this in Terminal:`);
+            line('step', did.install);
+          }
         } catch (error) {
           line('error', `could not update: ${error}`);
         }
