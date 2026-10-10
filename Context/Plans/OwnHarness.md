@@ -142,10 +142,10 @@ where it is removed.
    would mean more questions in a small box and a rule of Null's own.
 8. **When Full Disk Access is asked for on a first run: settled by the owner on 2026-10-09.**
    After the first reply, not at the first start (item 5).
-9. **What Null's release tags are called, and what becomes of the Voice app's release
-   workflow.** Open. Built as `null-v0.1.0`, because `release.yml` answers to `v` tags
-   (item 6). Recommended: keep `null-v` until that workflow is removed with the cleanup.
-10. **The first release.** Open. Publishing is public and needs the owner's word: a tag
+9. **What Null's release tags are called: settled by the owner on 2026-10-09.** `null-v…`,
+   as in `null-v0.1.0`, until the Voice app's release workflow (`release.yml`, which answers
+   to `v` tags) is removed with the cleanup (item 6).
+10. **The first release: the owner gave the word on 2026-10-09.** Null 0.1.0, by the tag
     `null-v0.1.0` on `main` once the workflow is merged.
 
 ## Work items
