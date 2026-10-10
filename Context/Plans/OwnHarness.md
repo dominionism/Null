@@ -9,8 +9,9 @@
 > and 10 are built, merged and installed (2026-10-09, about 20:06): what a harness can do, the
 > harness check, and `/update`. The carried version is 18.8.7. That installed build has not yet
 > been checked by the owner's hand (see Verification). Item 5, the first opening, is built and
-> proven by script, and not installed. Item 9 is partly done: the README and the decision record.
-> Not started: items 6 to 8.**
+> proven by script, and not installed. Item 6 is begun: GitHub builds a ready-made Null, and one
+> fetched from there runs on this Mac with no warning. Item 9 is partly done: the README and the
+> decision record. Not started: items 7 and 8.**
 
 ## Goal
 
@@ -141,6 +142,11 @@ where it is removed.
    would mean more questions in a small box and a rule of Null's own.
 8. **When Full Disk Access is asked for on a first run: settled by the owner on 2026-10-09.**
    After the first reply, not at the first start (item 5).
+9. **What Null's release tags are called: settled by the owner on 2026-10-09.** `null-v…`,
+   as in `null-v0.1.0`, until the Voice app's release workflow (`release.yml`, which answers
+   to `v` tags) is removed with the cleanup (item 6).
+10. **The first release: the owner gave the word on 2026-10-09.** Null 0.1.0, by the tag
+    `null-v0.1.0` on `main` once the workflow is merged.
 
 ## Work items
 
@@ -483,7 +489,31 @@ where it is removed.
      anything else in this item. The clone way does not have this risk: an app built on the Mac
      it runs on is that Mac's own.
    - Source: specified from user + inferred.
-   - Status: Not started
+   - Status: In progress. The ready-built Null and most of the spike are done (2026-10-09). Not
+     started: the npm package, the signing identity at install, and a first release
+   - **Built:** `.github/workflows/null-release.yml`. On a Mac runner it fetches the carried
+     Oh-my-pi, builds `Null.app`, seals it with no certificate (the Oh-my-pi inside keeps its
+     author's signature), and packs it as `Null-<version>-macos-arm64.zip` with a
+     `SHA256SUMS.txt`. A push that changes the workflow, or a run started by hand, keeps the
+     app with the run for 14 days. A tag `null-v<version>` publishes it as a release, after
+     checking that the tag names the version in `Cargo.toml` and `tauri.conf.json`.
+   - **The spike, as far as this Mac goes (2026-10-09, macOS 26.5.2):** the Null that GitHub
+     built was fetched with `gh`, which like npm attaches no quarantine mark. Its checksum
+     matched, its seal held, and the Oh-my-pi inside had the checksum of `Engine.toml` and its
+     author's Developer ID signature. Run from a scratch folder on a folder of its own, and
+     never installed: it started and loaded its page; a message went through the Oh-my-pi it
+     carries to the stand-in and came back; and opened the way a double-click opens an app
+     (`open`), it started with no warning from macOS. `spctl` calls the app "rejected", which is
+     what it says of any app without an Apple certificate, and that verdict is only acted on
+     for a file that carries the quarantine mark.
+   - **Not proven:** npm itself as the carrier; a Mac user account that has never had Null;
+     the app signed again on that Mac at install (decision 6); publishing by a tag, which has
+     not been tried since nothing was to be published without the owner's word.
+   - **Found:** the repository already has `.github/workflows/release.yml`, which came with
+     the Voice app. It answers to any tag that starts with `v`, and would try to build that
+     app for three systems with certificates this repository does not have. So Null's tags are
+     `null-v…`. The owner's call whether that workflow stays, and whether Null's tags should
+     be plain `v…` once it is gone.
    - **Gap found (2026-10-09), settled by the owner the same day (decision 6):**
      `Mini/Scripts/install` signs the app only when a signing keychain is already on the Mac,
      and nothing makes one for someone else. Their Null would be installed unsigned, and macOS
@@ -502,6 +532,8 @@ where it is removed.
      its version moves, the box cannot say that a newer Null is there, and the `null` line in
      `Engine.toml` guards nothing (item 10, Limits). Not designed. The npm way of item 6
      already needs a build for each release.
+   - **Since 2026-10-09:** a release can be built (item 6): a tag `null-v<version>` publishes
+     the version the files name. No tag exists yet, and nothing moves the number.
    - Depends on: 6.
    - Status: Not started
 
