@@ -10,7 +10,7 @@
 > built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
 > kept, the way back to the built-in one, and `omp update` in the terminal (to 18.8.7) changing
 > nothing in Null. Item 4, the harness check, is built and passes on 18.4.3 and on 18.8.7.
-> Not started: items 3 and 5 to 9.**
+> Not started: items 3 and 5 to 10.**
 
 ## Goal
 
@@ -101,6 +101,8 @@ where it is removed.
 5. **Keeping up happens in the repo.** A check that any Oh-my-pi version can be put through says
    whether Null still works with it. Null moves to a newer version only after it passes. A fix is a
    change to Null's code that the check has to pass. Nothing rewrites itself on a user's Mac.
+   **Amended by the owner on 2026-10-09:** the user may move to the newest checked version
+   themselves, by typing `/update` (item 10). Still nothing unchecked, and nothing by itself.
 
 ## Decisions for the owner
 
@@ -351,6 +353,8 @@ where it is removed.
    - What: no mechanism of Null's own. The next version comes the way the first did: `npm update`,
      or `git pull` and the install script. That is also how the harness moves forward. To design
      once item 6 exists: the box saying, once, that a newer Null is there.
+   - **Amended (owner, 2026-10-09):** the harness alone can also move forward from the box, with
+     `/update` (item 10). A new Null still comes the way the first did.
    - Depends on: 6.
    - Status: Not started
 
@@ -372,6 +376,33 @@ where it is removed.
      (`/grill`). `Providers.md` already points here from its decision 3 and its item 6.
    - Depends on: 2 for the README.
    - Status: Not started
+
+10. **`/update`: the newest checked harness, from the box**
+    - **Decided (owner, 2026-10-09):** "Let's provide add a command that helps update the latest
+      version of omp if the user chooses to do so. ... Like /update". Asked what it should
+      install, the owner chose the newest version the repo's check has passed, not the very
+      latest; and to build it after item 3.
+    - What: a typed command. It reads `Mini/Engine.toml` on the repo's `main`, which anyone can
+      read without signing in (seen 2026-10-09). If that names a newer version than the one
+      Null runs as "built in", it fetches that version's program from Oh-my-pi's release, holds
+      it against the checksum in that file, and keeps it in Null's support folder. It does not
+      go inside the app, whose seal covers the program it came with. "Built in" then means the
+      newest checked program Null has, and the one that came with the app stays as the
+      fallback. One line says what happened: which version it is on now, or that it is already
+      on the newest checked one. When the newer harness needs a newer Null, `/update` says so,
+      says how to get it, and changes nothing.
+    - Why: the owner's words above. People who never open the repo get the newest checked
+      harness with one command, and only when they choose to.
+    - Depends on: 3 (so that a harness that differs a little costs one feature, not the box)
+      and 4. Most useful with 8, which is what keeps the checked version moving.
+    - Risk: macOS refusing a program the app fetched itself; a version the repo checked against
+      a newer Null than the user has. Know it by: a scripted run under a throwaway profile
+      (fetch, checksum, start, answer), and the "needs a newer Null" line seen with a made-up
+      file.
+    - Open: how `Engine.toml` says which Null a version was checked with; what `/harness` calls
+      a fetched program; whether `/update` also says that a newer Null is there (item 7).
+    - Source: specified from user + inferred.
+    - Status: Not started
 
 ## Verification
 
