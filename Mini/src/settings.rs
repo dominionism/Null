@@ -37,7 +37,45 @@ pub struct Settings {
 pub struct Store(Mutex<Settings>);
 
 fn path(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|dir| dir.join(file_name("settings", "json")))
+    dir(app).map(|dir| dir.join(file_name("settings", "json")))
+}
+
+/// Where Null keeps its own files: the app's support folder, or the folder of
+/// a run that has one of its own.
+pub fn dir(app: &AppHandle) -> Option<PathBuf> {
+    match own_folder() {
+        Some(folder) => Some(folder.join("null")),
+        None => app.path().app_config_dir().ok(),
+    }
+}
+
+/// A run on a folder of its own (`NULL_MINI_FOLDER`, for scripted checks). The
+/// harness's folder and Null's own files are both under it, so such a run reads
+/// nothing of the user's and leaves nothing behind but that folder.
+pub fn own_folder() -> Option<PathBuf> {
+    std::env::var_os("NULL_MINI_FOLDER").filter(|folder| !folder.is_empty()).map(PathBuf::from)
+}
+
+/// Where the harness of such a run keeps what it keeps: sign-ins, settings and
+/// conversations.
+pub fn harness_folder() -> Option<PathBuf> {
+    own_folder().map(|folder| folder.join("agent"))
+}
+
+/// Make that folder and point the harness at it. This comes before anything is
+/// started, because every program the app starts takes the folder from the
+/// app's own environment.
+pub fn enter_own_folder() -> Result<(), String> {
+    let Some(folder) = own_folder() else { return Ok(()) };
+    for part in ["agent", "null"] {
+        std::fs::create_dir_all(folder.join(part)).map_err(|e| format!("could not make {}: {e}", folder.join(part).display()))?;
+    }
+    // The harness is started in other folders, so the path has to hold from anywhere.
+    let folder = folder.canonicalize().map_err(|e| format!("could not find {}: {e}", folder.display()))?;
+    std::env::set_var("NULL_MINI_FOLDER", &folder);
+    std::env::set_var("PI_CODING_AGENT_DIR", folder.join("agent"));
+    log!("this run is on a folder of its own: {}", folder.display());
+    Ok(())
 }
 
 /// The name of one of the app's own files. A run under a harness profile

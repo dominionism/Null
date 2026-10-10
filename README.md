@@ -124,7 +124,7 @@
 
 <a id="development-switches-and-smoke-checks"></a>
 <p align="center">
-  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the seven NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, and the warning that profile isolation does not isolate MCP." />
+  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the nine NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider, and the warning that profile isolation does not isolate MCP." />
 </p>
 
 <a id="optional-voice-tools"></a>

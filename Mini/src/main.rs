@@ -2,7 +2,7 @@
 //! own agent harness. It is one app with no server; the page in `Page/` talks to
 //! this process through commands and events.
 //!
-//! Six switches for development, all read from the environment:
+//! Eight switches for development, all read from the environment:
 //! - `NULL_MINI_EXIT_WHEN_READY`: quit as soon as the page has loaded, which makes
 //!   "start, load the page, stop" a check a script can run.
 //! - `NULL_MINI_NO_SHORTCUT`: do not listen for Control+Space, and show the box at
@@ -15,6 +15,12 @@
 //!   so sign-in and first-run behaviour can be tried without the real sign-ins.
 //! - `NULL_MINI_UPDATES`: where `/update` reads which version is checked, in
 //!   place of the repository: a made-up file, as a `file://` address.
+//! - `NULL_MINI_FOLDER`: run on that folder, made if it is not there, in place of
+//!   the user's: the harness's folder, Null's own files and the log are all under
+//!   it. A new one is a Mac with nothing signed in, and removing it removes the run.
+//! - `NULL_MINI_STANDIN`: offer a stand-in provider's models in that folder, so a
+//!   message is answered, or refused, with no real sign-in. Needs
+//!   `NULL_MINI_FOLDER`. The models are `standin-anthropic/ok` and the like.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -34,6 +40,7 @@ mod providers;
 mod settings;
 mod shortcut;
 mod signin;
+mod standin;
 mod translate;
 
 use log::log;
@@ -78,6 +85,11 @@ fn quit(app: tauri::AppHandle) {
 }
 
 fn main() {
+    // A run on a folder of its own is set up before anything is started.
+    if let Err(reason) = settings::enter_own_folder().and_then(|()| standin::for_this_run()) {
+        log!("not started: {reason}");
+        std::process::exit(2);
+    }
     tauri::Builder::default()
         .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
