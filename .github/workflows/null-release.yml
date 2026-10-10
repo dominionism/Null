@@ -1,0 +1,114 @@
+name: Null release
+
+# Null as other people get it: built here, ready to run, with the Oh-my-pi it carries inside,
+# so that nobody needs Rust or Apple's developer tools to install it.
+#
+# A tag like null-v0.1.0 builds that version and publishes it as a release, with a checksum.
+# A push that changes this file, or a run started by hand, only builds, and keeps the app with
+# the run for a few days, so the build can be tried without publishing anything.
+#
+# The tag is null-v and not v: the workflow in release.yml, which came with the Voice app,
+# answers to v tags and builds that app.
+on:
+  push:
+    tags:
+      - "null-v*"
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/null-release.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Null is a macOS app, and the Oh-my-pi it carries is fetched for Apple Silicon.
+    runs-on: macos-latest
+    permissions:
+      # Only a tag publishes anything.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./Mini -> target"
+          key: release
+
+      - name: Keep the carried Oh-my-pi between runs
+        uses: actions/cache@v4
+        with:
+          path: Mini/Engine
+          key: null-engine-${{ hashFiles('Mini/Engine.toml') }}
+
+      # The tool that puts the program, the page and Oh-my-pi together as Null.app.
+      - name: Install the Tauri build tool
+        run: command -v cargo-tauri || cargo install tauri-cli --version "^2" --locked
+
+      # The script keeps a file only if its checksum is the one in Mini/Engine.toml.
+      - name: Fetch the Oh-my-pi that Null carries
+        run: Mini/Scripts/engine
+
+      - name: Read the version
+        id: version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Mini/Cargo.toml | head -1)
+          bundled=$(sed -n 's/^  "version": "\(.*\)",/\1/p' Mini/tauri.conf.json | head -1)
+          if [ -z "$version" ] || [ "$version" != "$bundled" ]; then
+            echo "Mini/Cargo.toml says \"$version\" and Mini/tauri.conf.json says \"$bundled\"; they have to agree." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "name=Null-$version-macos-arm64" >> "$GITHUB_OUTPUT"
+
+      - name: The tag has to name the version being built
+        if: startsWith(github.ref, 'refs/tags/null-v')
+        run: |
+          if [ "$GITHUB_REF_NAME" != "null-v${{ steps.version.outputs.version }}" ]; then
+            echo "The tag is $GITHUB_REF_NAME, and the files say ${{ steps.version.outputs.version }}." >&2
+            exit 1
+          fi
+
+      - name: Build Null.app
+        working-directory: Mini
+        run: cargo tauri build
+
+      # No certificate is used here. The app is sealed as it stands, so that what arrives on
+      # someone's Mac can be told from what was built; the Oh-my-pi inside keeps its author's
+      # own signature. Whoever installs it signs it again on their own Mac.
+      - name: Seal and pack the app
+        id: pack
+        run: |
+          app=Mini/target/release/bundle/macos/Null.app
+          codesign --force --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          carried=$(sed -n 's/^version = "\(.*\)"/\1/p' Mini/Engine.toml | head -1)
+          "$app/Contents/MacOS/omp" --version
+          mkdir -p "$RUNNER_TEMP/out"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/out/${{ steps.version.outputs.name }}.zip"
+          cd "$RUNNER_TEMP/out"
+          shasum -a 256 "${{ steps.version.outputs.name }}.zip" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "carried=$carried" >> "$GITHUB_OUTPUT"
+
+      - name: Keep the app with this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.name }}
+          path: ${{ runner.temp }}/out/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/null-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/out/${{ steps.version.outputs.name }}.zip" "$RUNNER_TEMP/out/SHA256SUMS.txt" \
+            --title "Null ${{ steps.version.outputs.version }}" \
+            --notes "Null ${{ steps.version.outputs.version }} for Apple Silicon Macs, macOS 13 or later, with Oh-my-pi ${{ steps.pack.outputs.carried }} inside."
