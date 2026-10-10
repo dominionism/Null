@@ -56,6 +56,14 @@ const RELEASES: &str = "https://github.com/can1357/oh-my-pi/releases/download";
 /// Oh-my-pi's name for the program for the kind of Mac Null is built for.
 const PUBLISHED: &str = "omp-darwin-arm64";
 
+/// Where `/update` learns which Null is the newest. The page of the newest
+/// release sends on to that release, whose address ends in its tag; asked this
+/// way, GitHub sets no limit on how often. `NULL_MINI_RELEASE` names another
+/// address, for a scripted check with a made-up one.
+const NEWEST_NULL: &str = "https://github.com/dominionism/Null/releases/latest";
+/// What gets the newest Null, for the box to show. Null does not replace itself.
+const INSTALL: &str = "curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null | sh -s install";
+
 /// The version of Oh-my-pi that Null carries and was checked with.
 pub fn carried_version() -> &'static str {
     named(include_str!("../Engine.toml"), "version").unwrap_or_default()
@@ -304,6 +312,22 @@ fn fetch(app: &AppHandle, version: &str, sha256: &str) -> Result<PathBuf, String
     Ok(program)
 }
 
+/// The version in the address of one of Null's releases: `…/releases/tag/null-v0.2.0`.
+/// The repository may hold releases of other things, so the tag has to be one of Null's.
+fn null_version_from(address: &str) -> Option<&str> {
+    let version = address.trim().rsplit('/').next()?.strip_prefix("null-v")?;
+    (!version.is_empty() && version.split('.').all(|part| part.parse::<u64>().is_ok())).then_some(version)
+}
+
+/// A released Null that is newer than this one. None when there is none, and
+/// none when GitHub could not be asked: that is not worth a word in the box.
+fn newer_null(this_null: &str) -> Option<String> {
+    let place = std::env::var("NULL_MINI_RELEASE").unwrap_or_else(|_| NEWEST_NULL.to_string());
+    let asked = ["--fail", "--location", "--silent", "--head", "--output", "/dev/null", "--max-time", "15", "--write-out", "%{url_effective}", place.as_str()];
+    let address = tool("/usr/bin/curl", &asked.map(std::ffi::OsStr::new)).ok()?;
+    null_version_from(&address).filter(|version| newer(version, this_null)).map(str::to_string)
+}
+
 /// What `/update` did, for the box to say.
 #[derive(Clone, Debug, Serialize)]
 pub struct Update {
@@ -316,6 +340,9 @@ pub struct Update {
     pub this_null: &'static str,
     /// Whether the box is running the user's own harness, which `/update` leaves alone.
     pub on_own: bool,
+    /// A released Null newer than this one, when there is one, and what gets it.
+    pub newer_null: Option<String>,
+    pub install: &'static str,
 }
 
 /// Move the built-in harness to the newest version the repository has checked,
@@ -337,14 +364,22 @@ fn update(app: &AppHandle) -> Result<Update, String> {
     let built_in = fetched(&app).map(|(version, _)| version).unwrap_or_else(|| carried_version().to_string());
     let this_null = env!("CARGO_PKG_VERSION");
     let on_own = matches!(in_use(&app), Some((_, Origin::Own)));
+    let did = |outcome, version, null| {
+        // Whatever became of the harness, say when Null itself has a newer release.
+        let newer_null = newer_null(this_null);
+        if let Some(newer) = &newer_null {
+            log!("/update: Null {newer} is out; this is Null {this_null}");
+        }
+        Update { outcome, version, null, this_null, on_own, newer_null, install: INSTALL }
+    };
     match step(&toml, &built_in, this_null)? {
         Step::Stay => {
             log!("/update: already on the newest checked {HARNESS_NAME}, {built_in}");
-            Ok(Update { outcome: "current", version: built_in, null: None, this_null, on_own })
+            Ok(did("current", built_in, None))
         }
         Step::NeedsNull { version, null } => {
             log!("/update: {HARNESS_NAME} {version} needs Null {null}; this is Null {this_null}");
-            Ok(Update { outcome: "needs_null", version, null: Some(null), this_null, on_own })
+            Ok(did("needs_null", version, Some(null)))
         }
         Step::Fetch { version, sha256 } => {
             log!("/update: fetching {HARNESS_NAME} {version}");
@@ -356,7 +391,7 @@ fn update(app: &AppHandle) -> Result<Update, String> {
             harness::restart(&app);
             providers::forget(&app);
             log!("/update: the built-in harness is now {}, version {version}", program.display());
-            Ok(Update { outcome: "updated", version, null: None, this_null, on_own })
+            Ok(did("updated", version, None))
         }
     }
 }
@@ -417,6 +452,16 @@ mod tests {
         assert!(step("null = \"0.1.0\"\n", "18.8.7", "0.1.0").is_err());
         assert!(step("version = \"18.9.0\"\n[sha256]\nomp-darwin-arm64 = \"short\"\n", "18.8.7", "0.1.0").is_err());
         assert!(step("version = \"18.9.0\"\n[sha256]\nomp-darwin-x64 = \"abc\"\n", "18.8.7", "0.1.0").is_err());
+    }
+
+    #[test]
+    fn a_release_of_null_is_known_by_its_tag_and_nothing_else_is() {
+        assert_eq!(null_version_from("https://github.com/dominionism/Null/releases/tag/null-v0.2.0\n"), Some("0.2.0"));
+        // A release of something else in the same repository, and a page that is no release.
+        assert_eq!(null_version_from("https://github.com/dominionism/Null/releases/tag/v0.9.0"), None);
+        assert_eq!(null_version_from("https://github.com/dominionism/Null/releases"), None);
+        assert_eq!(null_version_from("https://github.com/dominionism/Null/releases/tag/null-vnext"), None);
+        assert_eq!(null_version_from(""), None);
     }
 
     #[test]

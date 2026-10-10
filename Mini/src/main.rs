@@ -2,7 +2,7 @@
 //! own agent harness. It is one app with no server; the page in `Page/` talks to
 //! this process through commands and events.
 //!
-//! Eight switches for development, all read from the environment:
+//! Nine switches for development, all read from the environment:
 //! - `NULL_MINI_EXIT_WHEN_READY`: quit as soon as the page has loaded, which makes
 //!   "start, load the page, stop" a check a script can run.
 //! - `NULL_MINI_NO_SHORTCUT`: do not listen for Control+Space, and show the box at
@@ -17,6 +17,8 @@
 //!   so sign-in and first-run behaviour can be tried without the real sign-ins.
 //! - `NULL_MINI_UPDATES`: where `/update` reads which version is checked, in
 //!   place of the repository: a made-up file, as a `file://` address.
+//! - `NULL_MINI_RELEASE`: where `/update` learns which Null is the newest, in
+//!   place of GitHub: a made-up address whose last part is a tag, `null-v0.2.0`.
 //! - `NULL_MINI_FOLDER`: run on that folder, made if it is not there, in place of
 //!   the user's: the harness's folder, Null's own files and the log are all under
 //!   it. A new one is a Mac with nothing signed in, and removing it removes the run.
