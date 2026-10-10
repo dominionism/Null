@@ -281,7 +281,7 @@ async fn serve(
 /// The settings Null hands the harness at every start. Always that it is not to
 /// look for a newer version of itself: Null runs the version it chose, and moves
 /// on only with a new Null. And the backup order, when there is one.
-fn own_settings(backups: Option<Value>) -> Value {
+pub fn own_settings(backups: Option<Value>) -> Value {
     let mut settings = json!({ "startup": { "checkUpdate": false } });
     if let (Some(all), Some(Value::Object(more))) = (settings.as_object_mut(), backups) {
         all.extend(more);

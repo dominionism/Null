@@ -404,12 +404,12 @@ mod tests {
         assert_eq!(feed.push(b"\x1b[1mWaiting\x1b[0m for browser authentication...\r\n"), vec![Said::Line("Waiting for browser authentication...".into())]);
     }
 
-    /// Runs the Oh-my-pi the build was given and reaches a provider, so it runs only when asked:
+    /// Runs Oh-my-pi itself and reaches a provider, so it runs only when asked:
     /// `cargo test -- --ignored`. It uses the probe profile, never the real sign-ins.
     #[test]
     #[ignore]
     fn a_wrong_key_is_refused_by_the_harness() {
-        let binary = engine::built_in().expect("Mini/Scripts/engine has fetched Oh-my-pi");
+        let binary = engine::under_test();
         let extra = vec!["--profile".to_string(), "null-probe".to_string()];
         let mut command = Command::new(&binary);
         command.args(&extra).arg("login");

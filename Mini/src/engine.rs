@@ -76,6 +76,20 @@ pub fn built_in() -> Option<PathBuf> {
     translate::runnable(&path).then_some(path)
 }
 
+/// The program the live checks run (`cargo test -- --ignored`): the one
+/// `NULL_MINI_ENGINE` names, for trying a version Null does not carry yet, else
+/// the one it carries.
+#[cfg(test)]
+pub fn under_test() -> PathBuf {
+    match std::env::var_os("NULL_MINI_ENGINE").map(PathBuf::from) {
+        Some(named) => {
+            assert!(translate::runnable(&named), "NULL_MINI_ENGINE names {}, which cannot be run", named.display());
+            named
+        }
+        None => built_in().expect("Mini/Scripts/engine has fetched Oh-my-pi"),
+    }
+}
+
 /// An Oh-my-pi of the user's own on this Mac: on the `PATH`, or where it installs itself.
 fn found() -> Option<PathBuf> {
     translate::find_installed(HARNESS, None)

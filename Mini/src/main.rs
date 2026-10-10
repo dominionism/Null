@@ -21,6 +21,8 @@ compile_error!("Null is macOS-only for now");
 
 mod access;
 mod backups;
+#[cfg(test)]
+mod check;
 mod engine;
 mod harness;
 mod log;

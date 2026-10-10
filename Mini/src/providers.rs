@@ -366,14 +366,13 @@ mod tests {
         assert!(!states[2].reported);
     }
 
-    /// Runs the Oh-my-pi the build was given, so it runs only when asked: `cargo test -- --ignored`.
+    /// Runs Oh-my-pi itself, so it runs only when asked: `cargo test -- --ignored`.
     /// It uses the probe profile, which is signed in to nothing, never the real sign-ins.
     #[test]
     #[ignore]
     fn the_harness_report_is_read_for_a_profile_with_nothing_signed_in() {
         let extra = vec!["--profile".to_string(), "null-probe".to_string()];
-        let carried = engine::built_in().expect("Mini/Scripts/engine has fetched Oh-my-pi");
-        assert_eq!(read_report(&carried, &extra), Some(Vec::new()));
+        assert_eq!(read_report(&engine::under_test(), &extra), Some(Vec::new()));
     }
 
     #[test]

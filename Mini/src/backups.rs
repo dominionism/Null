@@ -65,11 +65,12 @@ pub fn overlay(order: &[String], own: &Value) -> Option<Value> {
 /// The fallback lists the user has in the harness's own settings, or null.
 fn own_lists(binary: &Path) -> Value {
     let output = std::process::Command::new(binary).args(harness::extra_args()).args(["config", "get", "retry.fallbackChains", "--json"]).output();
-    output
-        .ok()
-        .and_then(|output| serde_json::from_slice::<Value>(&output.stdout).ok())
-        .and_then(|read| read.get("value").cloned())
-        .unwrap_or(Value::Null)
+    output.map(|output| lists_read(&output.stdout)).unwrap_or(Value::Null)
+}
+
+/// Those lists, out of what the harness prints when asked for them.
+pub fn lists_read(printed: &[u8]) -> Value {
+    serde_json::from_slice::<Value>(printed).ok().and_then(|read| read.get("value").cloned()).unwrap_or(Value::Null)
 }
 
 /// The order in force: the user's, unless `NULL_MINI_BACKUPS` (model ids with
