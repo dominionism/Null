@@ -502,6 +502,11 @@ fn earlier_conversations_are_listed_with_their_folders_and_one_loads_back_in_its
     assert_eq!(words.trim(), "pong", "the next message continues it: {ended}");
     let again = agent.conversations();
     assert_eq!(history::entries(&again, &Default::default(), &folder.work(), None).len(), 2, "continuing a conversation makes no new one: {again:?}");
+
+    // One the harness does not have is refused and not made up, which is how
+    // the box knows to stay on the conversation it had.
+    let missing = agent.request("session/load", json!({ "sessionId": "01a00000-0000-7000-8000-000000000000", "cwd": folder.work(), "mcpServers": [] }));
+    assert!(missing.is_err(), "a conversation the harness does not have was loaded: {missing:?}");
 }
 
 /// The harness gives its list a page at a time, and the box shows all of it:
