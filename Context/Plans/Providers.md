@@ -97,6 +97,8 @@ then let's go with that." Each recommendation was looked at again against the de
    this way relies on Oh-my-pi's standing with Anthropic.
 3. **A Mac without Oh-my-pi.** Null says how to install it, in one line with the command. It does
    not download or run an installer.
+   **Reversed by the owner on 2026-10-09:** Null carries its own Oh-my-pi, at one version it
+   chose. See `Context/Plans/OwnHarness.md`.
 4. **Who switches when a provider runs out.** Oh-my-pi does (item 7). Its own fallback moves to
    the next model and sends the message again; Null supplies the order and says that it happened.
    Settled after item 2 showed the harness doing this over the protocol.
@@ -331,7 +333,8 @@ then let's go with that." Each recommendation was looked at again against the de
    - Depends on: 1, 5.
    - Risk: low.
    - Source: inferred + `MiniApp.md` (the Full Disk Access pattern).
-   - Status: Not started
+   - Status: Moved (2026-10-09) to `Context/Plans/OwnHarness.md`, item 5. The first line of
+     "What" above no longer holds: the harness is inside Null
 
 7. **Limit reached: carry on with another provider**
    - **Decided (owner, 2026-10-08, on item 2's findings): Oh-my-pi does the switching.** Null does
