@@ -455,13 +455,19 @@ def dev_switches(c):
         ("PROFILE=<name>", "Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files"),
         ("BACKUPS=\"m/one,m/two\"", "Override the backup order for this run without changing the saved order"),
         ("UPDATES=<address>", "Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address"),
+        ("FOLDER=<path>", "Run on that folder in place of yours, made if missing: OMP's folder, its MCP definitions and Null's own files are all under it, so a new one is a Mac with nothing signed in"),
+        ("STANDIN=1", "Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and the same for openai and codex; needs FOLDER"),
     ]:
         c.row(f"NULL_MINI_{key}", value)
     c.command("NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \\")
     c.command("  NULL_MINI_PROFILE=null-probe ./target/debug/null-mini")
+    c.command("NULL_MINI_FOLDER=/tmp/null-run NULL_MINI_STANDIN=1 NULL_MINI_SMOKE=ping \\")
+    c.command("  NULL_MINI_SMOKE_MODEL=standin-anthropic/ok ./target/debug/null-mini")
     c.note("Profile isolation does not isolate MCP: definitions still come from the normal "
            "~/.omp/agent/mcp.json, and smoke or self-test prompts can call those servers and run "
-           "real tools. The startup-only check above sends no prompt.")
+           "real tools. The startup-only check above sends no prompt. A run on a folder of its "
+           "own reads none of that and leaves nothing behind but the folder; a local model server "
+           "on this Mac, such as Ollama, is still found.")
 
 
 # ── Optional voice tools ──────────────────────────────────────────────────
