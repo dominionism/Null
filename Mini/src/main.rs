@@ -37,6 +37,7 @@ mod backups;
 mod check;
 mod engine;
 mod harness;
+mod history;
 mod log;
 mod markdown;
 mod panel;
@@ -112,6 +113,8 @@ fn main() {
             harness::new_conversation,
             harness::events_since,
             harness::report,
+            history::history,
+            history::open_conversation,
             layout,
             providers::providers,
             backups::backups,
