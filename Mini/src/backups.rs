@@ -2,14 +2,14 @@
 //!
 //! Null does not do the switching. The harness does: given a list of fallbacks
 //! in its settings, it moves to the next model and sends the message again by
-//! itself. This module keeps the order the user chose and hands it to the
-//! harness in a settings file of Null's own, which the harness reads at start
-//! beside the user's. The file holds model names and nothing else.
+//! itself. This module keeps the order the user chose and puts it in the form
+//! of the harness's settings, which `harness.rs` hands over at start in a file
+//! of Null's own, beside the user's. It holds model names and nothing else.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::{json, Map, Value};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::log::log;
 use crate::{harness, settings};
@@ -30,14 +30,14 @@ pub fn tidy(order: &[String]) -> Vec<String> {
 ///
 /// `default` is the list the harness turns to for any model that has no list of
 /// its own. It skips the model that just failed, so a model may be in its own
-/// list. The text is JSON, which the harness's settings format accepts.
+/// list.
 ///
 /// `own` is the lists the user already has in the harness's settings. The
 /// harness adds this file to those, and tries a list for one model or one
 /// provider before `default`. So that Null's order comes first whatever model
 /// is in use, each such list is given again here: the order, then whatever the
 /// user's list adds to it.
-pub fn overlay(order: &[String], own: &Value) -> Option<String> {
+pub fn overlay(order: &[String], own: &Value) -> Option<Value> {
     let order = tidy(order);
     if order.is_empty() {
         return None;
@@ -59,7 +59,7 @@ pub fn overlay(order: &[String], own: &Value) -> Option<String> {
             lists.insert(key.clone(), json!(ahead_of(Some(list))));
         }
     }
-    Some(json!({ "retry": { "fallbackChains": lists } }).to_string())
+    Some(json!({ "retry": { "fallbackChains": lists } }))
 }
 
 /// The fallback lists the user has in the harness's own settings, or null.
@@ -72,10 +72,6 @@ fn own_lists(binary: &Path) -> Value {
         .unwrap_or(Value::Null)
 }
 
-fn file(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|dir| dir.join(settings::file_name("backups", "yml")))
-}
-
 /// The order in force: the user's, unless `NULL_MINI_BACKUPS` (model ids with
 /// commas between) names one for a scripted check.
 fn order(app: &AppHandle) -> Vec<String> {
@@ -85,24 +81,14 @@ fn order(app: &AppHandle) -> Vec<String> {
     }
 }
 
-/// What to add when starting the harness so that it knows the backup order.
-/// Writes the settings file afresh each time; nothing when there is no order.
-pub fn launch_args(app: &AppHandle, binary: &Path) -> Vec<String> {
+/// The harness settings that make it follow the backup order in force, for the
+/// harness about to be started. None when there is no order.
+pub fn harness_settings(app: &AppHandle, binary: &Path) -> Option<Value> {
     let order = order(app);
     if order.is_empty() {
-        return Vec::new();
+        return None;
     }
-    let (Some(text), Some(path)) = (overlay(&order, &own_lists(binary)), file(app)) else { return Vec::new() };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    match std::fs::write(&path, text) {
-        Ok(()) => vec!["--config".into(), path.display().to_string()],
-        Err(e) => {
-            log!("could not write the backup order to {}: {e}", path.display());
-            Vec::new()
-        }
-    }
+    overlay(&order, &own_lists(binary))
 }
 
 /// The backup order, first to last.
@@ -141,8 +127,7 @@ mod tests {
 
     #[test]
     fn the_harness_is_given_the_order_as_its_fallbacks_for_every_model() {
-        let text = overlay(&ids(&["anthropic/claude-opus-5-5", "opencode-go/deepseek-v4.1-flash"]), &Value::Null).unwrap();
-        let read: Value = serde_json::from_str(&text).unwrap();
+        let read = overlay(&ids(&["anthropic/claude-opus-5-5", "opencode-go/deepseek-v4.1-flash"]), &Value::Null).unwrap();
         assert_eq!(read, json!({ "retry": { "fallbackChains": { "default": ["anthropic/claude-opus-5-5", "opencode-go/deepseek-v4.1-flash"] } } }));
     }
 
@@ -155,8 +140,7 @@ mod tests {
             "default": ["ollama/llama3.2:latest"],
             "smol": ["opencode-go/deepseek-flash"]
         });
-        let text = overlay(&ids(&["anthropic/claude-opus-5-5", "opencode-go/deepseek-v4.1-flash"]), &own).unwrap();
-        let read: Value = serde_json::from_str(&text).unwrap();
+        let read = overlay(&ids(&["anthropic/claude-opus-5-5", "opencode-go/deepseek-v4.1-flash"]), &own).unwrap();
         assert_eq!(
             read["retry"]["fallbackChains"],
             json!({
@@ -170,9 +154,9 @@ mod tests {
     #[test]
     fn settings_that_cannot_be_read_change_nothing() {
         let order = ids(&["a/one"]);
-        let read: Value = serde_json::from_str(&overlay(&order, &json!("nonsense")).unwrap()).unwrap();
+        let read = overlay(&order, &json!("nonsense")).unwrap();
         assert_eq!(read["retry"]["fallbackChains"], json!({ "default": ["a/one"] }));
-        let read: Value = serde_json::from_str(&overlay(&order, &json!({ "b/*": "not a list", "c/two": [1, null, "c/three"] })).unwrap()).unwrap();
+        let read = overlay(&order, &json!({ "b/*": "not a list", "c/two": [1, null, "c/three"] })).unwrap();
         assert_eq!(read["retry"]["fallbackChains"], json!({ "default": ["a/one"], "b/*": ["a/one"], "c/two": ["a/one", "c/three"] }));
     }
 

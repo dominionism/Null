@@ -19,7 +19,7 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::log::log;
-use crate::{harness, panel, providers};
+use crate::{engine, harness, panel, providers};
 
 /// One entry of the harness's own list of providers.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -291,8 +291,8 @@ fn current(app: &AppHandle) -> Option<Arc<Running>> {
 
 /// The providers the harness can sign in to, as the harness lists them.
 #[tauri::command(async)]
-pub fn signin_providers() -> Result<Vec<Provider>, String> {
-    let binary = harness::installed().ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
+pub fn signin_providers(app: AppHandle) -> Result<Vec<Provider>, String> {
+    let (binary, _) = engine::in_use(&app).ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
     let mut command = Command::new(binary);
     command.args(harness::extra_args()).arg("login");
     // With nothing to read it prints its list and gives up, which is all that is wanted.
@@ -312,7 +312,7 @@ pub fn signin_start(app: AppHandle, number: u32) -> Result<(), String> {
     if slot.is_some() {
         return Err("a sign-in is already under way".into());
     }
-    let binary = harness::installed().ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
+    let (binary, _) = engine::in_use(&app).ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
     let said = app.clone();
     let over = app.clone();
     let running = start(
@@ -404,12 +404,12 @@ mod tests {
         assert_eq!(feed.push(b"\x1b[1mWaiting\x1b[0m for browser authentication...\r\n"), vec![Said::Line("Waiting for browser authentication...".into())]);
     }
 
-    /// Needs Oh-my-pi installed and reaches a provider, so it runs only when asked:
+    /// Runs the Oh-my-pi the build was given and reaches a provider, so it runs only when asked:
     /// `cargo test -- --ignored`. It uses the probe profile, never the real sign-ins.
     #[test]
     #[ignore]
     fn a_wrong_key_is_refused_by_the_harness() {
-        let binary = harness::installed().expect("Oh-my-pi is installed");
+        let binary = engine::built_in().expect("Mini/Scripts/engine has fetched Oh-my-pi");
         let extra = vec!["--profile".to_string(), "null-probe".to_string()];
         let mut command = Command::new(&binary);
         command.args(&extra).arg("login");
