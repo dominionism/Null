@@ -10,7 +10,7 @@
 > built-in harness, and `/harness` moving to the owner's own Oh-my-pi with the conversation
 > kept, the way back to the built-in one, and `omp update` in the terminal (to 18.8.7) changing
 > nothing in Null. Item 4, the harness check, is built and passes on 18.4.3 and on 18.8.7.
-> Not started: items 3 and 5 to 10.**
+> Item 3 is built and checked by script, and not yet installed. Not started: items 5 to 10.**
 
 ## Goal
 
@@ -231,7 +231,45 @@ where it is removed.
    - Risk: a check that is itself wrong hides a feature that works. Know it by: unit tests on the
      noting, and item 4 running the same questions against two real versions.
    - Source: inferred from codebase (`translate::reply_failed`, `providers.rs`, `signin.rs`).
-   - Status: Not started
+   - Status: In progress. Built and checked by script (2026-10-09); not yet installed
+   - **Built:** `translate::abilities`, and one line in the log at the first conversation of
+     each harness version met in a run: "what this harness can do: a list of 19 models; says
+     which model is in use when asked through thinking; loads a conversation back". Whatever
+     is missing is said there with the feature it costs. `translate::judge_reply`: a reply
+     without a token count is taken for a refusal only once this harness has been seen to
+     count one. The version Null carries is trusted from the start, because the harness check
+     asks exactly that of it. `/usage` on a harness whose report cannot be read says so in one
+     line, where it used to list every provider as "no usage report".
+   - **Already there:** `/model` on a harness with no model list says "this harness offers no
+     model list"; `/login` on one that lists no providers says so; `/harness` and the line
+     after choosing mark a version Null was not checked with (item 2).
+   - **Deviation:** the usage report and the sign-in list are not tried at the first start.
+     They are found out when `/usage` or `/login` is used, and a failure is not remembered.
+     Trying at start would cost two more runs of the harness and a round to the providers
+     every time, and a remembered "cannot" would hide a feature after one slow answer, which
+     is the risk named above.
+   - **Changed at the owner's word (2026-10-09, "we have keep things user-friendly and
+     undertandable"):** which version was seen to count tokens is remembered between runs
+     (the setting `counts_tokens`). A first cut forgot it at every restart, so on a version
+     other than the carried one the first reply after each start, if it was a refusal, came
+     in plain words and not in red.
+   - **What is left of that:** the very first reply ever from a version Null has not met, when
+     that reply is a refusal. Null cannot tell a refusal from a harness that never counts
+     tokens until one reply has counted, and taking the reply for a refusal would paint every
+     answer red on such a harness. On the built-in version it never happens.
+   - **Added (same day):** while `/harness` is open the box says what the choice means: "built
+     in stays until Null is updated. yours follows omp update". The owner had to ask what the
+     difference was, which the box should have said.
+   - **Proven without a person:** 59 unit tests, three of them new: the rule before and after
+     tokens were seen; the noting, from a greeting and a conversation's settings; a harness
+     that offers less. The app under the probe profile against the stand-in: on the built-in
+     18.4.3 a bad sign-in as the first reply is marked ("reply ended: completed, with nothing
+     from the model"); on the owner's 18.8.7 the same reply is not marked; and 18.8.7 after a
+     working reply logs that it counts tokens and is remembered, so that after a fresh start a
+     bad sign-in as the very first reply is marked. The 15 live checks still pass. `/harness`
+     drawn again with its line of explanation, which goes when the list is put away.
+   - **Not proven:** a harness that really lacks one of these, since none exists to try and
+     the unit tests stand in for it; the `/usage` line on such a harness; the installed app.
 
 4. **The harness check**
    - What: `Mini/tests/harness.rs`, run with `cargo test -- --ignored` against the built-in
