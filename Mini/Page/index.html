@@ -1538,10 +1538,8 @@
 
       const chooseEarlier = async (entry) => {
         if (!entry || picker.opening) return;
-        if (entry.open) {
-          closeHistory();
-          return;
-        }
+        // The one that is open is asked for like any other: after the app was
+        // started again the box is on it and shows little or nothing of it.
         const list = picker;
         list.opening = true;
         mark('working');
