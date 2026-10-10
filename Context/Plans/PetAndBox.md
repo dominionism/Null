@@ -5,13 +5,12 @@
 > that the owner asked for in the same breath. It replaces items 25 and 26 of `NullMini.md`, which
 > were written for a mini inside the Voice desktop app.
 >
-> Status: **All four pieces are built (2026-10-10): the cursor (`caret-level`), attaching files
-> (`attach-files`), history (`history`) and the pet, Nil (`pet`). They could not all be merged
-> one after another, so they are brought together on one branch, `box-and-pet-trial`, with
-> every collision settled and two faults that only showed together mended; the tests, the
-> harness check, the pictures and a scripted run of the real app all pass (item 6). Pull request
-> #33 carries that branch and this plan to `main`, at the owner's word. Nothing is installed,
-> and the owner has not yet used any of it. Open: decisions 3, 4, 6 and 7, and item 7.**
+> Status: **All four pieces are built and on `main` (2026-10-10): the cursor, attaching files,
+> history and the pet, Nil. They were brought together on one branch, `box-and-pet-trial`, with
+> every collision settled and two faults that only showed together mended (item 6); pull request
+> #33 carried that branch and this plan to `main`. Null 0.2.0 is installed on the owner's Mac
+> and the owner is using it (item 8). It is not released: the tag `null-v0.2.0` waits for the
+> owner's word. Open: decisions 3, 4, 6 and 7, and item 7.**
 
 ## Goal
 
@@ -471,7 +470,8 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
      ends on GitHub's build. Also, an installed 0.2.0 will not see `/update` say that 0.2.0 is
      out, so that proof (`OwnHarness.md`, item 7) waits for the release after this one.
    - Source: specified from user.
-   - Status: In progress. Steps 1 and 2 are done (2026-10-10); the owner's own use is next
+   - Status: In progress. Steps 1 and 2 are done (2026-10-10). Step 3, the owner's own use, is
+     under way: one find so far, mended and installed. Step 4 waits for the owner's word
    - **Step 1:** pull request #34. `main` says 0.2.0 and the README is up to date. The unit
      tests, the harness check and the page check passed on it.
    - **Step 2, the install:** `Mini/Scripts/install` on `main` at `94b4f39`. The owner had quit
@@ -495,6 +495,9 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
        fade. That mended an older fault on the way: the chosen row was scrolled to before the
        rows after it were drawn, so with the keys it always came to rest against the list's
        very end. Decided by the agent, and the owner may want the scroll bar back.
+       Pull request #35, merged (`5ab85e3`). The app was built from that branch's tip
+       (`56f69dd`) and installed about half a minute before the merge; the merge changed no
+       file, so the installed app is `main`'s code.
 
 ## Verification
 
