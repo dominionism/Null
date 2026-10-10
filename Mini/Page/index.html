@@ -1826,6 +1826,10 @@
         following = true;
         if (picker && picker.history) closeHistory();
         mark(busy ? 'working' : '');
+        // Nothing has just happened here: the pet rests, whatever was replayed
+        // and whatever it was saying of the conversation before.
+        noAnswer = false;
+        if (!busy) mood('rest');
         // It is on the model it was left on, which the next message goes to.
         if (event.model) line('note', `now on ${event.model}`);
         place();
@@ -2133,6 +2137,7 @@
           reply = null;
           steps = null;
           anchor = null;
+          mood('rest'); // whatever the pet was saying of the last conversation is over
           fit();
           return;
         }
