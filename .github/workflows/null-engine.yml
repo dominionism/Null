@@ -112,7 +112,12 @@ jobs:
           WAS: ${{ steps.asked.outputs.was }}
           NEWEST: ${{ steps.asked.outputs.newest }}
         run: |
-          title="Oh-my-pi ${NEWEST:-(newest)} does not pass the harness check"
+          # A version that failed questions is one thing; a run that never got to ask is another.
+          if [ -s "$RUNNER_TEMP/failed.md" ]; then
+            title="Oh-my-pi $NEWEST does not pass the harness check"
+          else
+            title="The newest Oh-my-pi could not be tried"
+          fi
           {
             echo "Null stays on Oh-my-pi $WAS. The run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo

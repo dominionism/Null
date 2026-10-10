@@ -86,7 +86,9 @@ rewrite() {
 move_to() {
 	next=${1#v}
 	if [ "$next" = "newest" ]; then
-		next=$(curl --fail --silent --show-error --location "https://api.github.com/repos/can1357/oh-my-pi/releases/latest" | sed -n 's/^ *"tag_name": "v\{0,1\}\([^"]*\)",$/\1/p' | head -n 1)
+		# The page of the newest release sends on to that release, whose address ends in its
+		# name. Asked this way, GitHub sets no limit on how often, as it does for its API.
+		next=$(curl --fail --silent --show-error --location --head --output /dev/null --write-out '%{url_effective}' "https://github.com/can1357/oh-my-pi/releases/latest" | sed -n 's#^.*/releases/tag/v\{0,1\}\(.*\)$#\1#p')
 		if [ -z "$next" ]; then
 			echo "Could not ask GitHub which Oh-my-pi is the newest." >&2
 			exit 1
