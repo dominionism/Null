@@ -140,47 +140,21 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
   <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the ten NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider that can also answer slowly, and the warning that profile isolation does not isolate MCP." />
 </p>
 
-<a id="optional-voice-tools"></a>
-<p align="center">
-  <img src=".github/Readme/voice.svg" width="100%" alt="Optional voice tools: Voicebox is a separate tool the box can use for voice, not part of its text path; your text path never calls the Voice API, and inference runs locally." />
-</p>
-
-<p align="center">
-  <a href="https://github.com/jamiepine/voicebox"><img src=".github/Readme/link-voicebox.svg" height="30" alt="Voicebox (opens https://github.com/jamiepine/voicebox)" /></a>
-</p>
-
-<a id="run-or-develop-the-voice-stack"></a>
-<p align="center">
-  <img src=".github/Readme/voice-run.svg" width="100%" alt="Run or develop the Voice stack: just setup, just dev, bun run dev:server, just test and the typecheck, with the API on 127.0.0.1:17493, narration on 17494, the MCP tools, and the warning that most endpoints have no authentication." />
-</p>
-
-<p align="center">
-  <a href="https://bun.sh"><img src=".github/Readme/link-bun.svg" height="30" alt="Bun (opens https://bun.sh)" /></a>
-  &nbsp;
-  <a href="https://github.com/casey/just"><img src=".github/Readme/link-just.svg" height="30" alt="just (opens https://github.com/casey/just)" /></a>
-</p>
-
 <a id="status-and-direction"></a>
 <p align="center">
   <img src=".github/Readme/status.svg" width="100%" alt="Status and direction: what is available in the box, and what is planned or incomplete." />
 </p>
 
-<a id="repository-layout-and-ongoing-cleanup"></a>
+<a id="repository-layout"></a>
 <p align="center">
-  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout and ongoing cleanup: Mini/, the Voice directories app, tauri, web, backend, scripts and data, the inherited docs and landing sites, and CHANGELOG.md; the plans, decisions, research and handoffs are the owner's own and are not tracked in Git." />
+  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout: Mini/ holds Null, with the Rust host, the page, the tests and the scripts; .github/workflows holds Null's tests, its releases and the weekly Oh-my-pi check; .github/Readme holds this README's cards. Context/ and Memories/ are the owner's own and are not tracked in Git." />
 </p>
 
 <a id="license"></a>
 <p align="center">
-  <img src=".github/Readme/license.svg" width="100%" alt="License: MIT, clone only voices you own or have permission to use, and the responsible-use, security and contribution files." />
+  <img src=".github/Readme/license.svg" width="100%" alt="License: MIT, see LICENSE. Built by dominionism. A small box, with your agent behind it." />
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src=".github/Readme/link-license.svg" height="30" alt="MIT" /></a>
-  &nbsp;
-  <a href="RESPONSIBLE_USE.md"><img src=".github/Readme/link-responsible.svg" height="30" alt="Responsible use" /></a>
-  &nbsp;
-  <a href="SECURITY.md"><img src=".github/Readme/link-security.svg" height="30" alt="Security" /></a>
-  &nbsp;
-  <a href="CONTRIBUTING.md"><img src=".github/Readme/link-contributing.svg" height="30" alt="Contributing" /></a>
 </p>

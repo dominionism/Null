@@ -6,9 +6,6 @@ name: Null release
 # A tag like null-v0.1.0 builds that version and publishes it as a release, with a checksum.
 # A push that changes this file, or a run started by hand, only builds, and keeps the app with
 # the run for a few days, so the build can be tried without publishing anything.
-#
-# The tag is null-v and not v: the workflow in release.yml, which came with the Voice app,
-# answers to v tags and builds that app.
 on:
   push:
     tags:

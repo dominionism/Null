@@ -505,10 +505,10 @@ mod tests {
 
     #[test]
     fn an_http_mcp_server_carries_its_headers() {
-        let entry = json!({ "type": "http", "url": "http://127.0.0.1:17493/mcp", "headers": { "X-Id": "omp" } });
-        let server = mcp_server_from_config("voicebox", &entry, &json!({ "http": true, "sse": false })).unwrap();
+        let entry = json!({ "type": "http", "url": "http://127.0.0.1:8080/mcp", "headers": { "X-Id": "omp" } });
+        let server = mcp_server_from_config("notes", &entry, &json!({ "http": true, "sse": false })).unwrap();
 
-        assert_eq!(server, json!({ "type": "http", "name": "voicebox", "url": "http://127.0.0.1:17493/mcp", "headers": [{ "name": "X-Id", "value": "omp" }] }));
+        assert_eq!(server, json!({ "type": "http", "name": "notes", "url": "http://127.0.0.1:8080/mcp", "headers": [{ "name": "X-Id", "value": "omp" }] }));
     }
 
     #[test]
