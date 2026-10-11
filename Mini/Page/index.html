@@ -1294,10 +1294,9 @@
         if (caret.className !== before) mood(allSay(state));
       };
 
-      // The box's own commands take their own colour as they are typed, so it is
-      // plain they will be carried out here. Anything else that starts with "/"
-      // stays white: it goes to the agent as typed. Each has a few words for the
-      // list that a lone "/" or a mistyped command opens.
+      // The box's own commands, each with a few words for the list that a lone "/" or
+      // a mistyped command opens. They take the command's colour as they are typed,
+      // as the harness's do: both are carried out, not sent as a message.
       const ABOUT = [
         ['/model', 'choose the model'],
         ['/backup', 'the models to carry on with'],
@@ -1313,7 +1312,6 @@
         ['/new', 'start a new conversation'],
         ['/quit', 'quit Null'],
       ];
-      const COMMANDS = ABOUT.map(([name]) => name);
 
       // The commands the harness says it can carry out itself, as it last said
       // so: one frame for each conversation, at its start and when the list
@@ -1365,14 +1363,14 @@
         return harnessSaid;
       };
 
+      // A command takes the command's colour as it is typed, so it is plain that it
+      // will be carried out rather than sent as a message: the box's own and the
+      // harness's alike, since both are commands. A word neither of them knows
+      // stays plain, which is what a slip looks like.
       const tint = () => {
         const text = input.value;
-        const command =
-          !picker &&
-          !signin &&
-          text.startsWith('/') &&
-          (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/attach ') || text.startsWith('/history ') || text.startsWith('/folder ') || text.startsWith('/rename ') || COMMANDS.some((name) => name.startsWith(text)));
-        input.classList.toggle('command', command);
+        const known = allAbout().some((one) => [one.name, one.sends].some((form) => form.startsWith(text) || text.startsWith(`${form} `)));
+        input.classList.toggle('command', !picker && !signin && text.startsWith('/') && known);
       };
 
       // Words appear only for something the user has to know, and then go away.
@@ -2670,10 +2668,9 @@
           const wide = Math.max(...rows.map((one) => one.name.length));
           rows.forEach((one) => {
             const selected = picker.shown.indexOf(one) === picker.index;
-            // The harness's names stay white: it is the harness that carries them
-            // out, not the box.
-            const name = el('span', one.harness ? null : 'command', one.name.padEnd(wide));
-            const row = el('div', selected ? 'option selected' : 'option', name, el('span', 'id', one.words));
+            // Both kinds take the command's colour: it is a command either way, and
+            // the heading above says whose it is.
+            const row = el('div', selected ? 'option selected' : 'option', el('span', 'command', one.name.padEnd(wide)), el('span', 'id', one.words));
             row.addEventListener('click', () => {
               chooseCommand(one);
               input.focus();
