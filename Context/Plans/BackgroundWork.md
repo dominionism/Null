@@ -6,12 +6,12 @@
 > history and the pet. It replaces those three items, which were written for a mini inside the
 > Voice desktop app and its server.
 >
-> Status: **The tools for history are built and on `main` (items 1 to 5, 2026-10-10): the list
-> of commands, renaming, deleting to the Trash and searching inside, each by its own pull
-> request (#42 to #45), and the version says 0.3.0. The owner has tried none of it yet, and
-> nothing is installed or released. Next: item 6, at the owner's word. Work in the background
-> itself (items 7 to 14) is not started. The owner confirmed the goal and settled all twelve
-> decisions.**
+> Status: **The tools for history are built and released as Null 0.3.0 (items 1 to 6,
+> 2026-10-10): the list of commands, renaming, deleting to the Trash and searching inside, each
+> by its own pull request (#42 to #45, and #47 for a fault the owner's use found). The owner's
+> Mac runs the release. The owner used deleting; the log shows no title given and no search
+> yet. Next: work in the background itself (items 7 to 14), which is not started. The owner
+> confirmed the goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -264,8 +264,8 @@ both groups change the same list in the page: built one after the other, they do
      stays what it is today, a lone slash-word with nothing after it.
    - Source: specified from user (decision 7) + inferred from codebase (`COMMANDS`, the list
      `/model` uses).
-   - Status: In progress. Built on the branch `command-list` (2026-10-10); not yet tried by
-     the owner
+   - Status: Complete (2026-10-10). On `main` with pull request #42 and in Null 0.3.0. Not
+     known to have been tried by the owner: the log does not say when the list is opened
    - **Built:** in the page, each command has a few words (`ABOUT`), and a section of its own
      draws them as a list with the keys and the typing taken before the field's own handlers,
      as the history list does. A lone `/` and Enter lists all eleven. A slash-word that is no
@@ -307,8 +307,8 @@ both groups change the same list in the page: built one after the other, they do
    - Depends on: 1 (a twelfth command needs the list).
    - Risk: none that reaches past the box. The harness's file is not touched.
    - Source: specified from user (decision 10) + inferred from codebase (`history::titles`).
-   - Status: In progress. Built on the branch `rename-conversation` (2026-10-10); not yet
-     tried by the owner
+   - Status: Complete (2026-10-10). On `main` with pull request #43 and in Null 0.3.0. Not
+     tried by the owner as far as the log shows: no title was given
    - **Built:** `history.rs` keeps two kinds of title, the ones Null makes and the ones the
      owner gives (`Titles`), in `history.json` under `titles`, as before, and `renamed`. A
      file an older Null wrote reads as it did. A new command, `rename_conversation`, with no
@@ -359,8 +359,9 @@ both groups change the same list in the page: built one after the other, they do
      Trash itself, which is why nothing is erased.
    - Source: specified from user (decision 9) + researched finding (the trial) + inferred
      from codebase.
-   - Status: In progress. Built on the branch `delete-conversation` (2026-10-10); not yet
-     tried by the owner
+   - Status: Complete (2026-10-10). On `main` with pull requests #44 and #47 and in Null
+     0.3.0. Used by the owner on the installed build: more than twenty conversations went to
+     the Trash, and one fault was found and mended
    - **Built:** `history.rs` finds a conversation's file by its id (`file_of`), asks macOS
      which programs have it open (`held_by`) and moves it to the Trash with macOS's own call
      (`to_trash`). A new command, `delete_conversation`: it refuses a conversation whose
@@ -437,8 +438,8 @@ both groups change the same list in the page: built one after the other, they do
      shown, and the harness check.
    - Source: specified from user (decision 11) + researched finding (the timing) + inferred
      from codebase.
-   - Status: In progress. Built on the branch `search-inside` (2026-10-10); not yet tried by
-     the owner
+   - Status: Complete (2026-10-10). On `main` with pull request #45 and in Null 0.3.0. Not
+     tried by the owner as far as the log shows: no search was made
    - **Built:** a new module, `Mini/src/search.rs`, in the two steps planned: every
      conversation's file looked through whole for the words, on every core, and only the
      files that have them all read line by line for who said what. A new command,
@@ -505,10 +506,33 @@ both groups change the same list in the page: built one after the other, they do
    - What: in the order of `PetAndBox.md` item 8. An installed 0.2.0 can then see `/update` say
      that a newer Null is out, which nothing has shown yet (`OwnHarness.md`, item 7).
    - Depends on: 5.
-   - Status: In progress. Step 1 is done (2026-10-10): `Mini/Cargo.toml` and
-     `Mini/tauri.conf.json` say 0.3.0 and the README is up to date. The number publishes
-     nothing; only a tag does. Next, at the owner's word: `main` built and installed on the
-     owner's Mac over the released 0.2.0, for the owner to use
+   - Status: Complete (2026-10-10). Null 0.3.0 is released, and the owner's Mac runs the
+     release
+   - **Step 1:** pull request #46. `main` says 0.3.0 and the README is up to date.
+   - **Step 2, the install:** at the owner's word ("Yes, let's build main and install the
+     latest version to my mac"), `Mini/Scripts/install` on `main` at `e1b2ce7`. The box had
+     been idle for two hours. Afterwards: 0.3.0, the seal holds, the same designated
+     requirement, the checksum of the Oh-my-pi inside, the login item running, "started,
+     version 0.3.0" and "Full Disk Access is on" in the log, and the keychain list as it was.
+   - **Step 3, what the owner's use turned up:** the x did not always delete ("It keep saying
+     that something is opened in another program"). Found, mended and installed again from
+     `main` at `71dec65` (item 3; pull request #47).
+   - **Step 4, the release:** at the owner's word ("New release."), the tag `null-v0.3.0` on
+     `main` at `71dec65`. Only Null's own workflows answered the tag. GitHub published
+     `Null-0.3.0-macos-arm64.zip` (97 MB) with `SHA256SUMS.txt`; fetched with `gh`, the
+     checksum matched, the seal held, the app says 0.3.0, and the Oh-my-pi inside has the
+     checksum of `Engine.toml` and its author's signature. Then the one-line install with no
+     version named, after checking that the script GitHub serves is the one in the
+     repository: it found 0.3.0 as the newest, signed it with the identity on the Mac and
+     replaced the build made here. No reply was under way. Afterwards, the same checks as
+     after step 2, all as they should be.
+   - **Released before the owner had tried all of it.** The owner gave the word five minutes
+     after the mended build was installed. By the log, the box was opened once in that time
+     and nothing was deleted, so the mend for deleting was not seen to work by the owner
+     before the release, and neither renaming nor searching had been used. Said to the owner
+     with the release.
+   - **Still not proven by anyone's hand:** `/update` on an installed 0.2.0 saying that 0.3.0
+     is out (the owner's Mac went from 0.2.0 to builds of 0.3.0 without asking it).
    - **To try by hand, since nothing but the owner's hand proves it:** a lone `/`; a mistyped
      command; `/rename`; the pencil and Command+R in `/history`; the x and Command+Delete,
      and "Put Back" in the Trash; a word that was said in a conversation and is in no title.
