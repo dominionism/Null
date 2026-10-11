@@ -264,7 +264,8 @@ def surface(c):
         "**Readable without getting bigger.** Streamed Markdown, folded tool steps, and code, tables "
         "and diagrams that scroll sideways instead of wrapping.",
         "**Today:** a standalone macOS text app with a small pet beside it, installed with one "
-        "command. Voice, background tasks and workspaces are planned, not built.",
+        "command. Several conversations can work at once, each in a folder you choose. Voice is "
+        "planned, not built.",
     ])
     c.note("The banner above is an illustration, not a recording of an agent session.")
 
@@ -327,7 +328,7 @@ def use_null(c):
         ("Control+Space", "Show or hide the box"),
         ("Enter", "Send a message, or choose a list entry"),
         ("Esc", "Close a picker, cancel sign-in, or hide the box"),
-        ("Ctrl+C", "Stop the reply; when idle, quit and close the conversation"),
+        ("Ctrl+C", "Stop the reply; when idle, quit and close the conversation, after one warning if others are still working"),
         ("↑", "Recall the last prompt in an empty field"),
         ("/ then Enter", "List the box's commands, each with a few words"),
         ("Drag", "Move the box; click away hides it"),
@@ -335,7 +336,9 @@ def use_null(c):
         c.row(key, value)
     c.note("The arrow pulses while the agent works and turns amber when it asks. The pet beside the "
            "box shows the same, hops once when a reply ends and sinks when one fails. The transcript "
-           "grows to about ten lines, then scrolls. Hiding the box does not stop a reply.")
+           "grows to about ten lines, then scrolls. Hiding the box does not stop a reply, and neither "
+           "does /new or opening another conversation: it goes on working, the pet speaks for it, "
+           "and /history lists it first.")
 
 
 def commands(c):
@@ -347,11 +350,12 @@ def commands(c):
         ("/harness", "See which Oh-my-pi the box runs, the built-in one or your own, and switch between them"),
         ("/update", "Move the built-in Oh-my-pi to the newest version the repository's harness check has passed, and say when a newer Null is out and what gets it"),
         ("/attach [path]", "Hand the agent a file with the next message: choose it from a list of your folders inside the box, or give its path. The plus at the end of the row does the same"),
-        ("/history [words]", "List the earlier conversations, the box's own and the terminal's, and open one again. Typing narrows the list by title and folder, then adds the conversations in which those words were said. Tab sorts it by folder. On a row, the pencil renames and the x moves the conversation to the Trash. The button after the plus opens the same list"),
+        ("/history [words]", "List the earlier conversations, the box's own and the terminal's, and open one again. Typing narrows the list by title and folder, then adds the conversations in which those words were said. Tab sorts it by folder. On a row, the pencil renames and the x moves the conversation to the Trash. Conversations that are working, asking or not yet looked at come first, under \"now\". The button after the plus opens the same list"),
         ("/rename <title>", "Give the open conversation a title of your own. In /history, Command+R does it for the chosen row, and Command+Delete moves that row to the Trash"),
         ("/pet", "Show the pet beside the box, or put it away"),
-        ("/new", "Start a fresh conversation on the last selected model"),
-        ("/quit", "Quit and clear the saved conversation pointer"),
+        ("/folder [path]", "Start a new conversation in a folder of your choosing, where the agent has that project's files and instructions: pick one that conversations already work in, walk to another, or give its path. The box says where each time such a conversation comes to the front"),
+        ("/new", "Start a fresh conversation on the last selected model, in the box's own folder. A conversation that is working goes on; at most four work at once"),
+        ("/quit", "Quit and clear the saved conversation pointer. With conversations still working it says how many first, and quits when asked again"),
     ]:
         c.row(key, value)
     c.note("A lone unknown /word is not passed to the agent: it opens the list of the box's "
@@ -411,7 +415,7 @@ def signing(c):
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
     c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, and whether the pet shows")
-    c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. And any title you gave with /rename")
+    c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. Any title you gave with /rename. And, while there are any, which conversations are working or not yet looked at: an id and one word each, so that work cut off by a restart is found again")
     c.row("harness.yml", "Settings handed to OMP at every start: no update check, and your backup order when there is one. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
     c.note("Your own OMP settings are not modified. OMP "
@@ -486,13 +490,13 @@ def dev_switches(c):
         ("EXIT_WHEN_READY=1", "Exit after the page loads; no prompt is sent"),
         ("NO_SHORTCUT=1", "Show at startup without claiming Control+Space"),
         ("SMOKE=\"<text>\"", "Send a real harness prompt, log the reply, exit without a window; also SMOKE_MODEL and SMOKE_STOP_AFTER (seconds)"),
-        ("SELFTEST=\"<text>\"", "Type into the real page, a line at a time, each once the page has stopped working: a message, a command, a choice from a list, an answer to a sign-in. Then log what the page shows and exit"),
+        ("SELFTEST=\"<text>\"", "Type into the real page, a line at a time, each once the page has stopped working: a message, a command, a choice from a list, an answer to a sign-in. A line that ends in \" &\" does not wait for its reply. Then log what the page shows and exit"),
         ("PROFILE=<name>", "Pass an isolated profile to OMP and use profile-specific Null settings and harness-settings files"),
         ("BACKUPS=\"m/one,m/two\"", "Override the backup order for this run without changing the saved order"),
         ("UPDATES=<address>", "Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address"),
         ("RELEASE=<address>", "Where /update learns which Null is the newest, in place of GitHub: a made-up address whose last part is a tag, null-v0.2.0"),
         ("FOLDER=<path>", "Run on that folder in place of yours, made if missing: OMP's folder, its MCP definitions and Null's own files are all under it, so a new one is a Mac with nothing signed in"),
-        ("STANDIN=1", "Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and the same for openai and codex; needs FOLDER"),
+        ("STANDIN=1", "Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and /slow, which says the message back a word at a time; the same for openai and codex; needs FOLDER"),
     ]:
         c.row(f"NULL_MINI_{key}", value)
     c.command("NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \\")
@@ -545,17 +549,17 @@ def status(c):
         "Files attached to a message, and every earlier conversation found again with /history",
         "Conversations renamed, moved to the Trash, and found by something said in them",
         "A small pet beside the box that shows what the agent is doing",
+        "Work in the background: several conversations at once, each seen at a glance, in a folder you choose",
     ])
     c.head("Planned or incomplete", MUTED)
     c.bullets([
-        "Work in the background: several conversations at once, each seen at a glance, in a folder you choose",
         "/logout and a sign-in timeout",
         "An npm package around the install command",
         "A resizable transcript and repeatable visual checks",
         "Cloned-voice conversation and other platforms",
     ], muted=True)
     c.note("The latest display, the pet, attached files, history with its renaming, deleting and "
-           "searching, and some provider flows still need "
+           "searching, work in the background, and some provider flows still need "
            "hands-on validation, and no real "
            "provider quota exhaustion has been verified. See the plans for evidence and open "
            "decisions rather than assuming every implemented path is finished.")

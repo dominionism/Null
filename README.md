@@ -25,7 +25,7 @@
 
 <a id="small-surface-real-agent"></a>
 <p align="center">
-  <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Press Control+Space from the app you are in: your tools, not just chat; your providers in one conversation; readable without getting bigger; today, a standalone macOS text app with a small pet beside it, installed with one command." />
+  <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Press Control+Space from the app you are in: your tools, not just chat; your providers in one conversation; readable without getting bigger; today, a standalone macOS text app with a small pet beside it, installed with one command, in which several conversations can work at once, each in a folder you choose." />
 </p>
 
 <a id="get-started"></a>
@@ -74,12 +74,12 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="use-null"></a>
 <p align="center">
-  <img src=".github/Readme/use-null.svg" width="100%" alt="Use Null: Control+Space shows or hides the box, Enter sends or chooses, Esc closes or hides, Ctrl+C stops the reply or quits when idle, the up arrow recalls the last prompt, a lone slash and Enter lists the commands, dragging moves the box, and the pet beside the box shows what the agent is doing." />
+  <img src=".github/Readme/use-null.svg" width="100%" alt="Use Null: Control+Space shows or hides the box, Enter sends or chooses, Esc closes or hides, Ctrl+C stops the reply or quits when idle, after one warning if other conversations are still working, the up arrow recalls the last prompt, a lone slash and Enter lists the commands, dragging moves the box, and the pet beside the box shows what the agent is doing; a conversation goes on working when you start or open another." />
 </p>
 
 <a id="commands"></a>
 <p align="center">
-  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /attach, /history, /rename, /pet, /new and /quit, with what each does; /history also finds a conversation by something said in it, renames one and moves one to the Trash; an unknown command opens the list of commands." />
+  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /attach, /history, /rename, /pet, /folder, /new and /quit, with what each does; /history also finds a conversation by something said in it, renames one, moves one to the Trash, and lists first the ones that are working, asking or not yet looked at; /folder starts a conversation in a folder you choose; /quit warns once while conversations are working; an unknown command opens the list of commands." />
 </p>
 
 <a id="when-a-provider-stops-answering"></a>
@@ -99,7 +99,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="what-null-keeps"></a>
 <p align="center">
-  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, history.json with a title for each conversation made in the box and any title you gave, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
+  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, history.json with a title for each conversation made in the box, any title you gave, and which conversations are working or not yet looked at, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
 </p>
 
 <a id="under-the-hood"></a>
@@ -137,7 +137,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="development-switches-and-smoke-checks"></a>
 <p align="center">
-  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the ten NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider, and the warning that profile isolation does not isolate MCP." />
+  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the ten NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider that can also answer slowly, and the warning that profile isolation does not isolate MCP." />
 </p>
 
 <a id="optional-voice-tools"></a>

@@ -18,10 +18,11 @@
 > #54). No work is stopped silently: `/quit` warns once, a restart of the harness waits,
 > and work that was cut off is found again (item 11, pull request #55). `/folder` starts a
 > conversation in a folder of the owner's choosing (item 12, pull request #56). All of work
-> in the background is built; none of it has been tried by the owner. Next: item 13, the
-> README, the research map and the glossary; then item 14, Null 0.4.0, tried by the owner
-> first and released only at the owner's word. The owner confirmed the goal and settled all
-> twelve decisions.**
+> in the background is built, and the README, the glossary and the research map say so
+> (item 13, pull request #57), with `main` at version 0.4.0. None of it has been tried by
+> the owner. Next: item 14. `main` is built and installed on the owner's Mac at the owner's
+> word, what the owner's use turns up is mended, and Null 0.4.0 is released only at the
+> owner's word. The owner confirmed the goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -1010,7 +1011,23 @@ both groups change the same list in the page: built one after the other, they do
     - What: the README's commands and what Null keeps. The research map. The glossary's
       Conversation line, for how an unseen conversation ended (decision 5).
     - Depends on: 9 to 12.
-    - Status: Not started
+    - Status: Complete (2026-10-10). On `main` with pull request #57
+    - **Done, the README:** six cards made again by `.github/Readme/make_cards.py`, and
+      what the README says of each beside it. Commands: `/folder`; what `/new` and `/quit`
+      do while conversations work; "now" in `/history`. Use Null: a conversation goes on
+      working when another is started or opened, and Ctrl+C at rest warns once. What Null
+      keeps: which conversations are working or not yet looked at. The small surface:
+      several conversations at once, each in a folder of the owner's choosing. Status:
+      work in the background is available and still waits for hands-on use. Development
+      switches: the stand-in's `slow`, and the line of a scripted run that does not wait
+      for its reply. One card looked at as a picture, the commands.
+    - **Done, the glossary:** the Conversation line, for the id and the one word Null
+      keeps of a conversation that is working or unseen. New: hold, pet and attach, the
+      last two left over from `PetAndBox.md`.
+    - **Done, the research map:** it was brought up to date with each item as that item
+      was built (the seventh to the twelfth addition).
+    - **Version:** `main` says 0.4.0 (`Mini/Cargo.toml`, `Mini/tauri.conf.json`,
+      `Mini/Cargo.lock`), the first step of item 14.
 
 14. **Null 0.4.0: tried by the owner first, then released** (decision 12)
     - What: in the order of `PetAndBox.md` item 8.

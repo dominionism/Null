@@ -55,8 +55,12 @@ A reply that carries a provider's "no" in place of an answer: a used-up limit, a
 _Avoid_: error, failure (an error is the harness or the protocol breaking, which is something else)
 
 **Conversation**:
-One exchange between the person and the harness, kept by the harness. Null keeps only which one was open, and a title for each one made in the box or named by the person.
+One exchange between the person and the harness, kept by the harness. Null keeps only which one was open, a title for each one made in the box or named by the person, and, for one that is working or unseen, its id and one word for how it stands.
 _Avoid_: session (the protocol's word), chat, mini session, task, job (a conversation that is working is still a conversation, and the box has no other thing)
+
+**Hold**:
+What Null does with a conversation it keeps a record of while it runs: the open one, and any that is working or unseen. Null keeps what such a conversation says; the harness keeps the conversation.
+_Avoid_: load (the harness loads a conversation back), track, cache
 
 **Open**:
 Said of the one conversation the box is showing.
@@ -105,6 +109,14 @@ _Avoid_: workspace (the code's word), project, directory, cwd
 **The box's own folder**:
 The folder a conversation works in unless the person chooses another with `/folder`.
 _Avoid_: default workspace, home folder, sandbox
+
+**Pet**:
+The small figure beside the box, called Nil. It says the most pressing thing any conversation has to say, where the arrow speaks only for the open one.
+_Avoid_: mascot, avatar, sprite
+
+**Attach**:
+To hand the agent a file with the next message, as the place where the file is. Null reads none of it.
+_Avoid_: upload, send a file
 
 **Harness check**:
 The live tests that ask a real Oh-my-pi the things Null depends on, each named for one of them.
