@@ -12,11 +12,11 @@
 > use found). The owner's Mac runs 0.3.1 from the release. The owner used deleting; the log shows no title given and no search
 > yet. Work in the background itself (items 7 to 14) has begun: the harness check asks what
 > it rests on (item 7, pull request #51), and Null keeps a record for each conversation it
-> holds (item 8, pull request #52). Item 9, where a conversation is left working, is built
-> and waits in pull request #53: it is not on `main` until two scripted runs through the
-> real page have passed, and those stand still while the Mac's screen is locked. Next: those
-> two runs, the merge, then item 10. The owner confirmed the goal and settled all twelve
-> decisions.**
+> holds (item 8, pull request #52). A conversation is left working with `/new` or
+> `/history` and found again, four at most (item 9, pull request #53). That is not to be
+> released before items 10 and 11: until then nothing shows how a conversation stands, and
+> quitting ends what works in the background without a word. Next: item 10. The owner
+> confirmed the goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -722,8 +722,8 @@ both groups change the same list in the page: built one after the other, they do
      stand-in (a slow job, `/new`, a quick question, back through `/history`, the slow reply
      whole), and memory and processes counted with the owner's own Oh-my-pi.
    - Source: specified from user (the goal) + researched finding + inferred from codebase.
-   - Status: Built (2026-10-10), in pull request #53, **not on `main` yet**. It waits for
-     the two scripted runs through the real page that are written out below
+   - Status: Complete (2026-10-10). On `main` with pull request #53. Not to be released
+     before items 10 and 11, for what is listed at the end of this item
    - **Built:** in `Mini/src/harness.rs`, the box turning to another conversation
      (`turn_to`) no longer drops the one it showed: one that is working is kept and goes
      on, and one at rest is held no longer and closed in the harness. A reply that ends
@@ -763,19 +763,24 @@ both groups change the same list in the page: built one after the other, they do
      with its next words following and the arrow and the pet at work; a fifth refused, back
      in the field; `/history` opened over a reply. Eight other states the same byte for
      byte as on `main`.
-   - **Not proven, and the reason it is not merged:** the real app from end to end. Both
-     runs need the Mac's screen unlocked, show a second box for a few seconds and may
-     take the keyboard meanwhile. Each is on a folder of its own with
+   - **Proven on the real app, by script (2026-10-10, at the owner's word, the screen
+     unlocked):** two runs through the real page, each on a folder of its own with
      `{"model":"standin-anthropic/slow","welcomed":true,"asked_full_disk":true}` in its
      `null/settings.json`, started as
      `NULL_MINI_FOLDER=<folder> NULL_MINI_STANDIN=1 NULL_MINI_NO_SHORTCUT=1 NULL_MINI_SELFTEST=<lines> target/debug/null-mini`.
-     - **Left and found again.** The lines: twenty-four words and " &"; `/new`; `/model`;
-       `standin-anthropic/ok`; `quick`; `/history`; the first of the twenty-four words. To
-       see: "the page shows" the twenty-four words twice, the message and the reply said
-       back whole, and in the log a second conversation opened and answered in between.
-     - **A fifth refused.** The lines: four times forty words and " &", then `/new`; then
-       `five`. To see: "the notice says: four conversations are already working. wait for
-       one to end, or stop one", and nothing shown.
+     The pull request was held back until both had passed.
+     - **Left and found again, in 9 seconds.** The lines: twenty-four words and " &";
+       `/new`; `/model`; `standin-anthropic/ok`; `quick`; `/history`; `alder`, the first of
+       the twenty-four. The slow job was left; a second conversation was opened, moved to
+       another model and answered; the box turned back to the first while it was still
+       working, and its reply ended after that. The page showed the twenty-four words
+       twice: the message, and the reply said back whole.
+     - **A fifth refused, in 8 seconds.** The lines: four times sixty words and " &", then
+       `/new`; then `five`. Four conversations were opened and working. The notice said
+       "four conversations are already working. wait for one to end, or stop one", nothing
+       was shown and the arrow was at rest.
+     - **What such a run does to the screen:** a second box for those seconds, and the
+       app that was in front (Ghostty) gave way to it meanwhile.
    - **Also not proven:** one conversation stopped while another goes on, in the real app
      (the harness check asks it of the harness). Memory and processes with the owner's own
      Oh-my-pi and MCP servers. The owner's hand.

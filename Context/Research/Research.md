@@ -36,8 +36,8 @@
 > written in where it belongs, by the session that built it. Nothing else was traced again.
 
 > Ninth addition, 2026-10-10: that a conversation goes on working when the box turns away (item 9
-> of the same plan) was written in where it belongs, by the session that built it. It is true of
-> `main` once pull request #53 is merged. Nothing else was traced again.
+> of the same plan) was written in where it belongs, by the session that built it. Nothing else
+> was traced again.
 
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
