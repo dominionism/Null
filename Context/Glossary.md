@@ -56,7 +56,55 @@ _Avoid_: error, failure (an error is the harness or the protocol breaking, which
 
 **Conversation**:
 One exchange between the person and the harness, kept by the harness. Null keeps only which one was open, and a title for each one made in the box.
-_Avoid_: session (the protocol's word), chat, mini session
+_Avoid_: session (the protocol's word), chat, mini session, task, job (a conversation that is working is still a conversation, and the box has no other thing)
+
+**Open**:
+Said of the one conversation the box is showing.
+_Avoid_: active, current, foreground, selected
+
+**Working**:
+Said of a conversation whose reply is still running, whether it is open or not.
+_Avoid_: running (the reference product's word), busy (the code's word), in progress, at work
+
+**Asking**:
+Said of a conversation that waits for the person's answer before it goes on.
+_Avoid_: needs input, waiting, blocked
+
+**Done**:
+Said of a conversation whose reply ended well.
+_Avoid_: ready, complete, finished
+
+**Failed**:
+Said of a conversation whose reply ended with an error or a refusal.
+_Avoid_: blocked, errored
+
+**Stopped**:
+Said of a conversation whose reply the person ended.
+_Avoid_: cancelled (the protocol's word), interrupted, killed
+
+**Cut off**:
+Said of a conversation that was working when Null or the harness went away.
+_Avoid_: orphaned, crashed, lost
+
+**Unseen**:
+Said of a conversation that ended or began asking while it was not open, and has not been opened since.
+_Avoid_: unread, ready, new
+
+**Now**:
+The first heading in `/history`: every conversation that is working, asking or unseen.
+_Avoid_: activity tray, tasks, running
+
+**Work in the background**:
+A conversation working while it is not open, or while the box is put away. It is not a mode, and not a thing of its own.
+_Avoid_: background task, background job, background session
+
+**Folder**:
+Where a conversation works: the place its agent reads and changes files in. It is chosen when the conversation starts and does not change.
+_Avoid_: workspace (the code's word), project, directory, cwd
+
+**The box's own folder**:
+The folder a conversation works in unless the person chooses another with `/folder`.
+_Avoid_: default workspace, home folder, sandbox
 
 **Harness check**:
 The live tests that ask a real Oh-my-pi the things Null depends on, each named for one of them.
