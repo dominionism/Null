@@ -19,10 +19,11 @@
 > and work that was cut off is found again (item 11, pull request #55). `/folder` starts a
 > conversation in a folder of the owner's choosing (item 12, pull request #56). All of work
 > in the background is built, and the README, the glossary and the research map say so
-> (item 13, pull request #57), with `main` at version 0.4.0. None of it has been tried by
-> the owner. Next: item 14. `main` is built and installed on the owner's Mac at the owner's
-> word, what the owner's use turns up is mended, and Null 0.4.0 is released only at the
-> owner's word. The owner confirmed the goal and settled all twelve decisions.**
+> (item 13, pull request #57), with `main` at version 0.4.0. The owner's Mac runs a build
+> of `main` at 0.4.0, installed at the owner's word on 2026-10-11 (item 14, step 2). None
+> of it has been tried by the owner yet. Next: what the owner's use turns up is mended,
+> each as a small pull request, and Null 0.4.0 is released only at the owner's word. The
+> owner confirmed the goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -1032,7 +1033,25 @@ both groups change the same list in the page: built one after the other, they do
 14. **Null 0.4.0: tried by the owner first, then released** (decision 12)
     - What: in the order of `PetAndBox.md` item 8.
     - Depends on: 13.
-    - Status: Not started
+    - Status: In progress (2026-10-11). The owner's Mac runs a build of `main` at 0.4.0.
+      Not released: no tag has been pushed
+    - **Step 1:** pull request #57. `main` says 0.4.0 and the README is up to date.
+    - **Step 2, the install:** at the owner's word ("Merge all of our work into main and
+      build the latest version and install the latest version"). Everything was already
+      in `main`: pull requests #51 to #57, none open. `main` at `f0ef9db` was built first
+      (`cargo tauri build`), the installed Null's log showed no reply under way since it
+      was started, and then `Mini/Scripts/install` ran. Afterwards: 0.4.0, the seal
+      holds, the same designated requirement as before, the checksum of the Oh-my-pi
+      inside is the one `Engine.toml` names, the login item running, "started, version
+      0.4.0" and "Full Disk Access is on" in the log, and the keychain list as it was.
+    - **To try by hand, since nothing but the owner's hand proves it:** a long job, then
+      `/new` and another question, and the pet meanwhile; `/history`, and the job under
+      "now"; opening it again while it works and after it has ended; the line that says
+      another conversation is done, and a press on it; `/folder` with a path and from its
+      list, in a real project, and the folder said when that conversation comes back to
+      the front; `/quit` while a job runs, and `/quit` again; a fifth job with four
+      working. The installed Null runs the owner's own Oh-my-pi ("yours"), with the
+      owner's MCP servers, which none of the checks used.
 
 15. **The pet stays while work goes on** (decision 1: a prototype first, outside the releases)
     - What: first a prototype for the owner to live with. Then: when the box is put away while a
