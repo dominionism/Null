@@ -167,6 +167,11 @@ pub fn replayed(updates: &[Value]) -> Vec<Value> {
     let mut tools = HashMap::new();
     let mut events = Vec::new();
     for mut event in updates.iter().filter_map(|update| translate::event_from_update(update, &mut tools)) {
+        // What the harness can carry out is no part of what was said in the
+        // conversation: it is kept for it where it arrives (see `open_earlier`).
+        if event["type"] == "commands" {
+            continue;
+        }
         if event["type"] == "text_delta" && event["thinking"] == true {
             continue;
         }

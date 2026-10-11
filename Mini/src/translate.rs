@@ -37,6 +37,8 @@ pub fn event_from_update(update: &Value, tools: &mut HashMap<String, Value>) -> 
             let text = update.pointer("/content/text")?.as_str()?;
             Some(crate::attach::said_again(text))
         }
+        // What the harness can carry out itself, beside the box's own commands.
+        "available_commands_update" => commands_said(update),
         "tool_call" | "tool_call_update" => {
             let call_id = update.get("toolCallId")?.as_str()?.to_string();
             let known = tools.get(&call_id).cloned().unwrap_or(Value::Null);
@@ -60,6 +62,30 @@ pub fn event_from_update(update: &Value, tools: &mut HashMap<String, Value>) -> 
         }
         _ => None,
     }
+}
+
+/// What a harness says it can carry out, as the box needs it: the name it
+/// answers to, the harness's own few words for it, and what it expects. None
+/// for an update that is not a harness saying so.
+pub fn commands_said(update: &Value) -> Option<Value> {
+    if update.get("sessionUpdate")?.as_str()? != "available_commands_update" {
+        return None;
+    }
+    let commands: Vec<Value> = update.get("availableCommands")?.as_array()?.iter().filter_map(command_from).collect();
+    Some(json!({ "type": "commands", "commands": commands }))
+}
+
+/// One of them. A command with no name is of no use to the box, and is left out.
+fn command_from(command: &Value) -> Option<Value> {
+    let name = command.get("name")?.as_str()?;
+    if name.is_empty() {
+        return None;
+    }
+    Some(json!({
+        "name": name,
+        "words": command.get("description").and_then(Value::as_str).unwrap_or(""),
+        "hint": command.pointer("/input/hint").and_then(Value::as_str).unwrap_or(""),
+    }))
 }
 
 /// How one reply ended, in the box's words. A failure is an error event, not a stop reason.
@@ -355,6 +381,25 @@ mod tests {
     fn an_update_the_box_has_no_use_for_is_dropped() {
         let usage = json!({ "sessionUpdate": "usage_update", "used": 10, "size": 100 });
         assert_eq!(event_from_update(&usage, &mut HashMap::new()), None);
+    }
+
+    #[test]
+    fn the_commands_a_harness_says_it_has_are_kept_for_the_box() {
+        let said = json!({ "sessionUpdate": "available_commands_update", "availableCommands": [
+            { "name": "skill:blueprint", "description": "Create an optimal plan.", "input": { "hint": "arguments" } },
+            { "name": "review" },
+            { "description": "no name at all" },
+            { "name": "" },
+        ] });
+        assert_eq!(
+            event_from_update(&said, &mut HashMap::new()),
+            Some(json!({ "type": "commands", "commands": [
+                { "name": "skill:blueprint", "words": "Create an optimal plan.", "hint": "arguments" },
+                { "name": "review", "words": "", "hint": "" },
+            ] }))
+        );
+        // An update that is not a harness saying so is still nobody's.
+        assert_eq!(commands_said(&json!({ "sessionUpdate": "usage_update" })), None);
     }
 
     #[test]

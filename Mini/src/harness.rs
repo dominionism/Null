@@ -1047,6 +1047,12 @@ impl Connection<'_> {
         // An earlier conversation is on the model it was left on, which may be another.
         let model = with(self.shared, which, |held| held.model.clone()).flatten().filter(|model| before.as_ref() != Some(model));
         publish(self.app, self.shared, which, json!({ "type": "conversation_opened", "events": events, "model": model, "folder": elsewhere.as_deref().map(attach::said_path) }));
+        // What the harness can carry out is said as soon as a session starts,
+        // which for a conversation loaded back from the list is while it is
+        // still loading. It belongs to that one, and is kept, not replayed.
+        if let Some(said) = replayed.iter().find_map(translate::commands_said) {
+            publish(self.app, self.shared, which, said);
+        }
         tell_work(self.app, self.shared);
         // The one that was left at rest, unless it is this same one, opened again.
         if let Some(left) = left.filter(|left| left != id) {
