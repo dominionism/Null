@@ -223,6 +223,12 @@ pub fn said(app: &AppHandle, id: &str, text: &str) {
     });
 }
 
+/// The title Null keeps for a conversation: the one the owner gave, or else
+/// the one Null made.
+pub fn title_of(app: &AppHandle, id: &str) -> Option<String> {
+    titles(app, |titles| titles.given.get(id).or_else(|| titles.made.get(id)).cloned())
+}
+
 /// A conversation was opened from the list and replayed. One the harness gave
 /// no title, and Null has none for, gets its title from what was said first.
 pub fn opened(app: &AppHandle, id: &str, events: &[Value]) {

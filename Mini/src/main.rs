@@ -116,6 +116,7 @@ fn main() {
             harness::set_model,
             harness::new_conversation,
             harness::events_since,
+            harness::work,
             harness::report,
             history::history,
             history::open_conversation,

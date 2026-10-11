@@ -100,6 +100,33 @@ enum Replay {
     Show,
 }
 
+/// How a conversation's last reply ended.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Ended {
+    Done,
+    /// With an error, or with a provider's or a model's refusal.
+    Failed,
+    /// By the person.
+    Stopped,
+}
+
+/// One conversation with something to say for itself, as the page is told of it.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Work {
+    /// The number Null knows it by.
+    conversation: u64,
+    /// The harness's id for it, once it has one: what `/history` lists it under.
+    id: Option<String>,
+    /// How it stands: working, asking, done, failed or stopped.
+    standing: &'static str,
+    /// It ended while the box showed another conversation, and has not been shown since.
+    unseen: bool,
+    /// It is the one the box shows.
+    open: bool,
+    /// The title Null keeps for it, when it keeps one.
+    title: Option<String>,
+}
+
 /// One conversation this run knows: how it stands, and what was said in it
 /// since Null came to hold it. The harness keeps the conversation itself.
 #[derive(Default)]
@@ -124,6 +151,24 @@ struct Conversation {
     /// Its reply ended while the box showed another conversation, and it has
     /// not been shown since. It is kept until it has been.
     unseen: bool,
+    /// How its last reply ended. None until one has.
+    ended: Option<Ended>,
+}
+
+impl Conversation {
+    /// How it stands, in the box's own words. A reply under way is working,
+    /// or asking while it waits for the person's answer. Otherwise it is as
+    /// its last reply ended. None for one that nothing has been asked of yet.
+    fn standing(&self) -> Option<&'static str> {
+        if self.busy {
+            return Some(if self.pending.is_empty() { "working" } else { "asking" });
+        }
+        self.ended.map(|ended| match ended {
+            Ended::Done => "done",
+            Ended::Failed => "failed",
+            Ended::Stopped => "stopped",
+        })
+    }
 }
 
 struct Shared {
@@ -149,13 +194,17 @@ struct Shared {
     /// and what the harness has replayed of it so far. Nothing of it is shown
     /// until it has loaded.
     opening: Option<(String, Vec<Value>)>,
+    /// How the conversations stood when the page was last told, and how many
+    /// times it has been told: a page that hears two tellings out of their
+    /// order keeps the later one.
+    told: (u64, Vec<Work>),
 }
 
 impl Shared {
     /// A box with one conversation in it: the one that was open last, to be
     /// loaded back, or a new one that the first message opens.
     fn new(session: Option<String>, model: Option<String>) -> Shared {
-        let mut shared = Shared { held: HashMap::new(), open: 0, numbered: 0, seq: 0, models: Vec::new(), approvals: 0, noted: None, counts_tokens: false, opening: None };
+        let mut shared = Shared { held: HashMap::new(), open: 0, numbered: 0, seq: 0, models: Vec::new(), approvals: 0, noted: None, counts_tokens: false, opening: None, told: (0, Vec::new()) };
         shared.open = shared.hold(Conversation { session, model, ..Default::default() });
         shared
     }
@@ -216,6 +265,22 @@ impl Shared {
         let model = self.open_one().model.clone();
         let which = self.hold(Conversation { model, ..Default::default() });
         (which, self.turn_to(which))
+    }
+
+    /// Every conversation with something to say for itself: one that is working
+    /// or asking, and one that waits to be seen. The most pressing first: one
+    /// that asks, then one that failed, one that is done, one that is working.
+    /// Among equals, the newer first.
+    fn work(&self) -> Vec<Work> {
+        let mut work: Vec<Work> = self
+            .held
+            .iter()
+            .filter(|(_, held)| held.busy || held.unseen)
+            .filter_map(|(which, held)| Some(Work { conversation: *which, id: held.session.clone(), standing: held.standing()?, unseen: held.unseen, open: *which == self.open, title: None }))
+            .collect();
+        let pressing = |standing: &str| ["asking", "failed", "done", "working"].iter().position(|known| *known == standing).unwrap_or(4);
+        work.sort_by_key(|one| (pressing(one.standing), std::cmp::Reverse(one.conversation)));
+        work
     }
 
     /// How many conversations are working.
@@ -312,6 +377,29 @@ fn describe(error: &agent_client_protocol::Error) -> String {
     }
 }
 
+/// Tell the page how the conversations stand, when that has changed since it
+/// was last told: the pet speaks for all of them, and `/history` names each.
+fn tell_work(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
+    let (told, work) = {
+        let mut shared = lock(shared);
+        let work = shared.work();
+        if work == shared.told.1 {
+            return;
+        }
+        shared.told = (shared.told.0 + 1, work.clone());
+        (shared.told.0, work)
+    };
+    let _ = app.emit_to(panel::LABEL, "mini:work", json!({ "told": told, "conversations": titled(app, work) }));
+}
+
+/// The same with the title Null keeps for each, which is what the notice line calls it by.
+fn titled(app: &AppHandle, mut work: Vec<Work>) -> Vec<Work> {
+    for one in &mut work {
+        one.title = one.id.as_deref().and_then(|id| history::title_of(app, id));
+    }
+    work
+}
+
 /// End a conversation's reply in flight, if there is one, with an error the box can show.
 fn fail_reply(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, event: Value) {
     if !with(shared, which, |held| held.busy).unwrap_or(false) {
@@ -319,17 +407,20 @@ fn fail_reply(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, event: V
     }
     publish(app, shared, which, json!({ "type": "status_change", "status": "blocked", "reason": event["message"] }));
     publish(app, shared, which, event);
-    finish(shared, which);
+    finish(shared, which, Ended::Failed);
+    tell_work(app, shared);
 }
 
-/// The reply is over: free the conversation and answer any approval still open
-/// as cancelled. One that the box is not showing waits to be seen.
-fn finish(shared: &Arc<Mutex<Shared>>, which: u64) {
+/// The reply is over, and this is how it ended: free the conversation and
+/// answer any approval still open as cancelled. One that the box is not
+/// showing waits to be seen.
+fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) {
     let pending: Vec<_> = {
         let mut shared = lock(shared);
         let open = shared.open;
         shared.of(which).map(|held| {
             held.busy = false;
+            held.ended = Some(ended);
             held.unseen = which != open;
             held.pending.drain().map(|(_, responder)| responder).collect()
         })
@@ -675,7 +766,14 @@ impl Connection<'_> {
                                 }
                                 publish(&app, &shared, which, json!({ "type": "status_change", "status": "ready", "reason": null }));
                                 publish(&app, &shared, which, json!({ "type": "message_done", "stop_reason": reason }));
-                                finish(&shared, which);
+                                let ended = match reason {
+                                    _ if failed => Ended::Failed,
+                                    "refused" => Ended::Failed,
+                                    "cancelled" => Ended::Stopped,
+                                    _ => Ended::Done,
+                                };
+                                finish(&shared, which, ended);
+                                tell_work(&app, &shared);
                                 // The user has now seen Null answer: the moment to ask for Full Disk Access.
                                 if !failed && reason == "completed" {
                                     access::after_reply(&app);
@@ -699,6 +797,7 @@ impl Connection<'_> {
                     }
                     let cancel: CancelNotification = typed(json!({ "sessionId": session }))?;
                     self.cx.send_notification(cancel).map_err(|e| describe(&e))?;
+                    tell_work(self.app, self.shared); // it asks no longer
                 }
             }
             Command::Restart => {} // taken by the loop that calls this
@@ -804,6 +903,7 @@ impl Connection<'_> {
         if let Some((which, left)) = held {
             settings::update(self.app, |settings| settings.session = Some(id.to_string()));
             log!("the box turned to the conversation {id}, which this run held");
+            tell_work(self.app, self.shared);
             if let Some(left) = left {
                 self.close(&left).await;
             }
@@ -843,6 +943,7 @@ impl Connection<'_> {
         // An earlier conversation is on the model it was left on, which may be another.
         let model = with(self.shared, which, |held| held.model.clone()).flatten().filter(|model| before.as_ref() != Some(model));
         publish(self.app, self.shared, which, json!({ "type": "conversation_opened", "events": events, "model": model }));
+        tell_work(self.app, self.shared);
         // The one that was left at rest, unless it is this same one, opened again.
         if let Some(left) = left.filter(|left| left != id) {
             self.close(&left).await;
@@ -1084,6 +1185,7 @@ fn on_permission(
         .collect();
     publish(app, shared, which, json!({ "type": "status_change", "status": "needs_input", "reason": null }));
     publish(app, shared, which, json!({ "type": "approval_request", "request_id": request_id, "title": title, "options": options, "call_id": call_id }));
+    tell_work(app, shared);
 }
 
 // ── What the page may ask ─────────────────────────────────────────────────
@@ -1108,10 +1210,13 @@ pub fn working(app: &AppHandle, id: &str) -> bool {
 /// it is held no longer.
 pub fn forget(app: &AppHandle, id: &str) {
     let harness = app.state::<Harness>();
-    let mut shared = lock(&harness.shared);
-    if let Some(which) = shared.named(id).filter(|which| *which != shared.open) {
-        shared.held.remove(&which);
+    {
+        let mut shared = lock(&harness.shared);
+        if let Some(which) = shared.named(id).filter(|which| *which != shared.open) {
+            shared.held.remove(&which);
+        }
     }
+    tell_work(app, &harness.shared);
 }
 
 /// Have the harness let go of a conversation the box has turned away from. Nobody waits for it.
@@ -1137,6 +1242,7 @@ pub fn send_text(app: &AppHandle, text: String) -> Result<u64, String> {
     let files = attach::take(app).inspect_err(|_| {
         with(&harness.shared, which, |held| held.busy = false);
     })?;
+    tell_work(app, &harness.shared);
     publish(app, &harness.shared, which, attach::said(&text, &files));
     publish(app, &harness.shared, which, json!({ "type": "status_change", "status": "running", "reason": null }));
     if let Err(reason) = order(&harness, Command::Send { which, text, files }) {
@@ -1170,6 +1276,7 @@ pub fn respond(app: AppHandle, request_id: String, answer: String) -> Result<(),
     let response: RequestPermissionResponse = typed(json!({ "outcome": { "outcome": "selected", "optionId": answer } }))?;
     responder.respond(response).map_err(|e| describe(&e))?;
     publish(&app, &harness.shared, which, json!({ "type": "status_change", "status": "running", "reason": null }));
+    tell_work(&app, &harness.shared);
     Ok(())
 }
 
@@ -1200,7 +1307,20 @@ pub fn new_conversation(app: AppHandle) -> Result<u64, String> {
     let (which, left) = lock(&harness.shared).start_over();
     settings::update(&app, |settings| settings.session = None);
     let_go_of(&harness, left);
+    tell_work(&app, &harness.shared);
     Ok(which)
+}
+
+/// How the conversations stand, for a page that has just loaded: the same as
+/// `mini:work` tells it at every change.
+#[tauri::command]
+pub fn work(app: AppHandle) -> Value {
+    let harness = app.state::<Harness>();
+    let (told, work) = {
+        let shared = lock(&harness.shared);
+        (shared.told.0, shared.work())
+    };
+    json!({ "told": told, "conversations": titled(&app, work) })
 }
 
 /// Have the harness let go of a conversation, if one is running and holds it.
@@ -1489,7 +1609,7 @@ mod tests {
             *shared.open_one() = Conversation { busy: true, ..opened("one") };
             (shared.open, shared.start_over().0)
         };
-        finish(&shared, working);
+        finish(&shared, working, Ended::Done);
         let mut shared = lock(&shared);
         assert!(shared.of(working).is_some_and(|held| !held.busy && held.unseen), "it is kept, at rest and not yet seen");
 
@@ -1502,7 +1622,7 @@ mod tests {
     fn a_reply_that_ends_in_the_open_conversation_has_been_seen() {
         let shared = Arc::new(Mutex::new(Shared::new(None, None)));
         let open = lock(&shared).begin_reply().expect("it may work").0;
-        finish(&shared, open);
+        finish(&shared, open, Ended::Done);
         assert!(lock(&shared).of(open).is_some_and(|held| !held.busy && !held.unseen));
     }
 
@@ -1523,6 +1643,38 @@ mod tests {
         shared.of(one).unwrap().busy = false;
         shared.start_over();
         assert!(shared.begin_reply().is_ok(), "one has ended, so there is room again");
+    }
+
+    #[test]
+    fn the_page_is_told_of_what_works_asks_or_waits_to_be_seen_the_most_pressing_first() {
+        let shared = Arc::new(Mutex::new(Shared::new(None, None)));
+        // Four left behind: one done, one failed, one stopped by the person and one still working.
+        let mut left = Vec::new();
+        for (session, ended) in [("done", Some(Ended::Done)), ("failed", Some(Ended::Failed)), ("stopped", Some(Ended::Stopped)), ("working", None)] {
+            let which = {
+                let mut shared = lock(&shared);
+                *shared.open_one() = Conversation { busy: true, ..opened(session) };
+                let which = shared.open;
+                shared.start_over();
+                which
+            };
+            if let Some(ended) = ended {
+                finish(&shared, which, ended);
+            }
+            left.push(which);
+        }
+        let mut shared = lock(&shared);
+        let told = |shared: &Shared| shared.work().iter().map(|one| (one.id.clone().unwrap_or_default(), one.standing, one.unseen, one.open)).collect::<Vec<_>>();
+        assert_eq!(told(&shared), [("failed".to_string(), "failed", true, false), ("done".to_string(), "done", true, false), ("working".to_string(), "working", false, false), ("stopped".to_string(), "stopped", true, false)]);
+
+        // The new one the box shows has nothing to say until something is asked of it.
+        let open = shared.begin_reply().expect("it may work").0;
+        assert_eq!(told(&shared)[2], (String::new(), "working", false, true), "the newer of the two that work comes first");
+        assert_eq!(shared.work()[2].conversation, open);
+
+        // Shown, one has been seen; at rest, it has nothing more to say.
+        shared.turn_to(left[1]);
+        assert!(!told(&shared).iter().any(|one| one.0 == "failed"));
     }
 
     #[test]
