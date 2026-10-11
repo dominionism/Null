@@ -73,6 +73,8 @@ fn page_ready(app: tauri::AppHandle) {
     if access::asking() {
         let _ = app.emit_to(panel::LABEL, "mini:notice", access::NOTICE);
     }
+    // PROTOTYPE (item 15): work that was cut off is something for the pet to say from the start.
+    panel::settle(&app);
 }
 
 /// `/quit` or Ctrl+C in the box. The app has no Dock icon or menu to quit from.
@@ -117,6 +119,7 @@ fn main() {
             page_ready,
             quit,
             panel::hide_box,
+            panel::show_box,
             panel::resize,
             panel::pet,
             panel::set_pet,
@@ -156,6 +159,8 @@ fn main() {
         ])
         .setup(|app| {
             log!("started, version {}", app.package_info().version);
+            // PROTOTYPE (item 15): said in the log, so that this build is told from a release.
+            log!("this build has the prototype of the pet staying alone (BackgroundWork.md, item 15); it is in no release");
             // A background app: no Dock icon, no menu bar of its own.
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 

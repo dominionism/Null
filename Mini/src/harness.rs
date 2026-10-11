@@ -467,6 +467,22 @@ fn tell_work(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
     // And it is written down, for a start of Null that finds work left behind.
     write_down(app, shared);
     let _ = app.emit_to(panel::LABEL, "mini:work", json!({ "told": told, "conversations": titled(app, work) }));
+    // PROTOTYPE (item 15): the pet alone stays or goes by what there is to say.
+    panel::settle(app);
+}
+
+/// PROTOTYPE (item 15). Whether any conversation is working, asking or unseen:
+/// what the pet alone stays for.
+pub fn anything_to_say(app: &AppHandle) -> bool {
+    !lock(&app.state::<Harness>().shared).work().is_empty()
+}
+
+/// PROTOTYPE (item 15). The box is up again: what ended in the open
+/// conversation while it was away has been seen.
+pub fn seen(app: &AppHandle) {
+    let harness = app.state::<Harness>();
+    lock(&harness.shared).open_one().unseen = false;
+    tell_work(app, &harness.shared);
 }
 
 fn write_down(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
@@ -517,7 +533,9 @@ fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) {
         shared.of(which).map(|held| {
             held.busy = false;
             held.ended = Some(ended);
-            held.unseen = which != open;
+            // PROTOTYPE (item 15, the pet alone): with the box put away, a reply
+            // that ends in the open conversation has not been seen either.
+            held.unseen = which != open || panel::put_away();
             held.pending.drain().map(|(_, responder)| responder).collect()
         })
     }
@@ -1636,7 +1654,18 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
     }
   };
   let leftWorking = false;
+  const pets = []; // PROTOTYPE (item 15): what the pet said at each of the lines below
   for (const line of lines) {
+    // PROTOTYPE (item 15): "<away>" puts the box away as Esc does, "<pet>" is a
+    // press on the pet alone, and "<wait 2000>" waits. None waits for a reply.
+    const act = /^<(away|pet|wait)(?: (\d+))?>$/.exec(line);
+    if (act) {
+      if (act[1] === 'away') await invoke('hide_box');
+      if (act[1] === 'pet') await invoke('show_box');
+      await pause(Number(act[2]) || 700);
+      pets.push(`${act[1]}: ${pet.getAttribute('class')}, ${busy ? 'working' : 'at rest'}`);
+      continue;
+    }
     if (leftWorking) await pause(700); // long enough for the reply to have begun
     else await settled();
     leftWorking = line.endsWith(' &');
@@ -1654,7 +1683,7 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
     shown: out.innerText,
     list: pick.style.display === 'none' ? '' : pick.innerText,
     notice: noticeLine.style.display === 'none' ? '' : noticeLine.textContent,
-    arrow: caret.className,
+    arrow: pets.length ? `${caret.className}; the pet said: ${pets.join(' > ')}` : caret.className,
     height: lastHeight,
     busy,
   });

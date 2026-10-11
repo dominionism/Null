@@ -155,6 +155,16 @@
       body.with-pet .box {
         margin-left: 62px;
       }
+      /* PROTOTYPE (`BackgroundWork.md`, item 15): the pet alone. With
+         the box put away and something to say, the window shrinks to the pet (56
+         by 60, src/panel.rs) and cuts the box off. The page keeps its width, so
+         that nothing in the box is laid out again meanwhile. */
+      body {
+        min-width: 616px;
+      }
+      body.with-pet {
+        min-width: 662px;
+      }
       .pet .eyes {
         fill: #fff;
       }
@@ -1251,7 +1261,8 @@
       let work = [];
       let workTold = -1;
       // What the most pressing of the others has to say: the ones the box is not showing.
-      const elsewhere = () => (work.find((one) => !one.open) || { standing: '' }).standing;
+      // PROTOTYPE (item 15): and the open one, when its reply ended with the box put away.
+      const elsewhere = () => (work.find((one) => !one.open || one.unseen) || { standing: '' }).standing;
       // The pet speaks for every conversation. It makes the most pressing thing
       // any of them has to say its own: one that asks, then one that failed,
       // or was cut off, one that is done, one that is working. `here` is the
@@ -1646,6 +1657,15 @@
         if (picker && picker.history && !picker.renaming && !picker.opening && !picker.deleting) drawWhereItStands();
       };
       listen('mini:work', (message) => hearWork(message.payload));
+
+      // PROTOTYPE (`BackgroundWork.md`, item 15): the pet alone. With
+      // the box put away and something to say, the app makes the window the pet
+      // alone and says so here. A press on it then brings the box back, and a
+      // drag moves it (see "Moving the box").
+      let alone = false;
+      listen('mini:alone', (message) => {
+        alone = !!message.payload;
+      });
 
       // ── Choosing a model ───────────────────────────────────────────────
 
@@ -3298,6 +3318,7 @@
 
       // 'frame', 'field', or null when the press belongs to what is under it.
       const grip = (event) => {
+        if (alone) return 'pet'; // PROTOTYPE (item 15): all there is to press is the pet
         const target = event.target;
         const within = (selector) => (target.closest ? target.closest(selector) : null);
         if (within('button, .option')) return null;
@@ -3320,6 +3341,11 @@
         const kind = grip(event);
         if (!kind) return;
         event.preventDefault(); // keep the typing cursor and any selection as they are
+        if (kind === 'pet') {
+          // PROTOTYPE (item 15): a press brings the box back, a drag moves the pet.
+          press = { x: event.clientX, y: event.clientY, pet: true };
+          return;
+        }
         if (kind === 'frame') {
           moveBox();
           return;
@@ -3340,6 +3366,7 @@
       });
 
       window.addEventListener('mouseup', () => {
+        if (press && press.pet) invoke('show_box'); // PROTOTYPE (item 15): the pet alone was pressed, not moved
         press = null;
       });
 
@@ -3455,9 +3482,22 @@
         }
       });
 
-      listen('mini:shown', () => {
+      listen('mini:shown', (message) => {
         input.focus();
-        if (!picker && !signin) catchUp(); // anything that arrived while hidden
+        // PROTOTYPE (item 15): back from the pet alone, the box opens on the most
+        // pressing conversation, which the app lists first.
+        const back = alone || !!(message.payload && message.payload.alone);
+        alone = false;
+        const first = work[0];
+        if (back && first && !first.open && first.id && !picker && !signin) {
+          mark('working');
+          openById(first.id)
+            .catch((error) => line('error', `could not open that conversation: ${error}`))
+            .finally(() => {
+              mark(standing());
+              input.focus();
+            });
+        } else if (!picker && !signin) catchUp(); // anything that arrived while hidden
         fit();
       });
 
