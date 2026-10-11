@@ -55,7 +55,7 @@ A reply that carries a provider's "no" in place of an answer: a used-up limit, a
 _Avoid_: error, failure (an error is the harness or the protocol breaking, which is something else)
 
 **Conversation**:
-One exchange between the person and the harness, kept by the harness. Null keeps only which one was open.
+One exchange between the person and the harness, kept by the harness. Null keeps only which one was open, and a title for each one made in the box.
 _Avoid_: session (the protocol's word), chat, mini session
 
 **Harness check**:
