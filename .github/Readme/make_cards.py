@@ -154,7 +154,8 @@ CARDS = {}
 # ── Link chips ────────────────────────────────────────────────────────────
 # A link inside a card cannot be clicked: an SVG loaded as an image is inert, and GitHub strips an
 # inline <svg> out of markdown. So each link is its own small window-styled image wrapped in <a>:
-# clickable, and with no text there is no underline for GitHub to draw.
+# clickable, and with no text there is no underline for GitHub to draw. The chips stand together at
+# the foot of the README, under the Links card, so that everything that can be pressed is in one place.
 CHIP_H, CHIP_PAD, CHIP_FS = 30, 14, 12.5
 CHIP_CW = CHIP_FS * 0.6
 CHIP_FONT = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
@@ -179,15 +180,13 @@ CHIPS = {
     "nav-development": ("Development", "#development", False),
 }
 
-# The header's navigation, chipped like everything else so nothing on the page is underlined.
-NAV = ["nav-get-started", "nav-use-null", "nav-privacy", "nav-architecture", "nav-development"]
-
-# Which chips sit under which card, in the README's order.
+# The rows of chips under the Links card, in the order of that card's own rows: the page's sections,
+# what is elsewhere, the files of the source map, and the license.
 # The Context/ chips are gone: the owner's plans, decisions and research are his
 # own and are not published, so nothing links to them.
 LINK_ROWS = [
-    ["oh-my-pi"],
-    ["rust", "tauri"],
+    ["nav-get-started", "nav-use-null", "nav-privacy", "nav-architecture", "nav-development"],
+    ["oh-my-pi", "rust", "tauri"],
     ["page-html", "harness-rs", "engine-rs", "translate-rs", "markdown-rs", "panel-rs", "settings-rs", "check-rs"],
     ["license"],
 ]
@@ -221,7 +220,7 @@ def chip(slug):
 
 
 def link_rows():
-    """The markdown blocks for the chips, to paste under their cards."""
+    """The markdown blocks for the chips, to paste under the Links card."""
     blocks = []
     for slugs in LINK_ROWS:
         body = "\n  &nbsp;\n".join(chip(slug) for slug in slugs)
@@ -542,6 +541,16 @@ def license_card(c):
     c.note("Built by dominionism. A small box, with your agent behind it.")
 
 
+# ── Links ─────────────────────────────────────────────────────────────────
+def links(c):
+    c.sub("The cards above are pictures, so nothing in them can be pressed. Everything on this page "
+          "that can be is in the rows below.")
+    c.row("This page", "Get started, Use Null, Privacy, Architecture and Development go to those sections")
+    c.row("Elsewhere", "Oh-my-pi, the Rust toolchain, and what Tauri needs on macOS")
+    c.row("Source", "The files of the source map")
+    c.row("License", "MIT")
+
+
 add("surface", "Small surface. Real agent.", surface)
 add("step-harness", "1. The harness comes with Null", step_harness)
 add("step-build", "2. Install", step_build)
@@ -560,6 +569,7 @@ add("dev-switches", "Development switches and smoke checks", dev_switches, key_c
 add("status", "Status and direction", status)
 add("layout", "Repository layout", layout)
 add("license", "License", license_card)
+add("links", "Links", links)
 
 for name, (title, svg) in CARDS.items():
     ET.fromstring(svg)   # a card that is not well-formed XML never reaches the README
@@ -568,9 +578,5 @@ for name, (title, svg) in CARDS.items():
     h = re.search(r'height="(\d+)"', svg)
     print(f"wrote {name}.svg  ({W}x{h[1] if h else '?'}, {len(svg) // 1024} KB)")
 
-nav = "\n  &nbsp;\n".join(chip(slug) for slug in NAV)
-print(f'<p align="center">\n{nav}\n</p>')
-
-for block in link_rows():
-    print()
-    print(block)
+print()
+print("\n\n".join(link_rows()))
