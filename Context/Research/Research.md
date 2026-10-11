@@ -41,16 +41,27 @@ sign-in or API key is the distribution goal.
 
 ### Deferred by the owner: name these at every recall
 
-Two tasks are put off on purpose, and the owner asked to be reminded of them at every recall,
-whichever plan is active. An agent that resumes this project names both in its orientation, until
-the owner says one is done or dropped. Their home is `Context/Plans/OwnHarness.md`, "Deferred by
-the owner".
+Five tasks are put off on purpose, and the owner asked to be reminded of them at every recall,
+whichever plan is active. An agent that resumes this project names every one of them in its
+orientation, until the owner says one is done or dropped. The first two have their home in
+`Context/Plans/OwnHarness.md`, "Deferred by the owner". The other three were put off when work in
+the background was planned (`Context/Plans/BackgroundWork.md`, "Out of scope"), with the owner's
+words: "make sure to put them somewhere safe ... so that we don't lose track of the deferred
+tasks".
 
 - **The npm package** (deferred 2026-10-10). Null installs with one line without it. It waits for
   the owner to make an npm account.
 - **The trial on a Mac user account that has never had Null** (deferred 2026-10-10). Not a threat
   to the project: every thing it would show has a fallback. Best done before many people are told
   about Null.
+- **The agent starting jobs by itself** (deferred 2026-10-10). In work in the background the owner
+  starts each job. An agent that hands work to another conversation and checks on it is
+  `Context/Plans/NullMini.md`, item 15 ("delegate"), and belongs with voice.
+- **A macOS notification or a sound when a job ends** (deferred 2026-10-10). Until then the pet
+  and `/history` are the signs that work has ended or is asking.
+- **Voice** (deferred 2026-10-10: "a big one (requiring a significant amount of planning -- let's
+  defer for now)"). Step 4 of the five in `Context/Plans/NullMini.md`, after work in the
+  background.
 
 ### Product direction and authoritative plans
 
