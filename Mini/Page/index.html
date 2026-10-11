@@ -8,7 +8,8 @@
      and lets you choose your own, /update moves the built-in one to the newest
      checked version, /attach (or the plus at the end of the row) hands the
      agent a file with the next message, /history (and the button after the
-     plus) lists the earlier conversations and opens one again, /rename and a
+     plus) lists the earlier conversations, finds one by its title or by
+     something said in it, and opens one again, /rename and a
      title calls the open conversation that (the pencil on a row of the list
      does it for any other, and the x beside it moves a conversation to the
      Trash), /pet shows the
@@ -764,6 +765,15 @@
       .option.past > .where {
         max-width: 30ch;
         text-align: right;
+      }
+      /* A conversation found by something said in it: a piece of that stands
+         after its title, and has the wider share of the row. */
+      .option.past.said {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+      }
+      .option.past.said > .where {
+        max-width: none;
+        text-align: left;
       }
       /* What can be done to a conversation, at the end of its row: quiet marks,
          seen only on the row under the pointer or chosen with the keys. They
@@ -1747,7 +1757,11 @@
       //
       // The list is sorted by when, under today, yesterday, this week and then
       // each month. Tab sorts it by folder instead, the box's own first, when
-      // there is more than one folder. Typing narrows it by title and folder.
+      // there is more than one folder. Typing narrows it by title and folder at
+      // once, and a moment later adds, under a heading of their own, the
+      // conversations in which those words were said, the best first, each with
+      // a piece of what was said. The app looks through the harness's files for
+      // that and keeps nothing of them.
       //
       // While the list is open it takes the keys and the typing before the
       // field's own handlers see them, so that those need not know of it.
@@ -1813,17 +1827,24 @@
           });
           matching.sort((a, b) => place.get(a.own ? '' : a.folder) - place.get(b.own ? '' : b.folder));
         }
-        picker.shown = matching;
-        picker.index = Math.min(picker.index, Math.max(matching.length - 1, 0));
+        // The conversations in which the words were said, for the words as they
+        // stand now, without the ones their titles found already.
+        const titled = new Set(matching.map((entry) => entry.id));
+        const kept = new Map(picker.conversations.map((entry) => [entry.id, entry]));
+        const inside = (picker.foundFor === words.join(' ') ? picker.found : []).filter((found) => kept.has(found.id) && !titled.has(found.id)).map((found) => ({ ...kept.get(found.id), piece: found.piece }));
+        picker.shown = matching.concat(inside);
+        picker.index = Math.min(picker.index, Math.max(picker.shown.length - 1, 0));
         pick.textContent = '';
         let under = null;
-        matching.forEach((entry, index) => {
-          const heading = byFolder ? (entry.own ? 'the box' : folderPath(entry.folder) || 'no folder') : era(entry);
+        picker.shown.forEach((entry, index) => {
+          const said = index >= matching.length;
+          const heading = said ? 'said inside' : byFolder ? (entry.own ? 'the box' : folderPath(entry.folder) || 'no folder') : era(entry);
           if (heading !== under) {
             under = heading;
             pick.append(el('div', 'provider', heading));
           }
-          const where = byFolder ? usedAt(entry, true) : [entry.own ? '' : folderName(entry.folder), usedAt(entry, false)].filter(Boolean).join(' · ');
+          // Found by what was said: a piece of it stands where the place and time do.
+          const where = said ? entry.piece : byFolder ? usedAt(entry, true) : [entry.own ? '' : folderName(entry.folder), usedAt(entry, false)].filter(Boolean).join(' · ');
           const title = el('span', entry.title ? '' : 'id', `${entry.open ? '● ' : '  '}${entry.title || 'untitled'}`);
           const tools = el(
             'span',
@@ -1835,7 +1856,7 @@
             }),
           );
           if (picker.deletes) tools.append(rowTool('move to the Trash', CROSS, () => deleteEarlier(entry)));
-          const row = el('div', index === picker.index ? 'option past selected' : 'option past', title, el('span', 'id where', where), tools);
+          const row = el('div', `option past${said ? ' said' : ''}${index === picker.index ? ' selected' : ''}`, title, el('span', 'id where', where), tools);
           row.addEventListener('click', () => {
             if (picker.renaming) return; // a title is being typed: Enter or Esc first
             chooseEarlier(entry);
@@ -1844,10 +1865,34 @@
           pick.append(row);
           if (index === picker.index && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
         });
-        if (!matching.length) pick.append(el('div', 'provider', 'no conversation matches'));
+        if (!picker.shown.length) pick.append(el('div', 'provider', 'no conversation matches'));
         // The one key here that nothing else says.
         if (picker.folders > 1) notice(byFolder ? 'tab sorts by when' : 'tab sorts by folder', true);
         fit();
+      };
+
+      // Looking inside. A quarter of a second after the last key, the app is
+      // asked for the conversations in which the words in the field were said.
+      // What it finds is for those words only: typed on, it is asked again.
+      let insideTimer = null;
+      const lookInside = () => {
+        clearTimeout(insideTimer);
+        const list = picker;
+        const typed = () => input.value.toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+        const wanted = typed();
+        if (wanted.replace(/ /g, '').length < 2) return; // one letter is in every conversation
+        insideTimer = setTimeout(async () => {
+          let found;
+          try {
+            found = await invoke('search_conversations', { words: wanted });
+          } catch (error) {
+            return; // the list still has what the titles found
+          }
+          if (picker !== list || list.renaming || typed() !== wanted) return;
+          list.found = found || [];
+          list.foundFor = wanted;
+          drawHistory();
+        }, 250);
       };
 
       // A mark at the end of a row. A press on it is not a press on the row, and
@@ -1998,13 +2043,14 @@
         }
         const conversations = dated(listed);
         const folders = new Set(conversations.map((entry) => (entry.own ? '' : entry.folder))).size;
-        picker = { history: true, conversations, folders, deletes: !!listed.deletes, deleting: false, opening: false, renaming: null, narrowed: '', models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
+        picker = { history: true, conversations, folders, found: [], foundFor: null, deletes: !!listed.deletes, deleting: false, opening: false, renaming: null, narrowed: '', models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
         tint();
         historyButton.classList.add('on');
         drawHistory();
+        lookInside();
       };
 
       const chooseEarlier = async (entry) => {
@@ -2105,6 +2151,7 @@
           if (picker.renaming) return; // what is typed is the title
           picker.index = 0;
           drawHistory();
+          lookInside();
         },
         true,
       );

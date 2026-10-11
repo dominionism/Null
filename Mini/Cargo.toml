@@ -20,6 +20,8 @@ futures = "0.3"
 # Control+Space is an ordinary system-wide shortcut, which macOS grants without asking the user.
 tauri-plugin-global-shortcut = "2"
 pulldown-cmark = { version = "0.13.4", default-features = false }
+# Looking through every conversation for a word, fast enough not to be noticed.
+memchr = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The box is a non-activating panel. Pinned to the revision it was proven with.
