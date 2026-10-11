@@ -11,6 +11,11 @@
 //! talking does what a model does: it asks the harness to read the file, and
 //! replies once it has been given what is in it.
 //!
+//! A fifth answer, `slow`, replies as `ok` does but takes its time: it says
+//! back the last line of the message it was sent, a wait and then a word,
+//! written as it comes. So a reply can still be under way while something else
+//! is asked, which is what work in the background is.
+//!
 //! Two things use it. The harness check (`check.rs`) asks a real Oh-my-pi its
 //! questions against it. And a scripted run of the app itself offers its models
 //! to the harness with `NULL_MINI_STANDIN`, on a folder of the run's own
@@ -29,7 +34,10 @@ use crate::settings;
 /// The three ways of talking the owner's providers use: the name in a stand-in
 /// address, and what the harness calls that way of talking.
 const KINDS: [(&str, &str); 3] = [("anthropic", "anthropic-messages"), ("openai", "openai-completions"), ("codex", "openai-codex-responses")];
-const ANSWERS: [&str; 4] = ["ok", "limit", "auth", "noaccess"];
+const ANSWERS: [&str; 5] = ["ok", "limit", "auth", "noaccess", "slow"];
+
+/// How long `slow` waits before each word.
+const PAUSE: Duration = Duration::from_millis(250);
 
 /// The first line of the file the stand-in writes, by which it knows its own file again.
 const MARK: &str = "# Offered by Null's stand-in provider (NULL_MINI_STANDIN). Not a real provider.\n";
@@ -141,7 +149,14 @@ fn answer(mut stream: TcpStream, asked: &Mutex<Vec<String>>, reached: &Mutex<Vec
     let model = said.get("model").and_then(Value::as_str).unwrap_or_default().to_string();
     let which = model.rsplit('/').next().unwrap_or_default();
     let (status, headers, body) = match (method.as_str(), which) {
-        ("POST", "ok" | "limit" | "auth" | "noaccess") => {
+        // A reply that takes its time cannot be sent whole: it is written as it comes.
+        ("POST", "slow") if matches!(kind, "anthropic" | "openai") => {
+            asked.lock().unwrap().push(format!("{kind}/{which}"));
+            let reply = spoken(kind, &model, &told(&said));
+            heard.lock().unwrap().push(said);
+            return slowly(stream, reply);
+        }
+        ("POST", "ok" | "limit" | "auth" | "noaccess" | "slow") => {
             asked.lock().unwrap().push(format!("{kind}/{which}"));
             let answered = reply(kind, which, &model, &said);
             heard.lock().unwrap().push(said);
@@ -164,13 +179,83 @@ fn answer(mut stream: TcpStream, asked: &Mutex<Vec<String>>, reached: &Mutex<Vec
     let _ = stream.write_all(format!("{head}\r\n{body}").as_bytes());
 }
 
+/// A reply as it is sent: what opens it, a piece for each word, and what ends it.
+type Spoken = (String, Vec<String>, String);
+
+/// Anthropic's way of sending a reply: a name and what goes with it, one after another.
+fn events(frames: &[(&str, Value)]) -> String {
+    frames.iter().map(|(event, data)| format!("event: {event}\ndata: {data}\n\n")).collect()
+}
+
+/// A reply of these words, in Anthropic's way of talking or in OpenAI's.
+fn spoken(kind: &str, model: &str, words: &[String]) -> Spoken {
+    if kind == "openai" {
+        let piece = |delta: Value, finish: Value| json!({ "id": "chatcmpl-standin", "object": "chat.completion.chunk", "created": 0, "model": model, "choices": [{ "index": 0, "delta": delta, "finish_reason": finish }] });
+        let mut last = piece(json!({}), json!("stop"));
+        last["usage"] = json!({ "prompt_tokens": 10, "completion_tokens": words.len(), "total_tokens": 10 + words.len() });
+        let pieces = words.iter().enumerate().map(|(place, word)| {
+            // The first piece says who is speaking.
+            let delta = if place == 0 { json!({ "role": "assistant", "content": word }) } else { json!({ "content": word }) };
+            format!("data: {}\n\n", piece(delta, Value::Null))
+        });
+        return (String::new(), pieces.collect(), format!("data: {last}\n\ndata: [DONE]\n\n"));
+    }
+    (
+        events(&[
+            ("message_start", json!({ "type": "message_start", "message": { "id": "msg_standin", "type": "message", "role": "assistant", "model": model, "content": [], "stop_reason": null, "stop_sequence": null, "usage": { "input_tokens": 10, "output_tokens": 1 } } })),
+            ("content_block_start", json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "text", "text": "" } })),
+        ]),
+        words.iter().map(|word| events(&[("content_block_delta", json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "text_delta", "text": word } }))])).collect(),
+        events(&[
+            ("content_block_stop", json!({ "type": "content_block_stop", "index": 0 })),
+            ("message_delta", json!({ "type": "message_delta", "delta": { "stop_reason": "end_turn", "stop_sequence": null }, "usage": { "output_tokens": words.len() } })),
+            ("message_stop", json!({ "type": "message_stop" })),
+        ]),
+    )
+}
+
+/// The one word `ok` replies with, sent whole.
+fn pong(kind: &str, model: &str) -> String {
+    let (opens, words, ends) = spoken(kind, model, &["pong".to_string()]);
+    format!("{opens}{}{ends}", words.concat())
+}
+
+/// What `slow` says: the last line of the message it was sent, so that a
+/// reply shows which message it answers and lasts as long as that line has
+/// words. Only the last line, since a harness puts a note of its own before
+/// what the person wrote.
+fn told(said: &Value) -> Vec<String> {
+    let message = said.get("messages").and_then(Value::as_array).and_then(|messages| messages.last()).map(words).unwrap_or_default();
+    let line = message.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default();
+    let mut told: Vec<String> = line.split_whitespace().enumerate().map(|(place, word)| if place == 0 { word.to_string() } else { format!(" {word}") }).collect();
+    if told.is_empty() {
+        told.push("pong".into());
+    }
+    told
+}
+
+/// Send a reply a word at a time, with a wait before each. A harness that
+/// stops the reply hangs up, and the rest is left unsaid.
+fn slowly(mut stream: TcpStream, (opens, words, ends): Spoken) {
+    let _ = stream.set_nodelay(true);
+    if stream.write_all(format!("HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-type: text/event-stream\r\n\r\n{opens}").as_bytes()).is_err() {
+        return;
+    }
+    for word in words {
+        std::thread::sleep(PAUSE);
+        if stream.write_all(word.as_bytes()).is_err() {
+            return;
+        }
+    }
+    let _ = stream.write_all(ends.as_bytes());
+}
+
 /// What a provider of this kind sends back for this answer: the status, the
 /// headers that say when to come back, and the body.
 fn reply(kind: &str, which: &str, model: &str, said: &Value) -> (u16, Vec<(&'static str, String)>, String) {
     let soon = |seconds: u64| (SystemTime::now().duration_since(UNIX_EPOCH).map(|now| now.as_secs()).unwrap_or(0) + seconds).to_string();
     let anthropic = |kind_of_error: &str, message: &str| json!({ "type": "error", "error": { "type": kind_of_error, "message": message }, "request_id": "req_standin" }).to_string();
     let openai = |message: String, kind_of_error: &str, code: &str| json!({ "error": { "message": message, "type": kind_of_error, "param": null, "code": code } }).to_string();
-    let events = |frames: &[(&str, Value)]| frames.iter().map(|(event, data)| format!("event: {event}\ndata: {data}\n\n")).collect::<String>();
     match (kind, which) {
         // Handed a file it has not read yet, a model asks to read it.
         ("anthropic", "ok") if reading(said).is_some() => {
@@ -188,18 +273,7 @@ fn reply(kind: &str, which: &str, model: &str, said: &Value) -> (u16, Vec<(&'sta
                 ]),
             )
         }
-        ("anthropic", "ok") => (
-            200,
-            Vec::new(),
-            events(&[
-                ("message_start", json!({ "type": "message_start", "message": { "id": "msg_standin", "type": "message", "role": "assistant", "model": model, "content": [], "stop_reason": null, "stop_sequence": null, "usage": { "input_tokens": 10, "output_tokens": 1 } } })),
-                ("content_block_start", json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "text", "text": "" } })),
-                ("content_block_delta", json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "text_delta", "text": "pong" } })),
-                ("content_block_stop", json!({ "type": "content_block_stop", "index": 0 })),
-                ("message_delta", json!({ "type": "message_delta", "delta": { "stop_reason": "end_turn", "stop_sequence": null }, "usage": { "output_tokens": 1 } })),
-                ("message_stop", json!({ "type": "message_stop" })),
-            ]),
-        ),
+        ("anthropic", "ok") => (200, Vec::new(), pong(kind, model)),
         ("anthropic", "limit") => (
             429,
             vec![
@@ -214,12 +288,7 @@ fn reply(kind: &str, which: &str, model: &str, said: &Value) -> (u16, Vec<(&'sta
         ),
         ("anthropic", "auth") => (401, Vec::new(), anthropic("authentication_error", "invalid x-api-key")),
         ("anthropic", _) => (403, Vec::new(), anthropic("permission_error", "Your account does not have access to this model.")),
-        ("openai", "ok") => {
-            let piece = |delta: Value, finish: Value| json!({ "id": "chatcmpl-standin", "object": "chat.completion.chunk", "created": 0, "model": model, "choices": [{ "index": 0, "delta": delta, "finish_reason": finish }] });
-            let mut last = piece(json!({}), json!("stop"));
-            last["usage"] = json!({ "prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11 });
-            (200, Vec::new(), format!("data: {}\n\ndata: {last}\n\ndata: [DONE]\n\n", piece(json!({ "role": "assistant", "content": "pong" }), Value::Null)))
-        }
+        ("openai", "ok") => (200, Vec::new(), pong(kind, model)),
         ("openai", "limit") => (429, Vec::new(), openai("You exceeded your current quota, please check your plan and billing details.".into(), "insufficient_quota", "insufficient_quota")),
         ("openai", "auth") => (401, Vec::new(), openai("Incorrect API key provided.".into(), "invalid_request_error", "invalid_api_key")),
         ("openai", _) => (403, Vec::new(), openai(format!("You do not have access to model {model}."), "invalid_request_error", "model_not_found")),
@@ -240,7 +309,7 @@ fn reply(kind: &str, which: &str, model: &str, said: &Value) -> (u16, Vec<(&'sta
             Vec::new(),
             json!({ "error": { "message": "Your authentication token has been invalidated. Please try signing in again.", "type": "invalid_request_error", "code": "token_invalidated" } }).to_string(),
         ),
-        // The ChatGPT sign-in has no stand-in that replies: only its refusals differ from the others.
+        // The ChatGPT sign-in has no stand-in that replies, at once or slowly: only its refusals differ from the others.
         _ => (403, Vec::new(), json!({ "detail": format!("The '{model}' model is not available on your plan.") }).to_string()),
     }
 }
@@ -319,5 +388,29 @@ mod tests {
             assert!(text.contains(&format!("  standin-{kind}:\n    baseUrl: http://127.0.0.1:{}/", standin.port)), "{kind}: {text}");
         }
         assert_eq!(text.matches("      - { id: ").count(), KINDS.len() * ANSWERS.len(), "{text}");
+    }
+
+    /// Send a model one message as a harness does, and give the words of the
+    /// reply in the pieces they came in.
+    fn replied(standin: &StandIn, path: &str, model: &str, message: &str) -> Vec<String> {
+        let body = json!({ "model": model, "stream": true, "messages": [{ "role": "user", "content": message }] }).to_string();
+        let mut stream = TcpStream::connect(("127.0.0.1", standin.port)).expect("the stand-in is listening");
+        stream.write_all(format!("POST {path} HTTP/1.1\r\nhost: 127.0.0.1\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}", body.len()).as_bytes()).unwrap();
+        let mut answer = String::new();
+        stream.read_to_string(&mut answer).expect("the reply is read to its end");
+        let frames = answer.lines().filter_map(|line| serde_json::from_str::<Value>(line.strip_prefix("data: ")?).ok());
+        frames.filter_map(|frame| frame.pointer("/delta/text").or(frame.pointer("/choices/0/delta/content")).and_then(Value::as_str).map(str::to_string)).collect()
+    }
+
+    #[test]
+    fn slow_says_back_the_last_line_it_was_sent_a_word_at_a_time() {
+        let standin = StandIn::start();
+        for (kind, path) in [("anthropic", "/anthropic/v1/messages"), ("openai", "/openai/v1/chat/completions")] {
+            let began = std::time::Instant::now();
+            assert_eq!(replied(&standin, path, &format!("standin-{kind}/slow"), "a note from the harness\none  two three\n"), ["one", " two", " three"], "{kind}");
+            assert!(began.elapsed() >= PAUSE * 3, "{kind}: three words came in {:?}, with no wait before each", began.elapsed());
+            assert_eq!(replied(&standin, path, &format!("standin-{kind}/ok"), "one two three"), ["pong"], "{kind}");
+        }
+        assert_eq!(standin.asked(), ["anthropic/slow", "anthropic/ok", "openai/slow", "openai/ok"]);
     }
 }
