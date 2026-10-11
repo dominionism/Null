@@ -531,6 +531,16 @@ both groups change the same list in the page: built one after the other, they do
      and nothing was deleted, so the mend for deleting was not seen to work by the owner
      before the release, and neither renaming nor searching had been used. Said to the owner
      with the release.
+   - **After the release, found by the owner in 0.3.0 (2026-10-10):** "when I click on the x
+     button to remove a chat, for some reason, it keeps resetting me to go the top of the
+     chats. I have to keep scrolling down to find where I was deleting from which kind of
+     annoying." The list was drawn afresh after each deletion, which starts it from its top,
+     and then went to the chosen row, which the pointer had never moved. Mended on the branch
+     `history-stays-in-place`: after a row is deleted or renamed the list is put back where
+     it was, and the row that took the deleted one's place is the chosen one, so that the x
+     can be pressed again at the same spot. Drawn with forty conversations and the list
+     400 px down: it stayed at 400 after one deletion, after three in a row, and through a
+     rename kept or left. The version is 0.3.1 on `main`; its release waits for the owner.
    - **Still not proven by anyone's hand:** `/update` on an installed 0.2.0 saying that 0.3.0
      is out (the owner's Mac went from 0.2.0 to builds of 0.3.0 without asking it).
    - **To try by hand, since nothing but the owner's hand proves it:** a lone `/`; a mistyped
