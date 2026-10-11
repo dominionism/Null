@@ -329,6 +329,7 @@ def use_null(c):
         ("Esc", "Close a picker, cancel sign-in, or hide the box"),
         ("Ctrl+C", "Stop the reply; when idle, quit and close the conversation"),
         ("↑", "Recall the last prompt in an empty field"),
+        ("/ then Enter", "List the box's commands, each with a few words"),
         ("Drag", "Move the box; click away hides it"),
     ]:
         c.row(key, value)
@@ -346,14 +347,15 @@ def commands(c):
         ("/harness", "See which Oh-my-pi the box runs, the built-in one or your own, and switch between them"),
         ("/update", "Move the built-in Oh-my-pi to the newest version the repository's harness check has passed, and say when a newer Null is out and what gets it"),
         ("/attach [path]", "Hand the agent a file with the next message: choose it from a list of your folders inside the box, or give its path. The plus at the end of the row does the same"),
-        ("/history [words]", "List the earlier conversations, the box's own and the terminal's, and open one again. Typing narrows the list and Tab sorts it by folder. The button after the plus does the same"),
+        ("/history [words]", "List the earlier conversations, the box's own and the terminal's, and open one again. Typing narrows the list by title and folder, then adds the conversations in which those words were said. Tab sorts it by folder. On a row, the pencil renames and the x moves the conversation to the Trash. The button after the plus opens the same list"),
+        ("/rename <title>", "Give the open conversation a title of your own. In /history, Command+R does it for the chosen row, and Command+Delete moves that row to the Trash"),
         ("/pet", "Show the pet beside the box, or put it away"),
         ("/new", "Start a fresh conversation on the last selected model"),
         ("/quit", "Quit and clear the saved conversation pointer"),
     ]:
         c.row(key, value)
-    c.note("A lone unknown /word is refused, and answered with the box's commands, rather than "
-           "passed to the agent; other messages go "
+    c.note("A lone unknown /word is not passed to the agent: it opens the list of the box's "
+           "commands, narrowed to the ones it could mean. Other messages go "
            "through normally. A listed model is not a guarantee that your account can use it: "
            "providers with reported limits exhausted are dimmed but stay selectable, and a model "
            "change waits until the current reply is stopped or finished.")
@@ -382,6 +384,7 @@ def privacy(c):
     c.row("No listener", "Null has no HTTP listener and no database of its own; it starts the OMP it carries as a child process and talks over stdio")
     c.row("Credentials", "Your /login answers go to the local omp login process, are masked in the UI and are never written to Null's settings or log. OMP handles authentication; no Null account exists")
     c.row("Attached files", "Null reads no file's content. A file you attach goes to the harness as its full path, which travels to your provider with the message, your user name in it. The content follows only when the agent reads the file")
+    c.row("Conversations", "OMP keeps your conversations, one file each. To find one by something said in it, Null reads those files on this Mac as you type in /history, keeps nothing of them and logs no word. Deleting moves a conversation's file to the Mac's Trash, where it can be put back, and changes nothing in it")
     c.row("Shortcut", "Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice")
     c.row("Approvals", "Null passes on OMP's approval setting and adds none of its own. OMP's own default lets the agent act without asking you first, and the first opening says so")
     c.row("Full Disk Access", "A separate choice, asked once, after the first reply, with an explanation: macOS attributes the agent's file access to Null. It is broader file access, not a sandbox, and it does not replace OMP's approval rules. The box opens without it")
@@ -408,13 +411,13 @@ def signing(c):
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
     c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, and whether the pet shows")
-    c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters. OMP gives no title for these")
+    c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. And any title you gave with /rename")
     c.row("harness.yml", "Settings handed to OMP at every start: no update check, and your backup order when there is one. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
     c.note("Your own OMP settings are not modified. OMP "
            "owns the transcript and the credentials: a restart resumes the saved session, while "
            "/quit and idle Ctrl+C clear Null's pointer, not OMP's stored transcript, which /history "
-           "finds again. Logs are in "
+           "finds again. A conversation you delete goes to the Mac's Trash. Logs are in "
            "~/Library/Logs/Null/mini.log, and the smoke and self-test modes can log reply text, so "
            "keep sensitive prompts out of those checks.")
 
@@ -449,7 +452,8 @@ def source_map(c):
         ("panel.rs, shortcut.rs", "Window, placement, sizing, the pet's room beside the box, visibility and Control+Space"),
         ("harness.rs, translate.rs", "ACP process and session lifecycle, approvals, events, protocol translation"),
         ("attach.rs", "The files that go with the next message, and the list of folders they are chosen from"),
-        ("history.rs", "Earlier conversations as the harness lists them, their titles, and opening one again"),
+        ("history.rs", "Earlier conversations as the harness lists them, their titles and renaming, opening one again, and moving one to the Trash"),
+        ("search.rs", "Finding a conversation by something said in it: OMP's files are read as you type, and nothing is kept"),
         ("engine.rs", "Which Oh-my-pi runs: the carried one or your own, and /harness"),
         ("providers.rs, signin.rs", "Usage reports and harness-owned sign-in"),
         ("welcome.rs", "The first opening: with no provider signed in, the box opens once with the sign-in list"),
@@ -539,17 +543,19 @@ def status(c):
         "An independent macOS app, installed with one command",
         "A first opening that leads a newcomer to sign in",
         "Files attached to a message, and every earlier conversation found again with /history",
+        "Conversations renamed, moved to the Trash, and found by something said in them",
         "A small pet beside the box that shows what the agent is doing",
     ])
     c.head("Planned or incomplete", MUTED)
     c.bullets([
-        "Background tasks, activity tray and workspace selection",
+        "Work in the background: several conversations at once, each seen at a glance, in a folder you choose",
         "/logout and a sign-in timeout",
         "An npm package around the install command",
         "A resizable transcript and repeatable visual checks",
         "Cloned-voice conversation and other platforms",
     ], muted=True)
-    c.note("The latest display, the pet, attached files, history and some provider flows still need "
+    c.note("The latest display, the pet, attached files, history with its renaming, deleting and "
+           "searching, and some provider flows still need "
            "hands-on validation, and no real "
            "provider quota exhaustion has been verified. See the plans for evidence and open "
            "decisions rather than assuming every implemented path is finished.")
