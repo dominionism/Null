@@ -8,10 +8,13 @@
 //!
 //! The harness gives a conversation a title only in a terminal. For one made
 //! in the box Null makes the title: the first line of its first message, cut
-//! short. Those titles are the one thing Null keeps about a conversation
-//! besides which was open. They are in `history.json` beside Null's settings,
-//! and a title goes when the harness no longer lists its conversation. No
-//! other word of a conversation is kept here.
+//! short. And the owner can give any conversation a title of their own
+//! (`/rename`), which the box then shows in place of any other. Those titles
+//! are the one thing Null keeps about a conversation besides which was open.
+//! They are in `history.json` beside Null's settings, and a title goes when
+//! the harness no longer lists its conversation. No other word of a
+//! conversation is kept here, and the harness's own file is never changed:
+//! a terminal goes on showing the title it had.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -51,6 +54,40 @@ pub struct Listed {
     pub conversations: Vec<Entry>,
 }
 
+/// The titles Null keeps, by conversation.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Titles {
+    /// Made by Null, from the first line of a conversation's first message.
+    made: BTreeMap<String, String>,
+    /// Given by the owner. One of these comes before any other title.
+    given: BTreeMap<String, String>,
+}
+
+impl Titles {
+    /// The owner calls a conversation something: kept as Null's own titles
+    /// are, on one line and cut short. Nothing to call it takes the owner's
+    /// title away again, and the title it had before shows once more. Gives
+    /// the title as it was kept.
+    fn rename(&mut self, id: &str, title: &str) -> Option<String> {
+        match title_from(title) {
+            Some(title) => {
+                self.given.insert(id.to_string(), title.clone());
+                Some(title)
+            }
+            None => {
+                self.given.remove(id);
+                None
+            }
+        }
+    }
+
+    /// A title does not outlive its conversation.
+    fn keep_only(&mut self, listed: &HashSet<&str>) {
+        self.made.retain(|id, _| listed.contains(id.as_str()));
+        self.given.retain(|id, _| listed.contains(id.as_str()));
+    }
+}
+
 /// A title out of words: their first line that has any, on one line, with
 /// nothing in it but what can be read, cut to `TITLE_LENGTH` characters.
 pub fn title_from(text: &str) -> Option<String> {
@@ -80,16 +117,17 @@ pub fn folder_of(listed: &[Value], id: &str) -> Option<PathBuf> {
 
 /// The harness's list as the box shows it, in the harness's order. A
 /// conversation in which nothing was said is left out: there is nothing to go
-/// back to. `titles` are the ones Null made, `own` is the folder the box's
-/// conversations work in, and `open` is the conversation open now.
-pub fn entries(listed: &[Value], titles: &BTreeMap<String, String>, own: &Path, open: Option<&str>) -> Vec<Entry> {
+/// back to. `titles` are the ones Null keeps, `own` is the folder the box's
+/// conversations work in, and `open` is the conversation open now. A title
+/// the owner gave comes first, then the harness's, then the one Null made.
+pub fn entries(listed: &[Value], titles: &Titles, own: &Path, open: Option<&str>) -> Vec<Entry> {
     let entry = |kept: &Value| {
         let id = kept.get("sessionId")?.as_str()?;
         if kept.pointer("/_meta/messageCount").and_then(Value::as_u64) == Some(0) {
             return None;
         }
         let folder = kept.get("cwd").and_then(Value::as_str).unwrap_or_default();
-        let title = kept.get("title").and_then(Value::as_str).and_then(title_from).or_else(|| titles.get(id).cloned());
+        let title = titles.given.get(id).cloned().or_else(|| kept.get("title").and_then(Value::as_str).and_then(title_from)).or_else(|| titles.made.get(id).cloned());
         let used = kept.get("updatedAt").and_then(Value::as_str).map(str::to_string);
         Some(Entry { id: id.to_string(), title, folder: folder.to_string(), own: Path::new(folder) == own, used, open: open == Some(id) })
     };
@@ -120,30 +158,42 @@ fn first_said(events: &[Value]) -> Option<&str> {
     events.iter().find(|event| event["type"] == "user_message").and_then(|event| event["text"].as_str())
 }
 
-// ── The titles Null made ──────────────────────────────────────────────────
+// ── The titles Null keeps ─────────────────────────────────────────────────
 
-/// By conversation. Read from the file the first time they are wanted.
-static TITLES: Mutex<Option<BTreeMap<String, String>>> = Mutex::new(None);
+/// Read from the file the first time they are wanted.
+static TITLES: Mutex<Option<Titles>> = Mutex::new(None);
 
 fn file(app: &AppHandle) -> Option<PathBuf> {
     settings::dir(app).map(|dir| dir.join(settings::file_name("history", "json")))
 }
 
-fn read(app: &AppHandle) -> BTreeMap<String, String> {
-    let kept = file(app).and_then(|file| std::fs::read_to_string(file).ok()).and_then(|text| serde_json::from_str::<Value>(&text).ok()).unwrap_or(Value::Null);
-    let titles = kept.get("titles").and_then(Value::as_object).into_iter().flatten();
-    titles.filter_map(|(id, title)| Some((id.clone(), title.as_str()?.to_string()))).collect()
+/// The titles as the file holds them: the ones Null made under `titles`, as
+/// they were before there was any other kind, and the owner's under `renamed`.
+fn parse(kept: &Value) -> Titles {
+    let under = |name: &str| {
+        let titles = kept.get(name).and_then(Value::as_object).into_iter().flatten();
+        titles.filter_map(|(id, title)| Some((id.clone(), title.as_str()?.to_string()))).collect()
+    };
+    Titles { made: under("titles"), given: under("renamed") }
+}
+
+fn written(titles: &Titles) -> Value {
+    json!({ "titles": &titles.made, "renamed": &titles.given })
+}
+
+fn read(app: &AppHandle) -> Titles {
+    parse(&file(app).and_then(|file| std::fs::read_to_string(file).ok()).and_then(|text| serde_json::from_str::<Value>(&text).ok()).unwrap_or(Value::Null))
 }
 
 /// Look at the titles, or change them. A change is written out.
-fn titles<T>(app: &AppHandle, with: impl FnOnce(&mut BTreeMap<String, String>) -> T) -> T {
+fn titles<T>(app: &AppHandle, with: impl FnOnce(&mut Titles) -> T) -> T {
     let mut kept = TITLES.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let titles = kept.get_or_insert_with(|| read(app));
     let before = titles.clone();
     let result = with(titles);
     if *titles != before {
         let written = file(app).ok_or_else(|| "Null has no folder of its own".to_string()).and_then(|file| {
-            let text = serde_json::to_string_pretty(&json!({ "titles": &*titles })).map_err(|e| e.to_string())?;
+            let text = serde_json::to_string_pretty(&written(titles)).map_err(|e| e.to_string())?;
             std::fs::write(file, text).map_err(|e| e.to_string())
         });
         if let Err(e) = written {
@@ -158,8 +208,8 @@ fn titles<T>(app: &AppHandle, with: impl FnOnce(&mut BTreeMap<String, String>) -
 /// its first line is the title.
 pub fn said(app: &AppHandle, id: &str, text: &str) {
     titles(app, |titles| {
-        if !titles.contains_key(id) {
-            titles.extend(title_from(text).map(|title| (id.to_string(), title)));
+        if !titles.made.contains_key(id) {
+            titles.made.extend(title_from(text).map(|title| (id.to_string(), title)));
         }
     });
 }
@@ -186,8 +236,7 @@ pub async fn history(app: AppHandle) -> Result<Listed, String> {
         // A title does not outlive its conversation. An empty list is not taken
         // for every conversation being gone: it may be a harness that had a bad moment.
         if !listed.is_empty() {
-            let kept: HashSet<&str> = listed.iter().filter_map(|kept| kept.get("sessionId")?.as_str()).collect();
-            titles.retain(|id, _| kept.contains(id.as_str()));
+            titles.keep_only(&listed.iter().filter_map(|kept| kept.get("sessionId")?.as_str()).collect());
         }
         entries(&listed, titles, &own, open.as_deref())
     });
@@ -200,6 +249,19 @@ pub async fn history(app: AppHandle) -> Result<Listed, String> {
 #[tauri::command]
 pub async fn open_conversation(app: AppHandle, id: String) -> Result<(), String> {
     harness::open_earlier(&app, id).await
+}
+
+/// `/rename`, or the pencil in the list: the owner gives a conversation a
+/// title, which the box shows from then on in place of any other. With no id
+/// it is the conversation open in the box. A title with nothing in it takes
+/// the owner's title away again. Gives the title as it was kept. What the
+/// owner called it is theirs: it goes in `history.json` and never in the log.
+#[tauri::command]
+pub fn rename_conversation(app: AppHandle, id: Option<String>, title: String) -> Result<Option<String>, String> {
+    let id = id.or_else(|| harness::open_id(&app)).ok_or("there is no conversation to rename yet")?;
+    let kept = titles(&app, |titles| titles.rename(&id, &title));
+    log!("{}", if kept.is_some() { "a conversation was given a title" } else { "a conversation's given title was taken away" });
+    Ok(kept)
 }
 
 #[cfg(test)]
@@ -232,7 +294,7 @@ mod tests {
 
     #[test]
     fn the_harness_s_list_is_shown_as_it_comes_with_the_titles_null_made() {
-        let titles = BTreeMap::from([("c2".to_string(), "what is the capital of France?".to_string()), ("c3".to_string(), "never shown".to_string())]);
+        let titles = Titles { made: BTreeMap::from([("c2".to_string(), "what is the capital of France?".to_string()), ("c3".to_string(), "never shown".to_string())]), given: BTreeMap::new() };
         let shown = entries(&listed(), &titles, Path::new("/Users/me/Null/Workspace"), Some("c2"));
 
         // The conversation nothing was said in is left out. The order is the harness's.
@@ -251,8 +313,54 @@ mod tests {
     #[test]
     fn a_harness_that_says_less_about_a_conversation_still_has_it_listed() {
         // No count of messages, no time, no folder: only that it exists.
-        let shown = entries(&[json!({ "sessionId": "bare" }), json!({ "cwd": "/nameless" })], &BTreeMap::new(), Path::new("/own"), None);
+        let shown = entries(&[json!({ "sessionId": "bare" }), json!({ "cwd": "/nameless" })], &Titles::default(), Path::new("/own"), None);
         assert_eq!(shown, vec![Entry { id: "bare".into(), title: None, folder: String::new(), own: false, used: None, open: false }]);
+    }
+
+    #[test]
+    fn a_title_the_owner_gave_comes_before_the_harness_s_and_null_s() {
+        let mut titles = Titles { made: BTreeMap::from([("c2".to_string(), "what is the capital of France?".to_string())]), given: BTreeMap::new() };
+        let shown = |titles: &Titles| entries(&listed(), titles, Path::new("/own"), None).into_iter().map(|entry| entry.title).collect::<Vec<_>>();
+
+        // One with the harness's title, one with Null's, one with none: each can be called something else.
+        assert_eq!(titles.rename("c3", "  the arm64 build\nand more  ").as_deref(), Some("the arm64 build"));
+        assert_eq!(titles.rename("c2", "capitals").as_deref(), Some("capitals"));
+        assert_eq!(titles.rename("c0", &"long ".repeat(40)).map(|title| title.chars().count()), Some(TITLE_LENGTH));
+        assert_eq!(shown(&titles)[..2], [Some("the arm64 build".to_string()), Some("capitals".to_string())]);
+        assert!(shown(&titles)[2].as_deref().is_some_and(|title| title.starts_with("long long")));
+
+        // Nothing to call it takes the owner's title away, and the one it had shows again.
+        assert_eq!(titles.rename("c3", " \n "), None);
+        assert_eq!(titles.rename("c2", ""), None);
+        assert_eq!(shown(&titles)[..2], [Some("Fix the linker error".to_string()), Some("what is the capital of France?".to_string())]);
+        // Taking away a title that was never given changes nothing.
+        assert_eq!(titles.rename("c3", ""), None);
+    }
+
+    #[test]
+    fn titles_are_kept_in_the_file_as_they_were_with_the_owner_s_beside_them() {
+        // The file as an older Null wrote it holds only the titles Null made.
+        let older = parse(&json!({ "titles": { "c2": "made by Null" } }));
+        assert_eq!(older, Titles { made: BTreeMap::from([("c2".to_string(), "made by Null".to_string())]), given: BTreeMap::new() });
+
+        let mut titles = older;
+        titles.rename("c3", "given by the owner");
+        assert_eq!(written(&titles), json!({ "titles": { "c2": "made by Null" }, "renamed": { "c3": "given by the owner" } }));
+        assert_eq!(parse(&written(&titles)), titles);
+        // Anything else in the file, or nothing at all, is no titles.
+        assert_eq!(parse(&json!({ "titles": [1, 2], "renamed": "no" })), Titles::default());
+        assert_eq!(parse(&Value::Null), Titles::default());
+    }
+
+    #[test]
+    fn a_title_goes_with_its_conversation_whoever_gave_it() {
+        let mut titles = Titles::default();
+        titles.made.insert("gone".to_string(), "made".to_string());
+        titles.made.insert("c2".to_string(), "made".to_string());
+        titles.rename("gone", "given");
+        titles.rename("c3", "given");
+        titles.keep_only(&HashSet::from(["c2", "c3"]));
+        assert_eq!(titles, Titles { made: BTreeMap::from([("c2".to_string(), "made".to_string())]), given: BTreeMap::from([("c3".to_string(), "given".to_string())]) });
     }
 
     #[test]

@@ -986,6 +986,11 @@ pub fn new_conversation(app: AppHandle) -> Result<(), String> {
     order(&harness, Command::NewConversation)
 }
 
+/// The id of the conversation open in the box, once it has one.
+pub fn open_id(app: &AppHandle) -> Option<String> {
+    lock(&app.state::<Harness>().shared).session.clone()
+}
+
 /// The conversations the harness keeps, each as the harness lists it, and the
 /// id of the one open in the box. No list when this harness cannot give one.
 pub async fn conversations(app: &AppHandle) -> Result<(Option<Vec<Value>>, Option<String>), String> {

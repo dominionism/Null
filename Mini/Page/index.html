@@ -8,7 +8,9 @@
      and lets you choose your own, /update moves the built-in one to the newest
      checked version, /attach (or the plus at the end of the row) hands the
      agent a file with the next message, /history (and the button after the
-     plus) lists the earlier conversations and opens one again, /pet shows the
+     plus) lists the earlier conversations and opens one again, /rename and a
+     title calls the open conversation that (the pencil on a row of the list
+     does it for any other), /pet shows the
      pet or puts it away, /new starts a new conversation, /quit quits the app
      and closes the conversation. A lone / and Enter lists these commands, and
      so does a command the box does not have. Ctrl+C stops a reply or, with
@@ -762,6 +764,44 @@
         max-width: 30ch;
         text-align: right;
       }
+      /* What can be done to a conversation, at the end of its row: quiet marks,
+         seen only on the row under the pointer or chosen with the keys. They
+         keep their room on every row, so that nothing moves when they show. */
+      .option.past {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+      }
+      .option.past > .tools {
+        display: flex;
+        overflow: visible;
+        visibility: hidden;
+      }
+      .option.past:hover > .tools,
+      .option.past.selected > .tools {
+        visibility: visible;
+      }
+      .rowtool {
+        width: 19px;
+        height: 19px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--faint);
+        cursor: pointer;
+      }
+      .rowtool:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text);
+      }
+      .rowtool svg {
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
 
       /* ── Attached files ────────────────────────────────────────────────
          What goes with the next message stands on the notice line, on the
@@ -1185,6 +1225,7 @@
         ['/update', 'the newest checked Oh-my-pi'],
         ['/attach', 'hand the agent a file'],
         ['/history', 'earlier conversations'],
+        ['/rename', 'give this conversation a title'],
         ['/pet', 'show the pet or put it away'],
         ['/new', 'start a new conversation'],
         ['/quit', 'quit Null'],
@@ -1196,7 +1237,7 @@
           !picker &&
           !signin &&
           text.startsWith('/') &&
-          (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/attach ') || text.startsWith('/history ') || COMMANDS.some((name) => name.startsWith(text)));
+          (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/attach ') || text.startsWith('/history ') || text.startsWith('/rename ') || COMMANDS.some((name) => name.startsWith(text)));
         input.classList.toggle('command', command);
       };
 
@@ -1783,8 +1824,18 @@
           }
           const where = byFolder ? usedAt(entry, true) : [entry.own ? '' : folderName(entry.folder), usedAt(entry, false)].filter(Boolean).join(' · ');
           const title = el('span', entry.title ? '' : 'id', `${entry.open ? '● ' : '  '}${entry.title || 'untitled'}`);
-          const row = el('div', index === picker.index ? 'option past selected' : 'option past', title, el('span', 'id where', where));
+          const tools = el(
+            'span',
+            'tools',
+            rowTool('rename', PENCIL, () => {
+              picker.index = index;
+              drawHistory();
+              startRename(entry);
+            }),
+          );
+          const row = el('div', index === picker.index ? 'option past selected' : 'option past', title, el('span', 'id where', where), tools);
           row.addEventListener('click', () => {
+            if (picker.renaming) return; // a title is being typed: Enter or Esc first
             chooseEarlier(entry);
             input.focus();
           });
@@ -1797,8 +1848,93 @@
         fit();
       };
 
+      // A mark at the end of a row. A press on it is not a press on the row, and
+      // leaves the typing in the field.
+      const PENCIL = 'M5.5 13.5l.7-2.9 6.4-6.4a1 1 0 0 1 1.4 0l.8.8a1 1 0 0 1 0 1.4l-6.4 6.4zM11.4 5.4l2.2 2.2';
+      const rowTool = (label, path, act) => {
+        const button = el('button', 'rowtool');
+        button.type = 'button';
+        button.tabIndex = -1;
+        button.setAttribute('aria-label', label);
+        const drawing = document.createElementNS(SVG, 'svg');
+        drawing.setAttribute('viewBox', '0 0 19 19');
+        drawing.setAttribute('width', '19');
+        drawing.setAttribute('height', '19');
+        const stroke = document.createElementNS(SVG, 'path');
+        stroke.setAttribute('d', path);
+        drawing.append(stroke);
+        button.append(drawing);
+        button.addEventListener('mousedown', (event) => event.preventDefault());
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          act();
+        });
+        return button;
+      };
+
+      // The list as the box holds it: each conversation with when it was last
+      // used as a date, if the harness said.
+      const dated = (listed) =>
+        listed.conversations.map((entry) => {
+          const when = entry.used ? new Date(entry.used) : null;
+          return { ...entry, when: when && !Number.isNaN(when.getTime()) ? when : null };
+        });
+
+      // Renaming. The pencil on a row, or Command+R on the chosen one, puts its
+      // title in the field to be changed. Enter keeps what is there, and with
+      // nothing there the title the owner gave is taken away again. Esc leaves
+      // it as it was. The list waits meanwhile: typing is the title, not a
+      // narrowing. Null keeps the title; the harness's own is left alone.
+      const startRename = (entry) => {
+        if (!entry || picker.opening || picker.renaming) return;
+        picker.renaming = entry;
+        picker.narrowed = input.value;
+        input.value = entry.title || '';
+        input.select();
+        tint();
+        notice('enter keeps the title. esc leaves it', true);
+      };
+
+      const endRename = () => {
+        input.value = picker.narrowed;
+        picker.renaming = null;
+        tint();
+        unnotice();
+        drawHistory();
+      };
+
+      const keepRename = async () => {
+        const list = picker;
+        const entry = list.renaming;
+        try {
+          await invoke('rename_conversation', { id: entry.id, title: input.value });
+          // The title it has now may be the one it had before the owner's.
+          const listed = await invoke('history');
+          if (picker === list) list.conversations = dated(listed);
+        } catch (error) {
+          if (picker === list) endRename();
+          notice(`could not rename it: ${error}`);
+          return;
+        }
+        if (picker === list) endRename();
+      };
+
+      // /rename and a title: the conversation open in the box is called that.
+      const rename = async (title) => {
+        if (!title) {
+          notice('/rename and a title names this conversation');
+          return;
+        }
+        try {
+          const kept = await invoke('rename_conversation', { id: null, title });
+          notice(kept ? `renamed: ${kept}` : 'renamed');
+        } catch (error) {
+          notice(String(error));
+        }
+      };
+
       const closeHistory = () => {
-        const said = picker.folders > 1;
+        const said = picker.folders > 1 || picker.renaming;
         historyButton.classList.remove('on');
         closePicker();
         if (said) unnotice();
@@ -1829,12 +1965,9 @@
           notice('no earlier conversations');
           return;
         }
-        const conversations = listed.conversations.map((entry) => {
-          const when = entry.used ? new Date(entry.used) : null;
-          return { ...entry, when: when && !Number.isNaN(when.getTime()) ? when : null };
-        });
+        const conversations = dated(listed);
         const folders = new Set(conversations.map((entry) => (entry.own ? '' : entry.folder))).size;
-        picker = { history: true, conversations, folders, opening: false, models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
+        picker = { history: true, conversations, folders, opening: false, renaming: null, narrowed: '', models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
@@ -1894,7 +2027,18 @@
         'keydown',
         (event) => {
           if (!picker || !picker.history || (event.key === 'c' && event.ctrlKey)) return;
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          if (picker.renaming) {
+            // A title is being typed. The keys that move about the list rest.
+            if (event.key === 'Enter' && !event.isComposing) keepRename();
+            else if (event.key === 'Escape') endRename();
+            else if (event.key !== 'Tab' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          if (event.key === 'r' && event.metaKey) {
+            startRename(picker.shown[picker.index]);
+          } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             const step = event.key === 'ArrowDown' ? 1 : -1;
             picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
             drawHistory();
@@ -1923,6 +2067,7 @@
           if (!picker || !picker.history) return;
           event.stopPropagation();
           tint();
+          if (picker.renaming) return; // what is typed is the title
           picker.index = 0;
           drawHistory();
         },
@@ -2285,6 +2430,10 @@
         }
         if (text === '/history' || text.startsWith('/history ')) {
           openHistory(text.slice(8).trim());
+          return;
+        }
+        if (text === '/rename' || text.startsWith('/rename ')) {
+          rename(text.slice(7).trim());
           return;
         }
         if (text === '/pet') {

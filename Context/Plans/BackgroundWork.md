@@ -289,7 +289,38 @@ both groups change the same list in the page: built one after the other, they do
    - Depends on: 1 (a twelfth command needs the list).
    - Risk: none that reaches past the box. The harness's file is not touched.
    - Source: specified from user (decision 10) + inferred from codebase (`history::titles`).
-   - Status: Not started
+   - Status: In progress. Built on the branch `rename-conversation` (2026-10-10); not yet
+     tried by the owner
+   - **Built:** `history.rs` keeps two kinds of title, the ones Null makes and the ones the
+     owner gives (`Titles`), in `history.json` under `titles`, as before, and `renamed`. A
+     file an older Null wrote reads as it did. A new command, `rename_conversation`, with no
+     id means the open conversation. In the page: `/rename` and a title, with "renamed" and
+     the title on the notice line; and in `/history` a pencil at the end of a row and
+     Command+R on the chosen one, which put the title in the field, selected. Enter keeps
+     what is there, Esc leaves the title as it was and the list open, and the words that
+     narrowed the list come back. The arrow keys and Tab rest meanwhile, and so does a press
+     on a row.
+   - **Decided by the agent:**
+     - **Taking a title away:** Enter on an empty field takes the owner's title away, and the
+       title the conversation had before shows again. Nothing else undoes a rename.
+     - **`/rename` with no title** says what the command is for and changes nothing.
+     - **A fresh box:** with no conversation yet, `/rename` says there is none to rename.
+     - **The log** says that a title was given or taken away, never the title.
+     - **Room for the marks:** every row of `/history` keeps 19 px at its end for them, so
+       that nothing moves when they show. The place and time of each row stand that much
+       further left than they did.
+   - **Proven without a person:** 87 unit tests, three new: the owner's title comes before
+     the harness's and Null's, and taking it away brings the other back; the file as an
+     older Null wrote it, and as it is written now; a title goes with its conversation
+     whoever gave it. Fourteen states drawn in the app's web engine and read back: the
+     pencil on the chosen row and on no other, a row's height unchanged at 23 px, Command+R,
+     Enter with a new title (the list then showed it), Enter on an empty field, Esc, Esc
+     again (the list goes), the narrowing words coming back, the arrow keys and a press on a
+     row doing nothing meanwhile, the pencil pressed on another row, `/rename` with and
+     without a title, and `/ren` through the list of commands. Three pictures looked at.
+   - **Not proven:** the real app from end to end: a title typed, kept in the file and shown
+     again after a restart. The pointer over a row (drawn by adding a rule, not by a
+     pointer). Command+R as macOS hands it to the box.
 
 3. **Deleting a conversation, to the Trash**
    - What: `Mini/src/history.rs` finds a conversation's file by its id in the harness's
