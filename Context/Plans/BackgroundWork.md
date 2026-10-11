@@ -415,7 +415,47 @@ both groups change the same list in the page: built one after the other, they do
      shown, and the harness check.
    - Source: specified from user (decision 11) + researched finding (the timing) + inferred
      from codebase.
-   - Status: Not started
+   - Status: In progress. Built on the branch `search-inside` (2026-10-10); not yet tried by
+     the owner
+   - **Built:** a new module, `Mini/src/search.rs`, in the two steps planned: every
+     conversation's file looked through whole for the words, on every core, and only the
+     files that have them all read line by line for who said what. A new command,
+     `search_conversations`, in which a newer search ends an older one. In the page: a
+     quarter of a second after the last key in `/history`, the conversations found are added
+     under the heading "said inside", each with its title and, where the place and time
+     stand on other rows, a piece of what was said. They are chosen, opened, renamed and
+     deleted like any other row. One new dependency named in `Cargo.toml`, `memchr`, which
+     the build already had.
+   - **Measured on the owner's Mac, with Null's own code, built as a release:** the owner's
+     162 conversations (the files right under a folder; the rest are helpers') were looked
+     through in 15 ms for a word nobody said, 44 ms for "linker" (4 found), 70 ms for "the"
+     (the best 40 of nearly all), and about 62 ms for two words. The first look took 60 ms.
+     Only the numbers were read.
+   - **Decided by the agent:**
+     - **At least two letters** in all. One letter is in every conversation.
+     - **Capitals do not matter for A to Z only.** A letter with an accent has to be typed as
+       it was written.
+     - **How a conversation is ranked:** a word in the harness's title counts five, in what
+       the owner wrote three, in what the agent replied one; and the more often a word is
+       said, the less each further time adds. A tie goes to the newer, by its id.
+     - **Not searched:** what a tool read or gave back, the agent's thinking, and the
+       conversations of the helpers an agent started.
+     - **The best forty** are given, no more.
+     - **Found by its title already,** a conversation is not shown a second time under "said
+       inside".
+     - **The log** says how many were found and how long it took, never a word.
+   - **Proven without a person:** 94 unit tests, five new: what was typed becomes the words;
+     a conversation is found by what was said in it and not by what a tool read; what stands
+     first; the piece shown, cut between letters and never through one; a search no longer
+     wanted gives nothing. A new question in the harness check, on the carried Oh-my-pi:
+     what the owner wrote and what the agent replied are in the conversation's file as the
+     search reads it. Eight states drawn in the app's web engine and read back: found by
+     title and by what was said, capitals, one letter (nothing asked), nothing found, found
+     only inside, the arrow keys and Enter on one found inside (it opened), typing on (only
+     the newest words asked), and the pencil on one found inside. One picture looked at.
+   - **Not proven:** the real app from end to end. The owner's eye on a found row: its title
+     is cut short to make room for the piece. The first search after the Mac was started.
+     The owner's own Oh-my-pi, "yours".
 
 5. **Say it: the tools for history**
    - What: the README's commands and what Null keeps (the titles the owner gave). The research

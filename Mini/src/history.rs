@@ -31,7 +31,7 @@ use serde_json::{json, Value};
 use tauri::AppHandle;
 
 use crate::log::log;
-use crate::{harness, settings, translate};
+use crate::{harness, search, settings, translate};
 
 /// How long a title Null makes may be, in characters. A row of the list shows about sixty.
 const TITLE_LENGTH: usize = 80;
@@ -381,6 +381,31 @@ pub async fn delete_conversation(app: AppHandle, id: String) -> Result<bool, Str
         let _ = harness::new_conversation(app.clone());
     }
     Ok(open)
+}
+
+// ── Looking inside ────────────────────────────────────────────────────────
+
+/// Typing in `/history`: the conversations in which those words were said,
+/// the best first (`search.rs`). Nothing when there is too little to look
+/// for, or when Null cannot find where this harness keeps its conversations.
+/// A newer search ends an older one. The log gets how many were found and how
+/// long it took, and never a word.
+#[tauri::command]
+pub async fn search_conversations(words: String) -> Result<Vec<search::Found>, String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LATEST: AtomicU64 = AtomicU64::new(0);
+
+    let mine = LATEST.fetch_add(1, Ordering::SeqCst) + 1;
+    let words = search::words_of(&words);
+    let Some(sessions) = sessions_folder().filter(|_| !words.is_empty()) else {
+        return Ok(Vec::new());
+    };
+    let began = std::time::Instant::now();
+    let found = tauri::async_runtime::spawn_blocking(move || search::search(&sessions, &words, &|| LATEST.load(Ordering::SeqCst) == mine)).await.map_err(|e| e.to_string())?;
+    if LATEST.load(Ordering::SeqCst) == mine {
+        log!("looked inside the conversations in {} ms: {} found", began.elapsed().as_millis(), found.len());
+    }
+    Ok(found)
 }
 
 /// `/rename`, or the pencil in the list: the owner gives a conversation a

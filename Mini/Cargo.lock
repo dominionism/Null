@@ -2200,6 +2200,7 @@ version = "0.2.0"
 dependencies = [
  "agent-client-protocol",
  "futures",
+ "memchr",
  "objc",
  "pulldown-cmark",
  "serde",

@@ -25,7 +25,7 @@ use serde_json::{json, Value};
 
 use crate::history;
 use crate::standin::{self, StandIn};
-use crate::{attach, backups, engine, harness, translate};
+use crate::{attach, backups, engine, harness, search, translate};
 
 /// How long one answer from the harness is waited for. It tries a provider that
 /// refuses several times before it gives up, which takes a quarter of a minute.
@@ -517,6 +517,28 @@ fn a_conversation_s_file_is_found_by_its_id_and_the_list_follows_the_file() {
     std::fs::rename(&in_the_trash, &file).expect("the file is taken out of the Trash again");
     assert!(listed(&mut agent), "put back, the conversation is listed again");
     agent.load(&folder, &session).expect("and loads");
+}
+
+/// Searching inside conversations leans on how the harness writes a
+/// conversation's file, which it promises nobody: a line for each thing said,
+/// with who said it and the words as they were. What the owner wrote and what
+/// the agent replied are both found there, by Null's own search.
+#[test]
+#[ignore]
+fn what_is_said_in_a_conversation_is_in_its_file_as_the_search_reads_it() {
+    let (_standin, folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", None);
+    let (_, replied) = agent.say(&session, "What is the word to remember?\nIt is Marmalade.").expect("the message is answered");
+    assert_eq!(replied, "pong", "the stand-in's reply");
+    let sessions = folder.settings().join("sessions");
+    let found = |typed: &str| search::search(&sessions, &search::words_of(typed), &|| true);
+
+    let by_the_owner = found("remember marmalade");
+    assert_eq!(by_the_owner.iter().map(|found| found.id.as_str()).collect::<Vec<_>>(), [session.as_str()], "found by what the owner wrote, whatever the capitals and the order");
+    assert_eq!(by_the_owner[0].piece, "What is the word to remember? It is Marmalade.", "with a piece of it, as it was written");
+    let by_the_agent = found("pong");
+    assert_eq!(by_the_agent.iter().map(|found| found.id.as_str()).collect::<Vec<_>>(), [session.as_str()], "found by what the agent replied");
+    assert_eq!(by_the_agent[0].piece, "pong");
+    assert_eq!(found("marmalade zebra"), Vec::new(), "every word has to be said");
 }
 
 /// `/history` draws the harness's own list of the conversations it keeps, the

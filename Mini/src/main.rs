@@ -43,6 +43,7 @@ mod log;
 mod markdown;
 mod panel;
 mod providers;
+mod search;
 mod settings;
 mod shortcut;
 mod signin;
@@ -120,6 +121,7 @@ fn main() {
             history::open_conversation,
             history::rename_conversation,
             history::delete_conversation,
+            history::search_conversations,
             layout,
             providers::providers,
             backups::backups,
