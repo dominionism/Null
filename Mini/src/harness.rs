@@ -240,6 +240,9 @@ impl Shared {
                 }
             }
         }
+        // This is how things stand at the start, and what a page that loads is
+        // given. Whatever changes from here is news, the first change too.
+        self.told = (0, self.work());
     }
 
     /// What is written down of the conversations this run holds: for one that
@@ -521,6 +524,8 @@ pub fn init(app: &AppHandle) {
     let mut shared = Shared::new(saved.session, saved.model);
     shared.recall(history::stood(app));
     let shared = Arc::new(Mutex::new(shared));
+    // What was working when Null went away is written down as cut off from now on.
+    write_down(app, &shared);
     let (commands, orders) = mpsc::unbounded();
     app.manage(Harness { shared: shared.clone(), commands });
 
@@ -1806,6 +1811,13 @@ mod tests {
         next.recall(written.clone());
         let told: Vec<_> = next.work().iter().map(|one| (one.id.clone().unwrap_or_default(), one.standing, one.unseen, one.open)).collect();
         assert_eq!(told, [("working".to_string(), "cut off", true, false), ("ended".to_string(), "done", true, false)]);
+        // That is where the page starts from, so that the first of them to be seen is news to it.
+        assert_eq!(next.told.1, next.work());
+        let seen = next.named("working").expect("it is held");
+        next.turn_to(seen);
+        assert_ne!(next.told.1, next.work(), "seen, it has nothing more to say, and the page has to hear that");
+        let mut next = Shared::new(Some("open".into()), None);
+        next.recall(written.clone());
         assert_eq!(next.stands(), BTreeMap::from([("ended".to_string(), "done".to_string()), ("working".to_string(), "cut off".to_string())]), "and it stays written down until it has been seen");
 
         // The one the box was on, if that was working: cut off too, and it is the open one.
