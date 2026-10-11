@@ -1972,7 +1972,7 @@
       // be put back. Nothing asks "are you sure": the Trash is what a slip is
       // put right from. The harness has no way to delete, so the app moves the
       // conversation's file itself, and refuses one that is still working or
-      // that another program has open.
+      // that is open in a terminal.
       const deleteEarlier = async (entry) => {
         if (!entry || picker.opening || picker.renaming || picker.deleting) return;
         const list = picker;

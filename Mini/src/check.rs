@@ -505,6 +505,7 @@ fn a_conversation_s_file_is_found_by_its_id_and_the_list_follows_the_file() {
 
     let file = history::file_of(&folder.settings().join("sessions"), &session).expect("one file for the conversation, found by its id");
     assert_eq!(history::held_by(&file), vec![agent.child.id()], "the harness has the file open while it holds the conversation");
+    assert!(!history::in_a_terminal(agent.child.id()), "a harness another program started, as Null starts its own, is in no terminal");
     agent.request("session/close", json!({ "sessionId": session })).expect("the harness closes the conversation");
     assert_eq!(history::held_by(&file), Vec::<u32>::new(), "nobody has the file open once the harness has closed the conversation");
 
