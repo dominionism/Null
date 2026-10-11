@@ -41,10 +41,10 @@ sign-in or API key is the distribution goal.
 
 ### Deferred by the owner: name these at every recall
 
-Five tasks are put off on purpose, and the owner asked to be reminded of them at every recall,
+Six tasks are put off on purpose, and the owner asked to be reminded of them at every recall,
 whichever plan is active. An agent that resumes this project names every one of them in its
 orientation, until the owner says one is done or dropped. The first two have their home in
-`Context/Plans/OwnHarness.md`, "Deferred by the owner". The other three were put off when work in
+`Context/Plans/OwnHarness.md`, "Deferred by the owner". The other four were put off when work in
 the background was planned (`Context/Plans/BackgroundWork.md`, "Out of scope"), with the owner's
 words: "make sure to put them somewhere safe ... so that we don't lose track of the deferred
 tasks".
@@ -62,6 +62,10 @@ tasks".
 - **Voice** (deferred 2026-10-10: "a big one (requiring a significant amount of planning -- let's
   defer for now)"). Step 4 of the five in `Context/Plans/NullMini.md`, after work in the
   background.
+- **Search by meaning in `/history`** (deferred 2026-10-10). Word search is planned first. Finding
+  a conversation by what it was about, when none of its words are remembered, needs a language
+  model inside Null. Worth its cost with thousands of conversations, or with voice, where one
+  asks by meaning. If the harness comes to offer a search of its conversations, Null shows that.
 
 ### Product direction and authoritative plans
 
