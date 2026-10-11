@@ -375,11 +375,12 @@ pub fn to_trash(what: &Path) -> Result<PathBuf, String> {
 /// a terminal, a person has the conversation in front of them, and it is left
 /// alone. A program in the background that still holds it does not stand in
 /// the way: nobody can see it to close it, and it loses nothing, since a
-/// harness goes on writing to a conversation's file wherever the file is. Says
-/// whether it was the conversation open in the box, which then has a new one.
-/// Why one was not deleted goes in the log, without saying which.
+/// harness goes on writing to a conversation's file wherever the file is. When
+/// it was the conversation open in the box, the box has a new one, and the
+/// number that one is known by is given. Why one was not deleted goes in the
+/// log, without saying which.
 #[tauri::command]
-pub async fn delete_conversation(app: AppHandle, id: String) -> Result<bool, String> {
+pub async fn delete_conversation(app: AppHandle, id: String) -> Result<Option<u64>, String> {
     let refuse = |why: &str| {
         log!("a conversation was not deleted: {why}");
         Err(why.to_string())
@@ -408,10 +409,7 @@ pub async fn delete_conversation(app: AppHandle, id: String) -> Result<bool, Str
         log!("what was kept beside a deleted conversation stayed where it was: {why}");
     }
     log!("a conversation was moved to the Trash");
-    if open {
-        let _ = harness::new_conversation(app.clone());
-    }
-    Ok(open)
+    Ok(if open { harness::new_conversation(app.clone()).ok() } else { None })
 }
 
 // ── Looking inside ────────────────────────────────────────────────────────

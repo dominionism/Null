@@ -31,6 +31,10 @@
 > harness check asks about work in the background (`Context/Plans/BackgroundWork.md`, item 7) were
 > written in where they belong, by the session that built them. Nothing else was traced again.
 
+> Eighth addition, 2026-10-10: how `harness.rs` keeps conversations since item 8 of
+> `Context/Plans/BackgroundWork.md` (a record for each, every event naming its conversation) was
+> written in where it belongs, by the session that built it. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -170,7 +174,8 @@ agent routes of its own: a retained Python ACP API and herdr delivery into termi
    otherwise `session/new` creates one in the app's `Workspace` directory. The selected model is
    restored if offered. Null persists the session ID; OMP persists its transcript.
 6. `session/prompt` produces text/tool/status notifications. `translate.rs` maps them to numbered
-   `mini:event` messages; a 5,000-event in-memory buffer supports `events_since` catch-up. Hiding
+   `mini:event` messages, each naming its conversation. They are kept in memory with that
+   conversation, 5,000 at most, and `events_since` gives a page the open conversation's. Hiding
    the panel does not stop the turn.
 7. The page immediately displays text, then calls Rust `layout` (`markdown.rs`, `pulldown-cmark`)
    to obtain a structural tree. DOM elements and `textContent` render it, never model-authored HTML.
@@ -312,7 +317,7 @@ Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and 
 | `main.rs` | Wiring: two plugins, state init, 35 `invoke_handler` commands, nine dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, or 662 with the pet's 46 px lane on its left, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize`, the commands `pet` and `set_pet` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
-| `harness.rs` | The ACP connection: one thread, one `omp … acp` process, one conversation, a 5,000-event ring, pending approval responders | What the harness reported; never what a provider is or whether a model is good |
+| `harness.rs` | The ACP connection: one thread, one `omp … acp` process, and a record for each conversation this run knows (today one, the open one), under a number Null gives it: its events (5,000 at most), its tools, its waiting approvals, its model | What the harness reported; never what a provider is or whether a model is good |
 | `translate.rs` | ACP JSON → box events; the model list out of session config options; the owner's `mcp.json` → `session/new`; finding the `omp` binary | Pure functions over JSON; no process, no network |
 | `backups.rs` | The fallback order, in the form of the harness's settings | The order, not the switching — the harness moves on and re-sends by itself |
 | `attach.rs` | The files that go with the next message, and the list of the Mac's folders they are chosen from | Which files, as paths. Never a file's content: the agent reads it with its own tool |
@@ -338,9 +343,10 @@ a provider requires; it adds no approval layer — the approval mode read from
 
 1. Control+Space → `shortcut.rs` (`ShortcutState::Pressed`) → `panel::toggle` → `show` → `mini:shown`.
 2. The page focuses the field. Enter → `invoke('send', { text })`.
-3. `harness::send_text`: refuse if busy; set busy; publish `user_message`, then `status_change
-   running`; queue `Command::Send`.
-4. The harness thread (`serve` → `converse` → `Conversation::handle`) builds
+3. `harness::send_text`: refuse if the open conversation is busy; set it busy; publish
+   `user_message`, then `status_change running`; queue `Command::Send`, which names that
+   conversation by its number.
+4. The harness thread (`serve` → `converse` → `Connection::handle`) builds
    `omp [--profile P] [--approval-mode M] --config …/harness.yml acp`, `initialize`s (the protocol
    version must come back 1), then opens a session: `session/load` on the saved id when the agent
    advertises `loadSession`, else `session/new`; MCP servers come from `~/.omp/agent/mcp.json` in
@@ -373,7 +379,10 @@ Events: `mini:event` carries `user_message`, `text_delta` (`{text, thinking}`), 
 `status_change` (`running` / `needs_input` / `ready` / `blocked`), `approval_request`,
 `message_done`, `model_changed`, `model_switched`, `reply_failed`, `error`, `conversation_opened`
 (an earlier conversation, with what was said in it), each with a running `seq`
-so a reloaded page catches up through `events_since`. `mini:attached` carries what is attached to the
+so a reloaded page catches up through `events_since`, and with the number of its `conversation`:
+the page draws an event only when it names the conversation the box shows. It learns that number
+from `events_since`, from `new_conversation`, from `delete_conversation` when the open one was
+deleted, and from `conversation_opened`. `mini:attached` carries what is attached to the
 next message. `mini:signin` carries the sign-in's lines,
 questions and `done`; `mini:welcome` (`{freely}`) is the first opening: the page says no provider is
 signed in, opens the sign-in list, and when that is over says whether the agent acts without asking;
@@ -443,7 +452,8 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 - **Singleton settings:** captures, generation, cloud. MCP bindings supply per-client voice defaults.
   Voice's cloud bearer key is separate from OMP provider credentials; do not conflate the boundaries.
 - **Ephemeral runtime state:** generation queue/task registry, speak subscribers, narration sessions,
-  Python Mini sessions, Rust Mini event buffer and approval responders. None is a durable task tray.
+  Python Mini sessions, Rust Mini's record of each conversation it holds (events, approval
+  responders). None is a durable task tray.
 - `Context/Glossary.md` holds Null's words since 2026-10-10 (harness, engine, provider, sign-in,
   account, backup, refusal and the rest); it has none of the Voice project's. The distinctions
   above are a factual research vocabulary, and where the two differ the glossary is the settled
