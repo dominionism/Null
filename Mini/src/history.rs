@@ -252,11 +252,13 @@ pub async fn history(app: AppHandle) -> Result<Listed, String> {
     Ok(Listed { lists: true, deletes: sessions_folder().is_some_and(|sessions| sessions.is_dir()), conversations })
 }
 
-/// Open one of them in the box, in place of the conversation that is open. It
-/// arrives as an event, with what was said in it; when it will not load, the
-/// box is left as it was.
+/// Open one of them in the box, in place of the conversation that is open,
+/// which goes on if it is working. One the harness loads arrives as an event,
+/// with what was said in it; when it will not load, the box is left as it
+/// was. One this run already held gives its number instead, and the page asks
+/// for what was kept of it.
 #[tauri::command]
-pub async fn open_conversation(app: AppHandle, id: String) -> Result<(), String> {
+pub async fn open_conversation(app: AppHandle, id: String) -> Result<Option<u64>, String> {
     harness::open_earlier(&app, id).await
 }
 
@@ -386,8 +388,8 @@ pub async fn delete_conversation(app: AppHandle, id: String) -> Result<Option<u6
         Err(why.to_string())
     };
     let open = harness::open_id(&app).as_deref() == Some(id.as_str());
-    if open && harness::busy(&app) {
-        return refuse("stop the reply with ctrl+c before deleting this conversation");
+    if harness::working(&app, &id) {
+        return refuse(if open { "stop the reply with ctrl+c before deleting this conversation" } else { "that conversation is still working. open it and stop it first" });
     }
     let Some(file) = sessions_folder().and_then(|sessions| file_of(&sessions, &id)) else {
         return refuse("this harness keeps its conversations where Null cannot find them");
@@ -409,7 +411,11 @@ pub async fn delete_conversation(app: AppHandle, id: String) -> Result<Option<u6
         log!("what was kept beside a deleted conversation stayed where it was: {why}");
     }
     log!("a conversation was moved to the Trash");
-    Ok(if open { harness::new_conversation(app.clone()).ok() } else { None })
+    if !open {
+        harness::forget(&app, &id);
+        return Ok(None);
+    }
+    Ok(harness::new_conversation(app.clone()).ok())
 }
 
 // ── Looking inside ────────────────────────────────────────────────────────
