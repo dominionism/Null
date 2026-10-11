@@ -147,8 +147,6 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <p align="center">
   <a href="https://github.com/jamiepine/voicebox"><img src=".github/Readme/link-voicebox.svg" height="30" alt="Voicebox (opens https://github.com/jamiepine/voicebox)" /></a>
-  &nbsp;
-  <a href="Context/ADR/0002-NullMiniIsItsOwnApp.md"><img src=".github/Readme/link-adr-0002.svg" height="30" alt="ADR 0002" /></a>
 </p>
 
 <a id="run-or-develop-the-voice-stack"></a>
@@ -160,8 +158,6 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
   <a href="https://bun.sh"><img src=".github/Readme/link-bun.svg" height="30" alt="Bun (opens https://bun.sh)" /></a>
   &nbsp;
   <a href="https://github.com/casey/just"><img src=".github/Readme/link-just.svg" height="30" alt="just (opens https://github.com/casey/just)" /></a>
-  &nbsp;
-  <a href="Context/Research/Research.md"><img src=".github/Readme/link-research.svg" height="30" alt="Research map" /></a>
 </p>
 
 <a id="status-and-direction"></a>
@@ -171,34 +167,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="repository-layout-and-ongoing-cleanup"></a>
 <p align="center">
-  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout and ongoing cleanup: Mini/, the Voice directories app, tauri, web, backend, scripts and data, the inherited docs and landing sites, Context/, and CHANGELOG.md." />
-</p>
-
-<p align="center">
-  <a href="Context/Plans/CapitalFolders.md"><img src=".github/Readme/link-cleanup-plan.svg" height="30" alt="Cleanup plan" /></a>
-  &nbsp;
-  <a href="Context/ADR/0001-CapitalizedFolderNames.md"><img src=".github/Readme/link-adr-0001.svg" height="30" alt="ADR 0001" /></a>
-</p>
-
-<a id="read-the-reasoning"></a>
-<p align="center">
-  <img src=".github/Readme/reasoning.svg" width="100%" alt="Read the reasoning: the app design, providers, own-harness, conversation display and future-phase plans, the decisions that constrain changes, and the codebase map including what was never traced." />
-</p>
-
-<p align="center">
-  <a href="Context/Plans/MiniApp.md"><img src=".github/Readme/link-miniapp.svg" height="30" alt="App design" /></a>
-  &nbsp;
-  <a href="Context/Plans/Providers.md"><img src=".github/Readme/link-providers.svg" height="30" alt="Providers" /></a>
-  &nbsp;
-  <a href="Context/Plans/OwnHarness.md"><img src=".github/Readme/link-own-harness.svg" height="30" alt="Own harness" /></a>
-  &nbsp;
-  <a href="Context/Plans/ConversationDisplay.md"><img src=".github/Readme/link-display.svg" height="30" alt="Conversation display" /></a>
-  &nbsp;
-  <a href="Context/Plans/NullMini.md"><img src=".github/Readme/link-phases.svg" height="30" alt="Future phases" /></a>
-  &nbsp;
-  <a href="Context/ADR/"><img src=".github/Readme/link-adrs.svg" height="30" alt="Decisions" /></a>
-  &nbsp;
-  <a href="Context/Research/Research.md"><img src=".github/Readme/link-research.svg" height="30" alt="Research map" /></a>
+  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout and ongoing cleanup: Mini/, the Voice directories app, tauri, web, backend, scripts and data, the inherited docs and landing sites, and CHANGELOG.md; the plans, decisions, research and handoffs are the owner's own and are not tracked in Git." />
 </p>
 
 <a id="license"></a>

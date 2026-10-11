@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 332" width="860" height="332" fill="none" role="img" aria-label="Repository layout and ongoing cleanup. Mini/                  Null app: Rust host, static Page/, install scripts app/                   Shared Voice React UI tauri/                 Voice desktop host web/                   Voice browser host backend/               Voice API, engines, MCP, SQLite and Python harness scripts/               Voice lifecycle, packaging and development helpers data/                  Voice development data docs/ · landing/       Inherited documentation and marketing sites Context/               Plans, decisions and research CHANGELOG.md           Voice changelog, also read by the web build The unmerged capital-folders branch capitalizes the existing directories and removes the inherited sites and other upstream material; the paths above describe the current checkout. Memories/ holds local handoffs and is not tracked in Git.">
-  <title>Repository layout and ongoing cleanup. Mini/                  Null app: Rust host, static Page/, install scripts app/                   Shared Voice React UI tauri/                 Voice desktop host web/                   Voice browser host backend/               Voice API, engines, MCP, SQLite and Python harness scripts/               Voice lifecycle, packaging and development helpers data/                  Voice development data docs/ · landing/       Inherited documentation and marketing sites Context/               Plans, decisions and research CHANGELOG.md           Voice changelog, also read by the web build The unmerged capital-folders branch capitalizes the existing directories and removes the inherited sites and other upstream material; the paths above describe the current checkout. Memories/ holds local handoffs and is not tracked in Git.</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 313" width="860" height="313" fill="none" role="img" aria-label="Repository layout and ongoing cleanup. Mini/                  Null app: Rust host, static Page/, install scripts app/                   Shared Voice React UI tauri/                 Voice desktop host web/                   Voice browser host backend/               Voice API, engines, MCP, SQLite and Python harness scripts/               Voice lifecycle, packaging and development helpers data/                  Voice development data docs/ · landing/       Inherited documentation and marketing sites CHANGELOG.md           Voice changelog, also read by the web build The unmerged capital-folders branch capitalizes the existing directories and removes the inherited sites and other upstream material; the paths above describe the current checkout. Context/ and Memories/ hold the owner&#x27;s own plans, decisions, research and handoffs, and are not tracked in Git.">
+  <title>Repository layout and ongoing cleanup. Mini/                  Null app: Rust host, static Page/, install scripts app/                   Shared Voice React UI tauri/                 Voice desktop host web/                   Voice browser host backend/               Voice API, engines, MCP, SQLite and Python harness scripts/               Voice lifecycle, packaging and development helpers data/                  Voice development data docs/ · landing/       Inherited documentation and marketing sites CHANGELOG.md           Voice changelog, also read by the web build The unmerged capital-folders branch capitalizes the existing directories and removes the inherited sites and other upstream material; the paths above describe the current checkout. Context/ and Memories/ hold the owner&#x27;s own plans, decisions, research and handoffs, and are not tracked in Git.</title>
   <style>
     text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }
     .rise { animation: rise .35s ease-out both; }
@@ -11,9 +11,9 @@
     @keyframes hold { 0%, 99.9% { opacity: 1; } 100% { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
   </style>
-  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="331" rx="12"/></clipPath>
+  <clipPath id="win"><rect x="0.5" y="0.5" width="859" height="312" rx="12"/></clipPath>
   <g clip-path="url(#win)">
-  <rect width="860" height="332" fill="#0D1117"/>
+  <rect width="860" height="313" fill="#0D1117"/>
   <rect width="860" height="30" fill="#161B22"/>
   <path d="M0 29.5H860" stroke="#21262D"/>
   <circle cx="20" cy="15.0" r="5.5" fill="#FF5F57"/>
@@ -28,11 +28,10 @@
   <text x="24" y="167.0" font-size="12.5" fill="#8B949E" xml:space="preserve">scripts/               Voice lifecycle, packaging and development helpers</text>
   <text x="24" y="186.0" font-size="12.5" fill="#8B949E" xml:space="preserve">data/                  Voice development data</text>
   <text x="24" y="205.0" font-size="12.5" fill="#8B949E" xml:space="preserve">docs/ · landing/       Inherited documentation and marketing sites</text>
-  <text x="24" y="224.0" font-size="12.5" fill="#8B949E" xml:space="preserve">Context/               Plans, decisions and research</text>
-  <text x="24" y="243.0" font-size="12.5" fill="#8B949E" xml:space="preserve">CHANGELOG.md           Voice changelog, also read by the web build</text>
-  <text x="24" y="268.0" font-size="12.5" fill="#8B949E">The unmerged capital-folders branch capitalizes the existing directories and removes the inherited</text>
-  <text x="24" y="287.0" font-size="12.5" fill="#8B949E">sites and other upstream material; the paths above describe the current checkout. Memories/ holds</text>
-  <text x="24" y="306.0" font-size="12.5" fill="#8B949E">local handoffs and is not tracked in Git.</text>
+  <text x="24" y="224.0" font-size="12.5" fill="#8B949E" xml:space="preserve">CHANGELOG.md           Voice changelog, also read by the web build</text>
+  <text x="24" y="249.0" font-size="12.5" fill="#8B949E">The unmerged capital-folders branch capitalizes the existing directories and removes the inherited</text>
+  <text x="24" y="268.0" font-size="12.5" fill="#8B949E">sites and other upstream material; the paths above describe the current checkout. Context/ and</text>
+  <text x="24" y="287.0" font-size="12.5" fill="#8B949E">Memories/ hold the owner&#x27;s own plans, decisions, research and handoffs, and are not tracked in Git.</text>
   </g>
-  <rect x="0.5" y="0.5" width="859" height="331" rx="12" stroke="#21262D"/>
+  <rect x="0.5" y="0.5" width="859" height="312" rx="12" stroke="#21262D"/>
 </svg>
