@@ -246,7 +246,36 @@ both groups change the same list in the page: built one after the other, they do
      stays what it is today, a lone slash-word with nothing after it.
    - Source: specified from user (decision 7) + inferred from codebase (`COMMANDS`, the list
      `/model` uses).
-   - Status: Not started
+   - Status: In progress. Built on the branch `command-list` (2026-10-10); not yet tried by
+     the owner
+   - **Built:** in the page, each command has a few words (`ABOUT`), and a section of its own
+     draws them as a list with the keys and the typing taken before the field's own handlers,
+     as the history list does. A lone `/` and Enter lists all eleven. A slash-word that is no
+     command lists the ones it could mean and stays in the field to be put right; typing
+     narrows the list. Enter carries out the chosen row, or what is in the field when that is
+     a whole command, with or without more after it (`/model opus`). Esc puts the list away.
+     The one line of commands is gone.
+   - **Decided by the agent:**
+     - **The order of what is listed:** commands that start with what was typed, then those
+       with it in their name, then those with a word beside them that starts with it (`/sign`
+       finds `/login`, `/file` finds `/attach`), then those one or two slips away, a slip
+       being a letter wrong, missing or added, or two swapped (`/histroy`, `/mdoel`).
+     - **Nothing like it:** the heading says "no command like /xyz" and every command is
+       listed under it, since the list is what was wanted.
+     - **The look:** the names in the blue a command has when typed, the words dim, under the
+       heading "commands". Eleven rows are more than the list's room, so it scrolls and fades
+       like the others.
+     - **It opens while a reply runs,** as `/usage` does: it changes nothing by itself.
+   - **Proven without a person:** 84 unit tests, none new (the change is in the page).
+     Seventeen states drawn in the app's web engine and read back, among them: `/`, `/hist`,
+     `/histroy`, `/mdoel`, `/xyz`, `/h`, `/sign`, `/file`, `/conv`; narrowing by typing; the
+     arrow keys to the last row; Enter on a row (`/hist` then Enter opened the history list,
+     the ninth row put the pet away); a whole command typed in the open list; Esc over a
+     reply, which came back; a message that starts with a path, which went to the agent as
+     before. No row was cut off. Four pictures looked at, dark and light.
+   - **Not proven:** the real app with a real key press and a real pointer. The page was
+     drawn outside the app with its commands replaced by stand-ins, which is all this change
+     touches.
 
 2. **Renaming a conversation**
    - What: `Mini/src/history.rs`: `history.json` gains the titles the owner gave, by
