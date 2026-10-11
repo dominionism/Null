@@ -415,7 +415,7 @@ pub fn workspace(app: &AppHandle) -> Result<PathBuf, String> {
 
 // ── One connection ────────────────────────────────────────────────────────
 
-struct Conversation<'a> {
+struct Connection<'a> {
     cx: ConnectionTo<Agent>,
     app: &'a AppHandle,
     shared: &'a Arc<Mutex<Shared>>,
@@ -464,7 +464,7 @@ async fn converse(
         unnoted
     };
 
-    let mut conversation = Conversation {
+    let mut connection = Connection {
         cx,
         app,
         shared,
@@ -486,7 +486,7 @@ async fn converse(
                         Some(command) => command,
                         None => return Ok(()), // the app is quitting
                     },
-                    _ = conversation.cx.incoming_closed().fuse() => return Err(format!("{HARNESS_NAME} exited")),
+                    _ = connection.cx.incoming_closed().fuse() => return Err(format!("{HARNESS_NAME} exited")),
                 }
             }
         };
@@ -494,11 +494,11 @@ async fn converse(
             log!("letting the harness process go; the next order starts a fresh one");
             return Ok(());
         }
-        conversation.handle(command).await?;
+        connection.handle(command).await?;
     }
 }
 
-impl Conversation<'_> {
+impl Connection<'_> {
     /// Carry out one order. An error here means the connection itself is no good.
     async fn handle(&mut self, command: Command) -> Result<(), String> {
         match command {
