@@ -2645,7 +2645,9 @@
         return allAbout()
           .map((one) => [rank(one), one])
           .filter(([place]) => place !== null)
-          .sort((a, b) => (a[1].harness ? 1 : 0) - (b[1].harness ? 1 : 0) || a[0] - b[0])
+          // The likeliest match first; the box's own before the harness's only when
+          // the two match equally well.
+          .sort((a, b) => a[0] - b[0] || (a[1].harness ? 1 : 0) - (b[1].harness ? 1 : 0))
           .map(([, one]) => one);
       };
 
@@ -2653,36 +2655,51 @@
         const like = commandsLike(input.value);
         // Nothing like it: say so, and show them all, which is what was wanted.
         picker.shown = like.length ? like : allAbout();
+        // Whether what was typed narrowed the list to real matches. Enter runs the row
+        // chosen only then; the whole list, or a word nothing matches, is there to be
+        // read, and Tab fills a name in.
+        picker.narrowed = like.length > 0 && input.value.trim().replace(/^\//, '') !== '';
         picker.index = Math.min(picker.index, picker.shown.length - 1);
         pick.textContent = '';
         pick.append(el('div', 'provider', like.length ? 'commands' : `no command like ${input.value.trim()}`));
-        // The box's own first, then the harness's: two sections, the first named
-        // and the second marked as the harness's, each lining its words up with
-        // its own widest name. With one kind only, the heading above is enough.
-        const sections = [
-          ['the box', picker.shown.filter((one) => !one.harness)],
-          ['the harness', picker.shown.filter((one) => one.harness)],
-        ].filter(([, rows]) => rows.length);
-        sections.forEach(([title, rows]) => {
-          if (sections.length > 1) pick.append(el('div', 'provider', title));
-          const wide = Math.max(...rows.map((one) => one.name.length));
-          rows.forEach((one) => {
-            const selected = picker.shown.indexOf(one) === picker.index;
-            // Both kinds take the command's colour: it is a command either way, and
-            // the heading above says whose it is.
-            const row = el('div', selected ? 'option selected' : 'option', el('span', 'command', one.name.padEnd(wide)), el('span', 'id', one.words));
-            row.addEventListener('click', () => {
-              chooseCommand(one);
-              input.focus();
-            });
-            pick.append(row);
+        // One column for the whole list, wide enough for the longest name the box
+        // knows, so every description starts in the same place and no name runs
+        // into its own words. Both kinds take the command's colour: a command is a
+        // command whichever of the two carries it out.
+        const wide = Math.max(...allAbout().map((one) => one.name.length)) + 2;
+        const row = (one) => {
+          const selected = picker.shown.indexOf(one) === picker.index;
+          const line = el('div', selected ? 'option selected' : 'option', el('span', 'command', one.name.padEnd(wide)), el('span', 'id', one.words));
+          line.addEventListener('click', () => {
+            chooseCommand(one);
+            input.focus();
           });
-        });
+          pick.append(line);
+        };
+        // With only the slash written, the whole list is there to be read: two
+        // sections, the box's own and then the harness's, each named. Once a word is
+        // being written it is one order instead, the likeliest match first whichever
+        // of the two it belongs to, because that is what completing a name needs and
+        // it is the order the keys walk.
+        const both = picker.shown.some((one) => one.harness) && picker.shown.some((one) => !one.harness);
+        if (input.value.trim().replace(/^\//, '') !== '') {
+          picker.shown.forEach(row);
+        } else {
+          [
+            ['the box', false],
+            ['the harness', true],
+          ].forEach(([title, harness]) => {
+            const rows = picker.shown.filter((one) => one.harness === harness);
+            if (!rows.length) return;
+            if (both) pick.append(el('div', 'provider', title));
+            rows.forEach(row);
+          });
+        }
         // Nothing from the harness yet: say that it has been asked, where its own
         // commands will stand, rather than leaving the box's own looking like all
         // there is to type.
-        if (asking && !sections.some(([title]) => title === 'the harness')) {
-          if (sections.length === 1) pick.append(el('div', 'provider', 'the harness'));
+        if (asking && !picker.shown.some((one) => one.harness)) {
+          pick.append(el('div', 'provider', 'the harness'));
           pick.append(el('div', 'provider', 'asking what it can carry out'));
         }
         fit();
@@ -2715,17 +2732,34 @@
             const step = event.key === 'ArrowDown' ? 1 : -1;
             picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
             drawCommands();
+          } else if (event.key === 'Tab' && !event.shiftKey) {
+            // Tab writes the chosen name out in full and leaves the list up, to be
+            // read or sent: it fills the field in rather than running anything.
+            const one = picker.shown[picker.index];
+            if (one) {
+              input.value = one.name;
+              tint();
+              drawCommands();
+            }
           } else if (event.key === 'Enter' && !event.isComposing) {
             // A command typed out whole, with or without more after it, is
-            // carried out as typed — in the harness's own spelling when it is
-            // one of the harness's. Anything else means the row chosen.
+            // carried out as typed — in the harness's own spelling when it is one of
+            // the harness's. Otherwise the row chosen is run, when what was typed
+            // narrowed the list to real matches; a lone "/", and a word nothing
+            // matches, leave the list up to be read.
             const typed = input.value.trim();
             const whole = allAbout().find((one) => typed === one.name || typed.startsWith(`${one.name} `));
             if (whole) {
               closePicker();
               send(whole.sends + typed.slice(whole.name.length));
-            } else {
+            } else if (picker.narrowed) {
               chooseCommand(picker.shown[picker.index]);
+            } else if (typed !== '/') {
+              // Nothing here matches what was typed, which may be because the harness
+              // has not been asked yet. The send path is what asks it, and then decides:
+              // the harness's command, or a slip that opens this list again.
+              closePicker();
+              send(typed);
             }
           } else {
             return; // Esc, Ctrl+C and typing are the page's own
@@ -3326,7 +3360,18 @@
           drawPlaces();
           return;
         }
-        if (picker && !picker.usage && !picker.harness) {
+        // A slash word opens the list of commands as it is written, and narrows it
+        // as more of the word arrives: the box's own and the harness's alike, since
+        // both are commands. A space ends the name, and with it the list.
+        const typed = input.value.trim();
+        if (!signin && !(picker && !picker.commands)) {
+          if (/^\/[\w:-]*$/.test(typed)) {
+            if (!picker) openCommands(typed);
+          } else if (picker && picker.commands) {
+            closePicker();
+          }
+        }
+        if (picker && !picker.usage && !picker.harness && !picker.commands) {
           picker.index = 0;
           drawPicker();
         }
