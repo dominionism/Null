@@ -5,12 +5,11 @@
 > that the owner asked for in the same breath. It replaces items 25 and 26 of `NullMini.md`, which
 > were written for a mini inside the Voice desktop app.
 >
-> Status: **All four pieces are built and on `main` (2026-10-10): the cursor, attaching files,
-> history and the pet, Nil. They were brought together on one branch, `box-and-pet-trial`, with
-> every collision settled and two faults that only showed together mended (item 6); pull request
-> #33 carried that branch and this plan to `main`. Null 0.2.0 is installed on the owner's Mac
-> and the owner is using it (item 8). It is not released: the tag `null-v0.2.0` waits for the
-> owner's word. Open: decisions 3, 4, 6 and 7, and item 7.**
+> Status: **Built, tried by the owner and released (2026-10-10). All four pieces are on `main`:
+> the cursor, attaching files, history and the pet, Nil (item 6, pull request #33). The owner
+> used the installed 0.2.0 and found nothing to change, which settles decisions 3, 4, 6 and 7.
+> Null 0.2.0 was published by the tag `null-v0.2.0`, and the owner's Mac runs that release
+> (item 8). Open: item 7, the glossary's new words and the research map.**
 
 ## Goal
 
@@ -110,6 +109,15 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
 
 ## Decisions for the owner
 
+**Settled by the owner on 2026-10-10, after using the installed 0.2.0:** "Everything is
+perfect. To answer all your questions, everything goes through. Nothing seems to have a
+defect." So: the arrow goes on pulsing beside the pet (3); history shows the terminal's
+conversations (4); the typed letters stay where they are (6); and Null may keep a title for
+each conversation made in the box (7), which the glossary's Conversation line now says. The
+agent's choices that were asked about stand too: lists without a scroll bar, `/pet` saying
+nothing, a mistyped command answered with the commands alone. Decision 5, other people's
+pets, was not asked and stays left out.
+
 1. **Which pet: Nil** (owner, 2026-10-10: "I really like the animations you made for Nil. Let's
    go with that"), level with the arrow.
 6. **Whether the typed letters now sit too low.** Levelling the cursor (item 1) took back a
@@ -148,8 +156,9 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
    - Risk: the letters and the cursor cannot both be exactly level, since the lift that centres
      one moves the other. Know it by: both measured before and after, and the choice said.
    - Source: specified from user + inferred from codebase (the comment on `top: -1px`).
-   - Status: In progress. Built by a sub-agent on the branch `caret-level` (`525e8f1`,
-     2026-10-10), which reaches `main` with pull request #33; not yet seen by the owner
+   - Status: Complete (2026-10-10). Built by a sub-agent on the branch `caret-level`
+     (`525e8f1`), on `main` with pull request #33 and in Null 0.2.0. The owner used it and
+     wants nothing changed (decision 6)
    - **Built:** the field's one-pixel lift is gone (`position: relative; top: -1px` in the
      `input` rule), with a comment that records what was measured. Nothing else changed.
    - **Why the fault was there:** the web engine draws the cursor 16 px tall in the middle of
@@ -184,10 +193,11 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
    - Risk: the file chooser taking the box away; a file that reaches the harness but not the
      model. Know it by: the stand-in provider, which shows exactly what arrived.
    - Source: specified from user + inferred from codebase (`panel.rs`, `harness.rs`).
-   - Status: In progress. Built by a sub-agent on the branch `attach-files` (three commits,
-     `452c344`, `9cc2c31`, `2ced2f5`, 2026-10-10), which reaches `main` with pull request #33;
-     not yet tried by the owner. The sub-agent was cut off once by the usage limit and resumed;
-     nothing was lost
+   - Status: Complete (2026-10-10). Built by a sub-agent on the branch `attach-files` (three
+     commits, `452c344`, `9cc2c31`, `2ced2f5`), on `main` with pull request #33 and in Null
+     0.2.0. The installed app's log shows the owner sending a message with a file twice, each
+     reply ending `completed`; what the model made of the file was not said. The sub-agent was
+     cut off once by the usage limit and resumed; nothing was lost
    - **Built:** `/attach` opens a list of the Mac's folders inside the box, on the list the box
      already has. Typing narrows, Enter opens a folder, attaches a file or takes an attached one
      off, `..` goes up, and a path typed from `/` or `~` goes straight there. It opens where it
@@ -248,9 +258,11 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
      first trial, on a folder of its own. Then the feature shows Null's own, or says in one line
      that this harness cannot.
    - Source: specified from user + inferred from codebase (`harness.rs`, `settings.rs`).
-   - Status: In progress. Built by a sub-agent on the branch `history` (eight commits, head
-     `b061f18`, 2026-10-10), which reaches `main` with pull request #33; not yet tried by the
-     owner. The sub-agent was cut off once by the usage limit and resumed; nothing was lost
+   - Status: Complete (2026-10-10). Built by a sub-agent on the branch `history` (eight
+     commits, head `b061f18`), on `main` with pull request #33 and in Null 0.2.0. The owner
+     used it ("I can see my history") and keeps the terminal's conversations and the titles
+     (decisions 4 and 7). The sub-agent was cut off once by the usage limit and resumed;
+     nothing was lost
    - **Built:** `/history`, `/history <words>` and a button last in the row. The list is the
      harness's own, in the space and the look of the box's other lists. It is sorted by when
      (today, yesterday, this week, then each month); Tab sorts it by folder instead, "the box"
@@ -340,9 +352,9 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
      lane; the box jumping sideways for people who already have a saved position. Know it by:
      the installed app, and a unit test on the position.
    - Source: specified from user + inferred from codebase (`mark()`, `panel.rs`, `settings.rs`).
-   - Status: In progress. Built on the branch `pet` (`33afe8b`, 2026-10-10), pushed at the
-     owner's word the same day, which reaches `main` with pull request #33; proven by pictures
-     and on the real window, not yet seen by the owner in the app
+   - Status: Complete (2026-10-10). Built on the branch `pet` (`33afe8b`), on `main` with
+     pull request #33 and in Null 0.2.0. The owner used it: `/pet` puts it away and brings it
+     back, and it moves as the box is used. The arrow goes on pulsing beside it (decision 3)
    - **Built:** in the page, Nil as drawn paths with its five moods and their movements as the
      owner approved them, 48 px, 4 px in from the window's left, with 10 px between it and the
      box. `mood()` follows `mark()`: the pet changes when the arrow changes. When a reply ends
@@ -450,7 +462,8 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
    - **Known to be behind once this lands:** `Research.md` (24 commands become 32; the events
      `conversation_opened` and `mini:attached`; 15 live tests become 18; `history.json` among
      the files Null keeps; the modules `attach.rs` and `history.rs`; the window's width). The
-     glossary's Conversation line, by decision 7. The line about what a harness can do, quoted
+     glossary's Conversation line was behind too, by decision 7, and was mended on 2026-10-10.
+     The line about what a harness can do, quoted
      in `OwnHarness.md` item 3, which now also says "lists earlier conversations".
 
 8. **Null 0.2.0: tried by the owner first, then released**
@@ -470,8 +483,8 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
      ends on GitHub's build. Also, an installed 0.2.0 will not see `/update` say that 0.2.0 is
      out, so that proof (`OwnHarness.md`, item 7) waits for the release after this one.
    - Source: specified from user.
-   - Status: In progress. Steps 1 and 2 are done (2026-10-10). Step 3, the owner's own use, is
-     under way: one find so far, mended and installed. Step 4 waits for the owner's word
+   - Status: Complete (2026-10-10). Null 0.2.0 is released, and the owner's Mac runs the
+     release
    - **Step 1:** pull request #34. `main` says 0.2.0 and the README is up to date. The unit
      tests, the harness check and the page check passed on it.
    - **Step 2, the install:** `Mini/Scripts/install` on `main` at `94b4f39`. The owner had quit
@@ -498,6 +511,26 @@ The owner dictates by voice. "Gnol" below is the dictation's spelling of Null.
        Pull request #35, merged (`5ab85e3`). The app was built from that branch's tip
        (`56f69dd`) and installed about half a minute before the merge; the merge changed no
        file, so the installed app is `main`'s code.
+     - **The owner's word (2026-10-10), after using it:** "Everything is perfect. To answer
+       all your questions, everything goes through. Nothing seems to have a defect. I can see
+       my history. I can use slash pet to remove my pet and have it appear back. When I'm
+       typing, the pet, you know, has animations." See "Decisions for the owner".
+   - **Step 4, the release:** the tag `null-v0.2.0` on `main` at `4d3ca89`, pushed at the
+     owner's word ("Release it."). Only Null's own workflows answered the tag; the Voice app's
+     `Release` did not start. GitHub published `Null-0.2.0-macos-arm64.zip` (97 MB) with
+     `SHA256SUMS.txt`. Fetched with `gh`: the checksum matched, the seal held, the app says
+     0.2.0, and the Oh-my-pi inside has the checksum of `Engine.toml` and its author's
+     signature.
+   - **Step 4, the install from the release:** the one-line command with no version named,
+     after checking that the script GitHub serves is the one in the repository. It found 0.2.0
+     as the newest, signed it with the identity on the Mac and replaced the Null that was
+     built here. No reply was under way. Afterwards: the app says 0.2.0; its seal holds and it
+     has the designated requirement it had before; the Oh-my-pi inside has the checksum of
+     `Engine.toml`; the login item reports it running; the log says "started, version 0.2.0"
+     and "Full Disk Access is on"; and the keychain list is as it was.
+   - **Not proven:** a terminal conversation opened from history by the owner; what a real
+     model made of an attached file; `/update` saying that a newer Null is out, which waits
+     for the release after this one.
 
 ## Verification
 
