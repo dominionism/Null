@@ -319,6 +319,20 @@ pub fn held_by(file: &Path) -> Vec<u32> {
     programs
 }
 
+/// Whether what `ps` writes for a program's terminal names one. A program a
+/// person runs in a terminal window has one, `ttys003` and the like. One that
+/// another program started in the background has none, written `??`.
+fn names_a_terminal(written: &str) -> bool {
+    let written = written.trim();
+    !written.is_empty() && written.chars().any(|c| c.is_ascii_alphanumeric())
+}
+
+/// Whether a program is running in a terminal: someone has it in front of them.
+pub fn in_a_terminal(program: u32) -> bool {
+    let asked = std::process::Command::new("/bin/ps").args(["-o", "tty=", "-p"]).arg(program.to_string()).output();
+    asked.is_ok_and(|answer| names_a_terminal(&String::from_utf8_lossy(&answer.stdout)))
+}
+
 /// Move a file or a folder to the Mac's Trash with macOS's own call for it,
 /// which writes down where it came from, so that the Trash can put it back.
 /// Gives where in the Trash it went.
@@ -355,23 +369,40 @@ pub fn to_trash(what: &Path) -> Result<PathBuf, String> {
 }
 
 /// The x on a row of the list, or Command+Delete: move a conversation to the
-/// Trash. Refused for one whose reply is still running, and for one that
-/// another program has open: Null's own harness lets go of it first, so
-/// whoever still has its file open is someone else. Says whether it was the
-/// conversation open in the box, which then has a new one.
+/// Trash. Refused for one whose reply is still running, and for one that is
+/// open in a terminal. Null's own harness lets go of the conversation first,
+/// so whoever still has its file open is someone else; if that is a program in
+/// a terminal, a person has the conversation in front of them, and it is left
+/// alone. A program in the background that still holds it does not stand in
+/// the way: nobody can see it to close it, and it loses nothing, since a
+/// harness goes on writing to a conversation's file wherever the file is. Says
+/// whether it was the conversation open in the box, which then has a new one.
+/// Why one was not deleted goes in the log, without saying which.
 #[tauri::command]
 pub async fn delete_conversation(app: AppHandle, id: String) -> Result<bool, String> {
+    let refuse = |why: &str| {
+        log!("a conversation was not deleted: {why}");
+        Err(why.to_string())
+    };
     let open = harness::open_id(&app).as_deref() == Some(id.as_str());
     if open && harness::busy(&app) {
-        return Err("stop the reply with ctrl+c before deleting this conversation".into());
+        return refuse("stop the reply with ctrl+c before deleting this conversation");
     }
-    let file = sessions_folder().and_then(|sessions| file_of(&sessions, &id)).ok_or("this harness keeps its conversations where Null cannot find them")?;
+    let Some(file) = sessions_folder().and_then(|sessions| file_of(&sessions, &id)) else {
+        return refuse("this harness keeps its conversations where Null cannot find them");
+    };
     harness::close(&app, id.clone()).await;
-    if !held_by(&file).is_empty() {
-        return Err("that conversation is open in another program. close it there first".into());
+    let holders = held_by(&file);
+    if holders.iter().any(|program| in_a_terminal(*program)) {
+        return refuse("that conversation is open in a terminal. close it there first");
+    }
+    if !holders.is_empty() {
+        log!("a program in the background still holds the conversation that is being deleted");
     }
     let helpers = beside(&file);
-    to_trash(&file).map_err(|why| format!("it could not be moved to the Trash: {why}"))?;
+    if let Err(why) = to_trash(&file) {
+        return refuse(&format!("it could not be moved to the Trash: {why}"));
+    }
     // The conversation is gone from the list now. What was beside it follows; if it will not, it only takes room.
     if let Some(Err(why)) = helpers.as_deref().map(to_trash) {
         log!("what was kept beside a deleted conversation stayed where it was: {why}");
@@ -560,6 +591,19 @@ mod tests {
         }
         assert_eq!(file_of(&sessions.join("nowhere"), "01a1-c3"), None);
         let _ = std::fs::remove_dir_all(sessions);
+    }
+
+    #[test]
+    fn a_program_in_a_terminal_is_told_from_one_in_the_background() {
+        // As `ps -o tty=` writes it: a terminal's name, or that there is none.
+        for terminal in ["ttys003", "ttys012\n", "  console  ", "pts/4"] {
+            assert!(names_a_terminal(terminal), "{terminal:?}");
+        }
+        for none in ["??", "??\n", "", " \n", "-", "?"] {
+            assert!(!names_a_terminal(none), "{none:?}");
+        }
+        // A program that is not running is in no terminal.
+        assert!(!in_a_terminal(u32::MAX - 7));
     }
 
     #[test]

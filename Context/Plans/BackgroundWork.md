@@ -204,6 +204,15 @@ additions.
      file is there": the lock file says nothing (see "What was found"). Null has its own
      harness let go of the conversation and then asks macOS whether any program still has the
      file open.
+   - **Mended after the owner's first use (2026-10-10):** "For some reason, it doesn't delete
+     the conversations all the time." / "It keep saying that something is opened in another
+     program." Null refused whenever any program had the file open, and on the owner's Mac
+     an Oh-my-pi that the Voice app's server started on 2026-10-08 was still running in the
+     background with ten conversations open, where nobody could see it to close it. The rule
+     is now what the owner agreed to, to the letter: only a conversation open in a terminal
+     is left alone. A program in the background that still holds one does not stand in the
+     way, and loses nothing (see "What was found": a harness goes on writing to the moved
+     file).
 10. **Renaming a conversation. Settled (owner, 2026-10-10: "I agree with the two
     recommendations").** Null keeps the new title itself, beside the titles it already makes
     in `history.json`, and a title the owner typed comes before the harness's own. The
@@ -393,6 +402,16 @@ both groups change the same list in the page: built one after the other, they do
      open in a terminal being refused (proven for a harness holding the file, not with the
      owner's terminal). The owner's own Oh-my-pi, "yours", which is what the installed Null
      runs.
+   - **Found by the owner's use, and mended (2026-10-10, branch `delete-held-in-background`):**
+     the refusal for a conversation "open in another program" came for conversations held by
+     a forgotten background harness (decision 9). Now a holder counts only if it runs in a
+     terminal, which macOS says of each program (`ps`); the words are "that conversation is
+     open in a terminal. close it there first". Why a conversation was not deleted now goes
+     in the log, without saying which, since the first look for this fault found nothing
+     there. In the owner's first two minutes with the x, 23 conversations went to the Trash.
+     One unit test more, 95 in all: a program in a terminal is told from one in the
+     background. The question in the harness check also asks that a harness started by a
+     program is in no terminal.
    - **What the owner will meet:** a conversation put back from the Trash has lost the title
      Null kept for it, made or given, once the list was shown without it; one made in the
      box is "untitled" until it is opened. A conversation with helpers' conversations is two
