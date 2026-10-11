@@ -19,11 +19,12 @@
 > and work that was cut off is found again (item 11, pull request #55). `/folder` starts a
 > conversation in a folder of the owner's choosing (item 12, pull request #56). All of work
 > in the background is built, and the README, the glossary and the research map say so
-> (item 13, pull request #57), with `main` at version 0.4.0. The owner's Mac runs a build
-> of `main` at 0.4.0, installed at the owner's word on 2026-10-11 (item 14, step 2). None
-> of it has been tried by the owner yet. Next: what the owner's use turns up is mended,
-> each as a small pull request, and Null 0.4.0 is released only at the owner's word. The
-> owner confirmed the goal and settled all twelve decisions.**
+> (item 13, pull request #57). **Null 0.4.0 is released (2026-10-11, at the owner's word),
+> and the owner's Mac runs the release (item 14).** It went out before the owner had tried
+> it by hand: by the log, the box was not opened between the install and the word to
+> release. Next: whatever the owner's use turns up, mended each as a small pull request
+> and released as 0.4.1; and item 15, the pet staying on screen, a prototype outside the
+> releases. The owner confirmed the goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -1033,8 +1034,8 @@ both groups change the same list in the page: built one after the other, they do
 14. **Null 0.4.0: tried by the owner first, then released** (decision 12)
     - What: in the order of `PetAndBox.md` item 8.
     - Depends on: 13.
-    - Status: In progress (2026-10-11). The owner's Mac runs a build of `main` at 0.4.0.
-      Not released: no tag has been pushed
+    - Status: Complete (2026-10-11). Null 0.4.0 is released, and the owner's Mac runs the
+      release. Not yet tried by the owner
     - **Step 1:** pull request #57. `main` says 0.4.0 and the README is up to date.
     - **Step 2, the install:** at the owner's word ("Merge all of our work into main and
       build the latest version and install the latest version"). Everything was already
@@ -1052,6 +1053,29 @@ both groups change the same list in the page: built one after the other, they do
       the front; `/quit` while a job runs, and `/quit` again; a fifth job with four
       working. The installed Null runs the owner's own Oh-my-pi ("yours"), with the
       owner's MCP servers, which none of the checks used.
+    - **Step 3, what the owner's use turned up:** nothing, since there was none. Nothing
+      was mended between the install and the release.
+    - **Step 4, the release:** at the owner's word ("Release it.", 2026-10-11), the tag
+      `null-v0.4.0` on `main` at `7ddafa3`. Only Null's own workflows answered the tag;
+      the Voice app's `release.yml` did not start. GitHub published
+      `Null-0.4.0-macos-arm64.zip` (97 MB) with `SHA256SUMS.txt`. Fetched with `gh`: the
+      checksum matched, the seal held, the app says 0.4.0, and the Oh-my-pi inside has the
+      checksum of `Engine.toml` and its author's signature. Then the install from the
+      release, with the script as GitHub serves it, after checking that it is the one in
+      the repository and that the installed Null was idle with nothing working or unseen:
+      it fetched 0.4.0, signed it with the identity on the Mac and replaced the build made
+      here. Afterwards the same checks as after step 2, all as they should be: 0.4.0, the
+      seal, the same designated requirement, the Oh-my-pi inside, the login item, "started,
+      version 0.4.0" and "Full Disk Access is on" in the log, the keychain list as it was.
+    - **Released before the owner had tried it.** The owner gave the word about five
+      minutes after the build of `main` was installed. By the log, the box was not opened
+      in that time, so nothing of work in the background, `/folder`, "now" in `/history`
+      or the `/quit` warning had been seen by the owner before it went out. Said to the
+      owner with the release. This is a larger change than 0.3.1 was: it is the first
+      release in which Null holds several conversations.
+    - **Still not proven by anyone's hand:** everything listed under "To try by hand"
+      above; a conversation that asks for approval; a restart of the harness that waits;
+      and `/update` on an older installed Null saying that a newer one is out.
 
 15. **The pet stays while work goes on** (decision 1: a prototype first, outside the releases)
     - What: first a prototype for the owner to live with. Then: when the box is put away while a
