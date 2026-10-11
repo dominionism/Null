@@ -118,6 +118,7 @@ fn main() {
             harness::report,
             history::history,
             history::open_conversation,
+            history::rename_conversation,
             layout,
             providers::providers,
             backups::backups,
