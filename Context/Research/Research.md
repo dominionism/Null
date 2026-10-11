@@ -43,6 +43,10 @@
 > same plan: the command `work`, the event `mini:work`, "now" in `/history`) was written in where
 > it belongs, by the session that built it. Nothing else was traced again.
 
+> Eleventh addition, 2026-10-10: quitting with work under way, a restart of the harness that
+> waits, and what is written down of work left behind (item 11 of the same plan) were written in
+> where they belong, by the session that built them. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -421,7 +425,10 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
   `counts_tokens` and `engine` (the version `/update` fetched, kept in `Engine/<version>/omp`
   beside the settings until the app itself carries that version or a newer one).
 - `…/history.json`: the titles Null keeps, by conversation: under `titles` the ones it made (the
-  first line of a box conversation's first message), under `renamed` the ones the owner gave.
+  first line of a box conversation's first message), under `renamed` the ones the owner gave. Under
+  `standing`, only while there is one to say it of: the id and one word (working, done, failed,
+  cut off) of each conversation Null held that was working or had not been shown. A start reads
+  it, and takes one that was working for cut off.
 - `…/Workspace`: the working directory of every conversation made in the box (`harness::workspace`).
 - The harness's own folder, `~/.omp/agent/sessions/<a folder>/<when>_<id>.jsonl`: one file for each
   conversation, sometimes with a folder of the same name beside it for the conversations of the
@@ -612,8 +619,10 @@ this repository does not have. A plain `v` tag would set it off.
 - Full terminal parity is an objective, not a theorem: the original ACP spike reported a skills
   count difference, and lone harness slash commands are blocked by Null's unknown-command rule.
 - A conversation goes on working when the box turns away from it (`/new`, `/history`), but
-  the pet, "now" in `/history` and the notice line say how each one stands. Quitting or a
-  restart of the harness still ends them without a word (`BackgroundWork.md`, item 11). No folder chosen for a conversation,
+  the pet, "now" in `/history` and the notice line say how each one stands. `/quit` says how
+  many are working and quits only when asked again; a restart of the harness waits until
+  nothing is working; and what was working when Null went away is found cut off at the next
+  start (`BackgroundWork.md`, items 9 to 11). No folder chosen for a conversation,
   continuous voice conversation, automatic speaking of every Null reply or cross-harness handoff
   is built. The pet is built and shows only with the box. Voice requires a profile first;
   today's inventory is empty. Later voice transport/echo cancellation/engine choices remain open.
