@@ -1337,6 +1337,34 @@
       // order the keys walk it, so a heading never sends the choice backwards.
       const allAbout = () => ABOUT.map(([name, words]) => ({ name, sends: name, words, harness: false })).concat(harnessAbout());
 
+      // The box cannot know what the harness can carry out until the harness has
+      // said so, and it says so when a session starts: which is the first thing
+      // asked of it, a message or this. So the first time the list is opened, or
+      // a lone /word is typed, the harness is asked, and the answer is waited for
+      // a moment. It arrives as an event, like everything else.
+      let asking = null;
+      const askHarness = (ms = 4000) => {
+        if (!asking) {
+          // The ask is answered by the app, and the box must not be left waiting on
+          // one that never comes: what arrives instead is the frame itself.
+          asking = Promise.race([
+            invoke('harness_commands').catch((error) => line('error', `could not ask the harness: ${error}`)),
+            new Promise((resolve) => setTimeout(resolve, ms)),
+          ]).finally(() => {
+            asking = null;
+          });
+        }
+        return asking;
+      };
+      const harnessSaidBy = async (ms) => {
+        if (harnessSaid.length) return harnessSaid;
+        await askHarness();
+        for (let waited = 0; waited < ms && !harnessSaid.length; waited += 50) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return harnessSaid;
+      };
+
       const tint = () => {
         const text = input.value;
         const command =
@@ -2653,6 +2681,13 @@
             pick.append(row);
           });
         });
+        // Nothing from the harness yet: say that it has been asked, where its own
+        // commands will stand, rather than leaving the box's own looking like all
+        // there is to type.
+        if (asking && !sections.some(([title]) => title === 'the harness')) {
+          if (sections.length === 1) pick.append(el('div', 'provider', 'the harness'));
+          pick.append(el('div', 'provider', 'asking what it can carry out'));
+        }
         fit();
       };
 
@@ -2663,6 +2698,9 @@
         pick.style.display = 'block';
         input.value = typed; // still there to be put right, and typing narrows the list
         tint();
+        // What the harness can carry out is not the box's to know until it has
+        // been told: ask, and the list fills in when the answer comes.
+        if (!harnessSaid.length) askHarness();
         drawCommands();
       };
 
@@ -2921,7 +2959,12 @@
         // in the box by its bare name, so "/research" is sent as
         // "/skill:research", with whatever follows it following that. The box's
         // own commands were carried out above, and are not touched by this.
+        //
+        // Whether a word is the harness's or a slip is not the box's to know
+        // until the harness has said what it has, and on the first use of a run
+        // it has not: the ask is also what starts it, so it is worth the wait.
         const leading = /^\/([\w:-]*)([\s\S]*)$/.exec(text);
+        if (leading && !harnessSaid.length) await harnessSaidBy(3000);
         const offered = leading && harnessSaid.find((one) => one.name === leading[1] || one.name === `skill:${leading[1]}`);
         if (offered) {
           text = `/${offered.name}${leading[2]}`;
