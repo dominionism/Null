@@ -954,6 +954,7 @@
 
       let lastSeq = 0; // the number of the last event shown
       let openConversation = null; // the number of the conversation the box shows, once the app has said
+      let openFolder = null; // where it works, as the box says it, when that is not the box's own folder
       let busy = false;
       let lastPrompt = '';
       let reply = null; // { element, text, drawn, busy, again }: the answer that is streaming in
@@ -1308,6 +1309,7 @@
         ['/history', 'earlier conversations'],
         ['/rename', 'give this conversation a title'],
         ['/pet', 'show the pet or put it away'],
+        ['/folder', 'a new conversation in a folder'],
         ['/new', 'start a new conversation'],
         ['/quit', 'quit Null'],
       ];
@@ -1318,7 +1320,7 @@
           !picker &&
           !signin &&
           text.startsWith('/') &&
-          (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/attach ') || text.startsWith('/history ') || text.startsWith('/rename ') || COMMANDS.some((name) => name.startsWith(text)));
+          (text.startsWith('/model ') || text.startsWith('/backup ') || text.startsWith('/attach ') || text.startsWith('/history ') || text.startsWith('/folder ') || text.startsWith('/rename ') || COMMANDS.some((name) => name.startsWith(text)));
         input.classList.toggle('command', command);
       };
 
@@ -1502,6 +1504,7 @@
         try {
           const snapshot = await invoke('events_since', { after: whole ? 0 : lastSeq });
           openConversation = snapshot.conversation;
+          openFolder = snapshot.folder || null;
           if (whole) {
             emptyBox();
             snapshot.events.forEach((item) => show(item.event));
@@ -1520,6 +1523,7 @@
             mood(allSay(standing()));
           }
           if (!busy && !picker) mark('');
+          if (!picker && !signin) sayFolder(); // the one showing as the box comes up, or just turned to
         } catch (error) {
           line('error', `could not reach the app: ${error}`);
         } finally {
@@ -1527,6 +1531,13 @@
           held = null;
           waiting.forEach(apply);
         }
+      };
+
+      // A conversation that works outside the box's own folder says where each
+      // time it comes to the front: the agent acts in that folder, and the next
+      // message should not be written with another in mind.
+      const sayFolder = () => {
+        if (openFolder) notice(`in ${openFolder}`);
       };
 
       // ── How the other conversations stand ──────────────────────────────
@@ -1632,10 +1643,10 @@
       };
 
       const closePicker = () => {
-        const { backups, saved, harness } = picker;
+        const { backups, saved, harness, places } = picker;
         picker = null;
         if (backups && backups.join() !== saved.join()) saveBackups(backups);
-        if (harness) unnotice();
+        if (harness || places) unnotice();
         pick.style.display = 'none';
         pick.textContent = '';
         if (out.textContent) {
@@ -2237,6 +2248,7 @@
           return;
         }
         if (picker === list) closeHistory();
+        sayFolder();
       };
 
       // An earlier conversation has been opened: the box shows it, in place of
@@ -2252,6 +2264,7 @@
         // It is at rest, whatever the conversation shown before it is doing.
         busy = false;
         running.clear();
+        openFolder = event.folder || null;
         event.events.forEach(show);
         // What was replayed is over, whatever it ended on.
         reply = null;
@@ -2667,9 +2680,108 @@
         pendingAsk = null;
         noAnswer = false;
         watchQuiet();
+        openFolder = null; // a new conversation is in the box's own folder, unless told otherwise
         if (!picker) mark('');
         mood(allSay('')); // whatever the pet was saying of the last conversation is over
         fit();
+      };
+
+      // ── /folder: a new conversation in a folder ────────────────────────
+
+      // Start a conversation in a folder. The one the box showed goes on if it
+      // is working. A folder that is none is said in one line, and a command
+      // that was typed is handed back to be put right.
+      const startIn = async (path, typed) => {
+        const left = busy;
+        let started;
+        try {
+          started = await invoke('new_conversation_in', { folder: path });
+        } catch (error) {
+          if (typed && !picker && !input.value) {
+            input.value = typed;
+            tint();
+          }
+          notice(String(error));
+          return;
+        }
+        if (picker && picker.places) closePicker();
+        openConversation = started.conversation;
+        emptyBox();
+        openFolder = started.shown;
+        notice(left ? `in ${started.shown}. the other is still working. /history shows it` : `in ${started.shown}`);
+      };
+
+      // The rows of the list. First the folders that conversations already work
+      // in, as the harness lists them, and a way on to every folder of the Mac.
+      // Then, walking the Mac's folders: this folder to start in, the one above,
+      // and the ones inside. Typing narrows either.
+      const placeRows = () => {
+        const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+        const wanted = (row) => words.every((word) => row.name.toLowerCase().includes(word));
+        const { listing } = picker;
+        if (!listing) return picker.recent.map((folder) => ({ name: folder.shown, path: folder.path, start: true })).filter(wanted).concat(words.length ? [] : [{ name: 'another folder', browse: true }]);
+        const here = words.length ? [] : [{ name: `start in ${shortPath(listing.shown)}`, path: listing.path, start: true }];
+        const up = listing.parent && !words.length ? [{ name: '..', path: listing.parent, folder: true }] : [];
+        return here.concat(up, listing.entries.filter((entry) => entry.folder && !entry.name.startsWith('.') && wanted(entry)));
+      };
+
+      const drawPlaces = () => {
+        picker.shown = placeRows().slice(0, MOST_ROWS);
+        picker.index = Math.min(Math.max(picker.index, 0), Math.max(picker.shown.length - 1, 0));
+        pick.textContent = '';
+        pick.append(picker.listing ? el('div', 'provider where', shortPath(picker.listing.shown)) : el('div', 'provider', 'folders'));
+        picker.shown.forEach((row, index) => {
+          const option = el('div', index === picker.index ? 'option selected' : 'option', el('span', row.browse ? 'id' : '', `  ${row.name}${row.folder ? '/' : ''} `));
+          option.addEventListener('click', () => choosePlace(row));
+          pick.append(option);
+          if (index === picker.index && option.scrollIntoView) option.scrollIntoView({ block: 'nearest' });
+        });
+        if (!picker.shown.length) pick.append(el('div', 'provider', 'no folder matches'));
+        fit();
+      };
+
+      // Open the list: on the folders conversations already work in, or on one
+      // of the Mac's folders to walk from.
+      const openPlaces = async (folder) => {
+        if (signin || (picker && !picker.places)) return;
+        let recent = picker ? picker.recent : [];
+        let listing = null;
+        mark('working');
+        try {
+          if (folder) listing = await invoke('attach_list', { folder, passing: true });
+          else recent = await invoke('folders');
+        } catch (error) {
+          mark(standing());
+          notice(String(error));
+          return;
+        }
+        mark(standing());
+        if (signin || (picker && !picker.places)) return; // another list was opened meanwhile
+        picker = { places: true, recent, listing, models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        input.value = '';
+        tint();
+        notice(listing ? 'enter opens a folder, or starts a conversation in this one. esc is done' : 'enter starts a conversation in that folder. esc is done', true);
+        drawPlaces();
+      };
+
+      const choosePlace = (row) => {
+        if (!row) return;
+        if (row.start) startIn(row.path);
+        else if (row.folder) openPlaces(row.path);
+        else if (row.browse) openPlaces('~');
+      };
+
+      const placesKey = (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          const step = event.key === 'ArrowDown' ? 1 : -1;
+          picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
+          drawPlaces();
+        } else if (event.key === 'Enter' && !event.isComposing) {
+          choosePlace(picker.shown[picker.index]);
+        }
       };
 
       // /quit, and Ctrl+C with nothing running here. With conversations still
@@ -2720,6 +2832,12 @@
         }
         if (text === '/history' || text.startsWith('/history ')) {
           openHistory(text.slice(8).trim());
+          return;
+        }
+        if (text === '/folder' || text.startsWith('/folder ')) {
+          const path = text.slice(7).trim();
+          if (path) startIn(path, text);
+          else openPlaces();
           return;
         }
         if (text === '/rename' || text.startsWith('/rename ')) {
@@ -2989,7 +3107,7 @@
         else openFiles(null, input.value);
       });
       pick.addEventListener('mousedown', (event) => {
-        if (picker && picker.files) event.preventDefault();
+        if (picker && (picker.files || picker.places)) event.preventDefault();
       });
 
       // The app says what is attached each time it changes: a file was added or
@@ -3104,6 +3222,11 @@
           narrowFiles();
           return;
         }
+        if (picker && picker.places) {
+          picker.index = 0;
+          drawPlaces();
+          return;
+        }
         if (picker && !picker.usage && !picker.harness) {
           picker.index = 0;
           drawPicker();
@@ -3132,6 +3255,10 @@
         }
         if (picker && picker.files) {
           filesKey(event);
+          return;
+        }
+        if (picker && picker.places) {
+          placesKey(event);
           return;
         }
         if (picker && picker.usage) {
