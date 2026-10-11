@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/Readme/hero.svg" width="100%" alt="Null — your agent, a shortcut away. A monochrome illustration of the floating input and Control+Space shortcut." />
+  <img src=".github/Readme/hero.svg" width="100%" alt="Null — your agent, a shortcut away. A monochrome illustration of Null's pet above the floating input and the Control+Space shortcut; the pet bobs, blinks and lifts its antenna, as it does at rest in the app." />
 </p>
 
 <p align="center">
