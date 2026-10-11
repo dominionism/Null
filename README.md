@@ -132,7 +132,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="development"></a>
 <p align="center">
-  <img src=".github/Readme/development.svg" width="100%" alt="Development: Mini/Scripts/engine once to fetch the Oh-my-pi the build takes in, cd Mini and cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle, why not to use bunx tauri, and the harness check." />
+  <img src=".github/Readme/development.svg" width="100%" alt="Development: Mini/Scripts/engine once to fetch the Oh-my-pi the build takes in, cd Mini and cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle, why not to use bunx tauri, the harness check, the key check and the box check." />
 </p>
 
 <a id="development-switches-and-smoke-checks"></a>
