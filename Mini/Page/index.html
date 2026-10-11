@@ -1339,11 +1339,15 @@
         const first = (words || '').split('. ')[0].replace(/\.$/, '').trim();
         return first.length > 48 ? `${first.slice(0, 47)}…` : first;
       };
+      // A name the box has too is the box's: typed, it is carried out here, so the
+      // harness's row for it could never be reached, and is left out.
       const harnessAbout = () =>
-        harnessSaid.map((one) => {
-          const bare = one.name.startsWith('skill:') ? one.name.slice('skill:'.length) : null;
-          return { name: `/${bare || one.name}`, sends: `/${one.name}`, words: saying(one.words), harness: true };
-        });
+        harnessSaid
+          .map((one) => {
+            const bare = one.name.startsWith('skill:') ? one.name.slice('skill:'.length) : null;
+            return { name: `/${bare || one.name}`, sends: `/${one.name}`, words: saying(one.words), harness: true };
+          })
+          .filter((one) => !ABOUT.some(([name]) => name === one.name));
       // Everything the box can carry out, the box's own first: one list, in the
       // order the keys walk it, so a heading never sends the choice backwards.
       const allAbout = () => ABOUT.map(([name, words]) => ({ name, sends: name, words, harness: false })).concat(harnessAbout());
