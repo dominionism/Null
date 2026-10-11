@@ -198,6 +198,18 @@ additions.
    that `/hist` leaves `/history` first and Enter runs it. A lone `/` and Enter shows them
    all. Set aside: one shortened line, which is no longer a whole answer and breaks again
    with the next command.
+   - **Amended (owner, 2026-10-11: "It would be great if there was an autofill when I start writing
+     out my slash commands ... including my skills").** The list opens as the slash word is written,
+     not only on Enter, and it holds the harness's commands as well as the box's own. Tab writes the
+     chosen name out in full and leaves the list up. Enter runs the row chosen when what was typed
+     narrowed the list to real matches, and otherwise hands the word to the send path, which asks the
+     harness what it has and then either sends the command or opens this list as a slip; a lone `/`
+     and Enter still shows them all. With only the slash written, the list is two sections, the box's
+     own and then the harness's, and every row shares one column so each description starts in the
+     same place. Amended again the same day for the column: "the spacing between the actual command
+     and the description is not consistent ... for longer command names, they just appear to have no
+     space" — the column is the widest name the box knows plus two spaces, so the longest name has
+     the gap too.
 8. **Settled (owner, 2026-10-10): left out and deferred.** The agent starting background
    conversations by itself (`NullMini.md`, item 15, "delegate"), which belongs with voice, and
    a macOS notification or a sound when work ends. Both are named at every recall (Out of
