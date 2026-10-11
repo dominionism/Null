@@ -913,6 +913,7 @@
       const ruler = document.getElementById('ruler');
 
       let lastSeq = 0; // the number of the last event shown
+      let openConversation = null; // the number of the conversation the box shows, once the app has said
       let busy = false;
       let lastPrompt = '';
       let reply = null; // { element, text, drawn, busy, again }: the answer that is streaming in
@@ -1402,9 +1403,13 @@
 
       // Each event carries a running number, so one that arrives twice (once
       // live, once while catching up) is shown once.
+      // And each names its conversation. Only what the open one says is drawn.
       const apply = (item) => {
         if (item.seq <= lastSeq) return;
         lastSeq = item.seq;
+        // An earlier conversation that has opened is the one the box shows from here on.
+        if (item.event.type === 'conversation_opened') openConversation = item.conversation;
+        if (openConversation != null && item.conversation !== openConversation) return;
         show(item.event);
       };
 
@@ -1423,6 +1428,7 @@
         held = [];
         try {
           const snapshot = await invoke('events_since', { after: lastSeq });
+          openConversation = snapshot.conversation;
           snapshot.events.forEach(apply);
           busy = snapshot.busy;
           watchQuiet();
@@ -1986,16 +1992,19 @@
         if (!entry || picker.opening || picker.renaming || picker.deleting) return;
         const list = picker;
         list.deleting = true;
-        let wasOpen;
+        let fresh; // the new conversation the box is on, when the open one was deleted
         try {
-          wasOpen = await invoke('delete_conversation', { id: entry.id });
+          fresh = await invoke('delete_conversation', { id: entry.id });
         } catch (error) {
           list.deleting = false;
           notice(String(error));
           return;
         }
         list.deleting = false;
-        if (wasOpen) emptyBox(); // the box is on a new conversation now
+        if (fresh != null) {
+          openConversation = fresh;
+          emptyBox();
+        }
         if (picker !== list) return;
         // The row that takes its place is the chosen one now, so that the list
         // stays where the owner was looking and the next one can be dealt with.
@@ -2555,7 +2564,7 @@
         }
         if (text === '/new') {
           try {
-            await invoke('new_conversation');
+            openConversation = await invoke('new_conversation');
           } catch (error) {
             notice(String(error));
             return;
