@@ -22,6 +22,11 @@
 > `welcomed`) and Full Disk Access moving to after the first reply were written in where they belong,
 > by the session that built them.
 
+> Sixth addition, 2026-10-10: what Null 0.2.0 added to the box (the pet, attached files, history,
+> `Context/Plans/PetAndBox.md`) and the tools for history that Null 0.3.0 adds (the list of commands,
+> renaming, deleting, searching inside, `Context/Plans/BackgroundWork.md`, items 1 to 4) were
+> written in where they belong, by the session that built the second. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -84,6 +89,12 @@ tasks".
 - `ConversationDisplay.md` defines the current presentation: compact black-and-white box, SF Mono,
   one reading edge, null sign beside user messages, no left-side rules, no boxes around code or
   diagrams, quiet/folded tool activity. The latest look is built but not yet owner-accepted.
+- `PetAndBox.md` is step 5 of the five in `NullMini.md`, done and released as Null 0.2.0: the pet
+  (Nil), attached files, history, and the cursor level with the arrow.
+- `BackgroundWork.md` is step 3, the active plan: first the tools for history (the list of commands,
+  renaming, deleting to the Trash, searching inside; built, for Null 0.3.0), then several
+  conversations working at once, seen at a glance, each in a folder of the owner's choosing (not
+  built, for Null 0.4.0).
 - `NullMini.md` remains the umbrella for later background tasks, workspaces, voice and pet behavior.
   Its old Voice-server/React implementation sketches must be re-planned against the standalone app
   when those phases begin, not implemented literally.
@@ -96,7 +107,8 @@ tasks".
 ### User-visible guarantees to preserve
 
 - The box opens quickly, hides completely, and takes typing without activating Null over the app
-  the user was using. Idle UI is the text field and arrow, not a dashboard of status and hints.
+  the user was using. Idle UI is the text field and arrow, two quiet buttons at the row's end and
+  the pet beside the box, not a dashboard of status and hints.
 - Null exposes real harness tools and work, not only chat. It mirrors harness approval semantics
   rather than adding a second permission system.
 - Provider sign-ins and retry behavior belong to OMP. Null supplies choices and displays outcomes;
@@ -139,9 +151,11 @@ agent routes of its own: a retained Python ACP API and herdr delivery into termi
    the panel. OMP is **not** started merely by opening the app.
 2. `shortcut.rs::start` registers Control+Space; `panel.rs::toggle/show` brings up a non-activating
    NSPanel. The page receives `mini:shown`, focuses its input and requests missed events.
-3. Enter in `Mini/Page/index.html` handles `/model`, `/backup`, `/usage`, `/login`, `/new`, `/quit`
-   locally. Ordinary text invokes `harness::send`; blank input and a second concurrent turn are
-   rejected. A lone unknown slash-word is rejected, not sent to the agent.
+3. Enter in `Mini/Page/index.html` handles the box's own commands locally: `/model`, `/backup`,
+   `/usage`, `/login`, `/harness`, `/update`, `/attach`, `/history`, `/rename`, `/pet`, `/new`,
+   `/quit`. Ordinary text invokes `harness::send`; blank input and a second concurrent turn are
+   rejected. A lone slash, or a lone unknown slash-word, is not sent to the agent: it opens the
+   list of those commands, narrowed to the ones it could mean.
 4. `engine.rs` picks the program: the user's own when the `harness` setting names one that can be
    run, else the one beside Null's executable (`Contents/MacOS/omp`), else, with a line in the log,
    one found on PATH or in the install directories. `harness.rs` starts it as
@@ -286,16 +300,20 @@ not produced by a run made for this section.
 ### The files in `Mini/src/`, and what each decides
 
 Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and `welcome.rs` came with
-`OwnHarness.md`.
+`OwnHarness.md`, `attach.rs` and `history.rs` with `PetAndBox.md`, and `search.rs` with
+`BackgroundWork.md`.
 
 | Module | Owns | Decides / does not decide |
 |---|---|---|
-| `main.rs` | Wiring: two plugins, state init, 24 `invoke_handler` commands, nine dev switches | Nothing else |
-| `panel.rs` | The window: 616 px wide, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize` | Where and whether the box is visible, not what it shows |
+| `main.rs` | Wiring: two plugins, state init, 35 `invoke_handler` commands, nine dev switches | Nothing else |
+| `panel.rs` | The window: 616 px wide, or 662 with the pet's 46 px lane on its left, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize`, the commands `pet` and `set_pet` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
 | `harness.rs` | The ACP connection: one thread, one `omp … acp` process, one conversation, a 5,000-event ring, pending approval responders | What the harness reported; never what a provider is or whether a model is good |
 | `translate.rs` | ACP JSON → box events; the model list out of session config options; the owner's `mcp.json` → `session/new`; finding the `omp` binary | Pure functions over JSON; no process, no network |
 | `backups.rs` | The fallback order, in the form of the harness's settings | The order, not the switching — the harness moves on and re-sends by itself |
+| `attach.rs` | The files that go with the next message, and the list of the Mac's folders they are chosen from | Which files, as paths. Never a file's content: the agent reads it with its own tool |
+| `history.rs` | Earlier conversations as the harness lists them; the titles Null keeps (made by Null, or given by the owner with `/rename`); opening one again; and moving one's file to the Trash | What is listed and shown. Never what is inside a conversation's file, which it moves and never changes |
+| `search.rs` | Finding a conversation by something said in it: the harness's conversation files are looked through as the owner types | Which conversations, and a piece of what was said. It keeps nothing and logs no word |
 | `engine.rs` | Which Oh-my-pi runs: the built-in one (beside Null's executable, or a newer checked one that `/update` fetched into the support folder), or the user's own by the `harness` setting; the commands `harnesses`, `set_harness` and `update_harness` | Which program, never what it does |
 | `check.rs` | Test-only: the harness check, with a stand-in provider and a throwaway folder (`cargo test -- --ignored`) | Whether a version answers as Null needs; nothing at run time |
 | `standin.rs` | The stand-in provider: a server on this Mac that answers by the model's name (`ok`, `limit`, `auth`, `noaccess`) in three ways of talking; used by the check, and by a scripted run of the app with `NULL_MINI_STANDIN` | What a provider would send; never a real provider, and never a file among the user's own |
@@ -343,19 +361,24 @@ Commands the page invokes (the `invoke_handler` list in `main.rs`): `page_ready`
 `hide_box`, `resize`, `send`, `interrupt`, `respond`, `models`, `set_model`, `new_conversation`,
 `events_since`, `report`, `providers`, `backups`, `set_backups`, `harnesses`, `set_harness`,
 `update_harness`, `signin_providers`, `signin_start`,
-`signin_answer`, `signin_cancel`, `open_url`.
+`signin_answer`, `signin_cancel`, `open_url`, `pet`, `set_pet`, `history`, `open_conversation`,
+`rename_conversation`, `delete_conversation`, `search_conversations`, `attach_list`, `attach_file`,
+`detach_file`, `attached`.
 
 Events: `mini:event` carries `user_message`, `text_delta` (`{text, thinking}`), `tool_activity`,
 `status_change` (`running` / `needs_input` / `ready` / `blocked`), `approval_request`,
-`message_done`, `model_changed`, `model_switched`, `reply_failed`, `error`, each with a running `seq`
-so a reloaded page catches up through `events_since`. `mini:signin` carries the sign-in's lines,
+`message_done`, `model_changed`, `model_switched`, `reply_failed`, `error`, `conversation_opened`
+(an earlier conversation, with what was said in it), each with a running `seq`
+so a reloaded page catches up through `events_since`. `mini:attached` carries what is attached to the
+next message. `mini:signin` carries the sign-in's lines,
 questions and `done`; `mini:welcome` (`{freely}`) is the first opening: the page says no provider is
 signed in, opens the sign-in list, and when that is over says whether the agent acts without asking;
 `mini:shown` means focus and catch up; `mini:notice` carries the
 shortcut-unavailable line or the Full Disk Access line, sent from `page_ready` because the page loads
 after the app has already tried both.
 
-Sizing contract (`panel.rs` comments, mirrored in the page's CSS): window 616 px wide; 76 px idle
+Sizing contract (`panel.rs` comments, mirrored in the page's CSS): window 616 px wide, 662 with the
+pet (a 46 px lane on its left; the remembered position is the corner the window has without it); 76 px idle
 (44 px box + 8 above + 24 below); at most 314 (2 border + 42 row + 212 transcript + 26 notice + 32
 margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved position is kept only while
 80 px of its top edge is still on a screen.
@@ -371,7 +394,13 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
   `settings.json` also holds `harness` (the path of the user's own Oh-my-pi when chosen),
   `counts_tokens` and `engine` (the version `/update` fetched, kept in `Engine/<version>/omp`
   beside the settings until the app itself carries that version or a newer one).
-- `…/Workspace`: the working directory of every conversation (`harness::workspace`).
+- `…/history.json`: the titles Null keeps, by conversation: under `titles` the ones it made (the
+  first line of a box conversation's first message), under `renamed` the ones the owner gave.
+- `…/Workspace`: the working directory of every conversation made in the box (`harness::workspace`).
+- The harness's own folder, `~/.omp/agent/sessions/<a folder>/<when>_<id>.jsonl`: one file for each
+  conversation, sometimes with a folder of the same name beside it for the conversations of the
+  helpers an agent started. Null reads these to search them and moves one to the Trash to delete
+  it; it writes none. The empty `.lock.os` file beside each says nothing about who has it open.
 - `mini.log`: one `[mini]` line per event plus a float timestamp; the app's only trace.
 
 ### Findings this deep-dive adds
@@ -393,9 +422,10 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 - **Harness versus provider:** OMP supplies agent execution/session/tools; providers supply models
   and account access. Null does not need a new harness for each model vendor.
 - **Null conversation:** OMP transcript + saved session ID; one active turn, bounded in-memory UI
-  events. Not a Voice `Capture`, not a narration session, not a herdr pane.
+  events. Not a Voice `Capture`, not a narration session, not a herdr pane. Null keeps a title for
+  it, can move its file to the Trash, and reads the harness's files to find one by what was said.
 - **Null settings:** position, chosen model, session ID, one-time Full Disk Access ask, whether the
-  first opening has happened, backup order,
+  first opening has happened, whether the pet shows, backup order,
   the user's own harness when chosen, and the harness version last seen to count tokens.
   Stored under the bundle's application-support directory; profile-specific settings/overlay names
   isolate development state. OMP remains transcript/credential owner.
@@ -448,7 +478,7 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 | Surface | Commands |
 | --- | --- |
 | Null | `Mini/Scripts/engine` once, then `cargo build`, `cargo test`, `cargo tauri build` from `Mini/` |
-| Null harness check | `cargo test -- --ignored` (15 live tests, and the key check in `Mini/tests/keys.rs`, which opens the box for a few seconds); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
+| Null harness check | `cargo test -- --ignored` (20 live tests, and the key check in `Mini/tests/keys.rs`, which opens the box for a few seconds); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
 | Null install | `Mini/Scripts/install` builds/signs/replaces the app and login agent; mutating, not a check |
 | Voice desktop dev | `just dev` starts backend if needed; `bun run dev` expects it separately |
 | Voice server/web | `bun run dev:server`, `bun run dev:web`, `just dev-web` |
@@ -550,8 +580,9 @@ this repository does not have. A plain `v` tag would set it off.
   that a typed key reaches neither Null's log nor its settings (`Providers.md`, item 9).
 - Full terminal parity is an objective, not a theorem: the original ACP spike reported a skills
   count difference, and lone harness slash commands are blocked by Null's unknown-command rule.
-- No background task tray, workspace picker, continuous voice conversation, automatic speaking of
-  every Null reply, cross-harness handoff or pet renderer is built. Voice requires a profile first;
+- No work in the background (one conversation at a time), folder chosen for a conversation,
+  continuous voice conversation, automatic speaking of every Null reply or cross-harness handoff
+  is built. The pet is built and shows only with the box. Voice requires a profile first;
   today's inventory is empty. Later voice transport/echo cancellation/engine choices remain open.
 
 ### Concrete implementation boundaries to consider for future work

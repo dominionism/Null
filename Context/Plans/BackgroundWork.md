@@ -6,9 +6,12 @@
 > history and the pet. It replaces those three items, which were written for a mini inside the
 > Voice desktop app and its server.
 >
-> Status: **Planned and grilled, nothing built. The owner confirmed the goal and settled all
-> twelve decisions. Next: item 1. Trials were run for the plan in scratch folders (see "What
-> was found"); none of that code is in the repo.**
+> Status: **The tools for history are built and on `main` (items 1 to 5, 2026-10-10): the list
+> of commands, renaming, deleting to the Trash and searching inside, each by its own pull
+> request (#42 to #45), and the version says 0.3.0. The owner has tried none of it yet, and
+> nothing is installed or released. Next: item 6, at the owner's word. Work in the background
+> itself (items 7 to 14) is not started. The owner confirmed the goal and settled all twelve
+> decisions.**
 
 ## Goal
 
@@ -462,13 +465,36 @@ both groups change the same list in the page: built one after the other, they do
      map, together with what `PetAndBox.md` item 7 left behind. The glossary's Conversation
      line, for the titles the owner gave.
    - Depends on: 1 to 4.
-   - Status: Not started
+   - Status: Complete (2026-10-10)
+   - **Done, the README:** six cards made again by `.github/Readme/make_cards.py`, and what
+     the README says of each beside it. Commands: `/rename`, what `/history` now finds and
+     does, and that an unknown command opens the list. Use Null: a lone slash. Privacy: Null
+     reads the harness's conversation files to search them and keeps nothing, and deleting
+     moves a file to the Trash. What Null keeps: a title the owner gave. Source map:
+     `search.rs`. Status: the three tools are available and still wait for hands-on use, and
+     work in the background is what is planned.
+   - **Done, the research map:** a sixth addition. The box's commands and what an unknown one
+     does; the modules `attach.rs`, `history.rs` and `search.rs`; 35 commands and the events
+     `conversation_opened` and `mini:attached`; the window's width with the pet; `history.json`
+     and how the harness keeps a conversation's file; 20 questions in the harness check; and
+     the two plans, with which of them is active.
+   - **Done, the glossary:** a conversation's title is one Null made "or named by the person".
+   - **Left for item 13:** the new words of `PetAndBox.md` (pet, attach) are still not in the
+     glossary; nothing here needed them.
 
 6. **Null 0.3.0: tried by the owner first, then released** (decision 12)
    - What: in the order of `PetAndBox.md` item 8. An installed 0.2.0 can then see `/update` say
      that a newer Null is out, which nothing has shown yet (`OwnHarness.md`, item 7).
    - Depends on: 5.
-   - Status: Not started
+   - Status: In progress. Step 1 is done (2026-10-10): `Mini/Cargo.toml` and
+     `Mini/tauri.conf.json` say 0.3.0 and the README is up to date. The number publishes
+     nothing; only a tag does. Next, at the owner's word: `main` built and installed on the
+     owner's Mac over the released 0.2.0, for the owner to use
+   - **To try by hand, since nothing but the owner's hand proves it:** a lone `/`; a mistyped
+     command; `/rename`; the pencil and Command+R in `/history`; the x and Command+Delete,
+     and "Put Back" in the Trash; a word that was said in a conversation and is in no title.
+     The installed Null runs the owner's own Oh-my-pi ("yours"), which none of the checks
+     used.
 
 7. **The harness check asks what work in the background rests on**
    - What: `Mini/src/standin.rs` gains a fifth answer, `slow`: a reply that comes a word at a
