@@ -868,7 +868,10 @@
       }
       .stands.failed,
       .where.failed,
-      #notice .failed {
+      #notice .failed,
+      .stands.cut-off,
+      .where.cut-off,
+      #notice .cut-off {
         color: var(--red);
       }
       #out > .you > .with {
@@ -1250,9 +1253,10 @@
       const elsewhere = () => (work.find((one) => !one.open) || { standing: '' }).standing;
       // The pet speaks for every conversation. It makes the most pressing thing
       // any of them has to say its own: one that asks, then one that failed,
-      // one that is done, one that is working. `here` is the open one's.
-      const PRESSING = ['asking', 'failed', 'done', 'working'];
-      const MOODS = { asking: 'ask', failed: 'fail', done: 'done', working: 'work' };
+      // or was cut off, one that is done, one that is working. `here` is the
+      // open one's.
+      const PRESSING = ['asking', 'failed', 'cut off', 'done', 'working'];
+      const MOODS = { asking: 'ask', failed: 'fail', 'cut off': 'fail', done: 'done', working: 'work' };
       const allSay = (here) => {
         const rank = (stands) => (PRESSING.includes(stands) ? PRESSING.indexOf(stands) : PRESSING.length);
         const there = elsewhere();
@@ -1542,7 +1546,7 @@
         go.type = 'button';
         go.className = 'go';
         go.tabIndex = -1;
-        go.append(el('span', one.standing, one.standing), `: ${one.title || 'untitled'}`);
+        go.append(el('span', one.standing.replace(' ', '-'), one.standing), `: ${one.title || 'untitled'}`);
         go.addEventListener('click', async () => {
           if (picker || signin) return;
           unnotice();
@@ -1567,7 +1571,7 @@
         workTold = said.told;
         work = said.conversations || [];
         // The most pressing piece of news about a conversation the box is not showing.
-        const news = work.find((one) => !one.open && one.id && ['asking', 'failed', 'done'].includes(one.standing) && before.get(one.conversation) !== one.standing);
+        const news = work.find((one) => !one.open && one.id && ['asking', 'failed', 'cut off', 'done'].includes(one.standing) && before.get(one.conversation) !== one.standing);
         // With `/history` open it is there to be seen, under "now".
         if (news && !quietly && !signin && !(picker && picker.history)) announce(news);
         // The pet says it too. What the open one does, it says with the arrow.
@@ -1994,8 +1998,9 @@
           // The open one has its dot. Another under "now" has a sign for how it
           // stands, drawn over the two spaces every other row begins with, so
           // that titles line up whatever the sign is.
-          const sign = stood && !entry.open ? { asking: '?', failed: '✗', done: '✓', working: '…', stopped: '–' }[stood] : null;
-          const title = el('span', entry.title ? '' : 'id', sign ? el('span', `stands ${stood}`, '  ') : entry.open ? '● ' : '  ', entry.title || 'untitled');
+          const sign = stood && !entry.open ? { asking: '?', failed: '✗', 'cut off': '✗', done: '✓', working: '…', stopped: '–' }[stood] : null;
+          const how = stood ? stood.replace(' ', '-') : ''; // as a class: "cut off" is two words
+          const title = el('span', entry.title ? '' : 'id', sign ? el('span', `stands ${how}`, '  ') : entry.open ? '● ' : '  ', entry.title || 'untitled');
           if (sign) title.firstChild.dataset.sign = sign;
           const tools = el(
             'span',
@@ -2007,7 +2012,7 @@
             }),
           );
           if (picker.deletes) tools.append(rowTool('move to the Trash', CROSS, () => deleteEarlier(entry)));
-          const row = el('div', `option past${said ? ' said' : ''}${index === picker.index ? ' selected' : ''}`, title, el('span', `id where${stood ? ` ${stood}` : ''}`, where), tools);
+          const row = el('div', `option past${said ? ' said' : ''}${index === picker.index ? ' selected' : ''}`, title, el('span', `id where${how ? ` ${how}` : ''}`, where), tools);
           row.addEventListener('click', () => {
             if (picker.renaming) return; // a title is being typed: Enter or Esc first
             chooseEarlier(entry);
@@ -2667,6 +2672,23 @@
         fit();
       };
 
+      // /quit, and Ctrl+C with nothing running here. With conversations still
+      // working it does not quit the first time: it says how many, since
+      // quitting stops them. Asked again, it quits.
+      let quitAsked = false;
+      const quit = async () => {
+        let working = 0;
+        try {
+          working = await invoke('quit', { anyway: quitAsked });
+        } catch (error) {
+          notice(String(error));
+          return;
+        }
+        if (!working) return; // the app is quitting
+        quitAsked = true;
+        notice(working === 1 ? '1 conversation is still working. /quit again stops it and quits.' : `${working} conversations are still working. /quit again stops them and quits.`, true);
+      };
+
       const send = async (text) => {
         if (text === '/model' || text.startsWith('/model ')) {
           openPicker(text.slice(6).trim());
@@ -2711,9 +2733,10 @@
           return;
         }
         if (text === '/quit') {
-          invoke('quit');
+          quit();
           return;
         }
+        quitAsked = false; // something else was wanted: the next /quit asks afresh
         if (text === '/new') {
           const left = busy; // the conversation that is left goes on working
           try {
@@ -3157,7 +3180,7 @@
           event.preventDefault();
           if (signin) cancelSignin();
           else if (busy) invoke('interrupt').catch(() => {});
-          else invoke('quit');
+          else quit();
         }
       });
 
@@ -3170,8 +3193,13 @@
       // Something the app needs the user to know, such as its shortcut being
       // unavailable. No words takes the line away again.
       listen('mini:notice', (message) => {
-        if (message.payload) {
-          notice(message.payload, true);
+        const said = message.payload;
+        if (said && said.text) {
+          notice(said.text, said.stay !== false); // one that goes away by itself says so
+          return;
+        }
+        if (said) {
+          notice(said, true);
           return;
         }
         unnotice();

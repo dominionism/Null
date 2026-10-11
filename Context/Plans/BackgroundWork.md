@@ -15,9 +15,10 @@
 > holds (item 8, pull request #52). A conversation is left working with `/new` or
 > `/history` and found again, four at most (item 9, pull request #53). The pet, "now" in
 > `/history` and the notice line say how each conversation stands (item 10, pull request
-> #54). None of it is to be released before item 11: until then quitting ends what works in
-> the background without a word. Next: item 11. The owner confirmed the goal and settled all
-> twelve decisions.**
+> #54). No work is stopped silently: `/quit` warns once, a restart of the harness waits,
+> and work that was cut off is found again (item 11, pull request #55). With that, items 9
+> to 11 are fit to be released together. Next: item 12, `/folder`. The owner confirmed the
+> goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -871,7 +872,78 @@ both groups change the same list in the page: built one after the other, they do
       scripted run that kills Null under a slow job and finds it "cut off" at the next start.
     - Source: specified from user (decision 3) + inferred from codebase (`harness::restart`,
       the page's `/quit` and Ctrl+C).
-    - Status: Not started
+    - Status: Complete (2026-10-10). On `main` with pull request #55
+    - **Built:**
+      - **Quitting.** The command `quit` (`Mini/src/main.rs`) gives how many conversations
+        are working and does not quit, unless asked with `anyway`. The page (`quit` in
+        `Mini/Page/index.html`) says "2 conversations are still working. /quit again stops
+        them and quits." and asks with `anyway` the next time. Ctrl+C with nothing running
+        in the box does the same.
+      - **Starting the harness again.** `harness::restart` lets the harness go only when
+        nothing is working. Otherwise it is put off (`restart_due`) until the last reply has
+        ended, and the box says "that takes effect once nothing is working: the harness
+        starts again then". The refusals of `/harness`, `/update` and `/backup` while a
+        reply ran are gone from the app; the page still refuses each while the open
+        conversation is working.
+      - **Being cut off.** `history.json` gains `standing`: the id and one word of each
+        conversation Null holds that is working or unseen, written at every change. At a
+        start (`recall`) one that was working is "cut off" and unseen, and one that had
+        ended is as it ended. A harness that goes away by itself cuts off every reply under
+        way, each with one line. Opening one that was only recalled is asked of the
+        harness, which has all of it.
+    - **Decided by the agent:**
+      - **`/quit` warns when the open conversation is the one working too,** not only for
+        the others: decision 3 says "while conversations are working".
+      - **Anything else typed after the warning** means the next `/quit` asks afresh.
+      - **Quitting at the owner's word leaves no "cut off" behind.** What was working was
+        stopped by the owner, so it is not written down; what still waits to be seen is.
+      - **Quitting sends the harness no order to stop each reply.** The harness goes with
+        Null, and the replies with it.
+      - **Cut off counts with failed:** next after asking in what is most pressing, a red
+        sign and word under "now", and the pet sunk.
+      - **A message to a conversation that waits to be seen** means it has been seen.
+    - **Found on the way:** the page was told of a new conversation's id only at the next
+      change, so one that was still working could be missing under "now", and was not
+      written down. It is told as soon as the harness has given the id. A unit test found
+      a fault in the waiting restart before anything ran it.
+    - **Proven without a person:** 109 unit tests, three new: how a conversation stood is
+      written beside the titles and read back, and goes with its conversation; what was
+      working when Null went away is cut off and unseen at the next start, the open one
+      too, and quitting at the owner's word leaves only what waits to be seen; the harness
+      is started again only once nothing is working, and once. The real app with no
+      window, killed under a slow job after two seconds: `history.json` held that
+      conversation's id and "working", and no harness was left running. Seven states of
+      the page drawn with stand-ins: the warning for one and for two; `/quit` twice (the
+      second asks with `anyway`); `/quit`, another message, `/quit` (asked afresh);
+      "cut off" under "now" with its sign; the line "cut off: title"; the app's line about
+      the restart. Fourteen other states the same byte for byte as on `main`.
+    - **Proven on the real app, by script (2026-10-10, the screen unlocked):** each run on
+      a folder of its own with
+      `{"model":"standin-anthropic/slow","welcomed":true,"asked_full_disk":true}` in its
+      `null/settings.json`. The pull request was held back until they had passed.
+      - **The warning.** The lines: `job`, fifty-nine words and " &"; `/new`; `/quit`. The
+        notice said "1 conversation is still working. /quit again stops it and quits."
+        and nothing was stopped.
+      - **Quitting anyway.** The same lines and `/quit` once more. The app ended by itself
+        with "quit from the box; the conversation is closed, and what was working is
+        stopped" in the log, nothing was written down, and no harness was left running.
+      - **Cut off and found, a job left behind.** The job left with `/new`, and the app
+        ended under it: `history.json` said "working". Started again, `/history` showed
+        "NOW | job … | cut off" and the file said "cut off". Started again with the lines
+        `/history`; `job`; `/history`: the harness loaded the conversation ("opened the
+        earlier conversation" in the log), the box showed its message, the list showed it
+        under "today" with the dot and no "now", and nothing was written down any more.
+      - **Cut off and found, the job that was on screen.** The same, where the box was on
+        the job when Null went away: opened again from `/history`, it stood under "today"
+        afterwards and nothing was written down.
+    - **A fault those runs found, and mended:** a conversation found cut off went on
+      standing under "now" after it had been opened, and stayed written down. The page is
+      told only of a change, and the list at a start was taken to be empty although the
+      page is handed what was recalled. What is recalled is now where the telling starts
+      from, and it is written down at once. The unit test for being cut off asks it.
+    - **Also not proven:** a restart that waits, in the real app (a sign-in, `/harness`,
+      `/update` or `/backup` while another conversation works): the unit test and the
+      drawn line only. A harness that goes away by itself under several replies.
 
 12. **Choosing the folder: `/folder`**
     - What: `/folder` opens a list in the box: first the folders that the harness's

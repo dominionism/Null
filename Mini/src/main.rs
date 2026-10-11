@@ -86,11 +86,22 @@ fn layout(text: String) -> serde_json::Value {
     markdown::tree(&text)
 }
 
+///
+/// With conversations still working it does not quit the first time. It gives
+/// how many, for the box to say, and stops nothing: quitting ends them, and on
+/// a Mac where the agent acts without asking that should not happen by one
+/// stray press. Asked again with `anyway`, it quits and they are stopped.
 #[tauri::command]
-fn quit(app: tauri::AppHandle) {
-    log!("quit from the box; the conversation is closed");
+fn quit(app: tauri::AppHandle, anyway: Option<bool>) -> usize {
+    let working = harness::working_now(&app);
+    if working > 0 && anyway != Some(true) {
+        return working;
+    }
+    log!("quit from the box; the conversation is closed{}", if working > 0 { ", and what was working is stopped" } else { "" });
     settings::update(&app, |settings| settings.session = None);
+    harness::quitting(&app);
     app.exit(0);
+    0
 }
 
 fn main() {

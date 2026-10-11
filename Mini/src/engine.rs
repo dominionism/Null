@@ -210,9 +210,6 @@ pub fn harnesses(app: AppHandle) -> Vec<Choice> {
 /// message starts the chosen one and the conversation is loaded back.
 #[tauri::command(async)]
 pub fn set_harness(app: AppHandle, path: Option<String>) -> Result<Choice, String> {
-    if harness::busy(&app) {
-        return Err("stop the reply before changing the harness".into());
-    }
     match &path {
         Some(own) if !translate::runnable(Path::new(own)) => return Err(format!("{own} is not a program that can be run")),
         None if built_in(&app).is_none() => return Err(format!("no {HARNESS_NAME} came with this Null")),
@@ -350,9 +347,6 @@ pub struct Update {
 /// next message starts the new one and the conversation is loaded back.
 #[tauri::command(async)]
 pub fn update_harness(app: AppHandle) -> Result<Update, String> {
-    if harness::busy(&app) {
-        return Err("stop the reply before updating".into());
-    }
     update(&app).inspect_err(|reason| log!("/update: nothing was changed: {reason}"))
 }
 

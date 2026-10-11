@@ -70,6 +70,9 @@ pub struct Titles {
     made: BTreeMap<String, String>,
     /// Given by the owner. One of these comes before any other title.
     given: BTreeMap<String, String>,
+    /// How a conversation stands that Null was holding and had not shown: its
+    /// id and one word. It is what a start of Null finds of the work it left.
+    stands: BTreeMap<String, String>,
 }
 
 impl Titles {
@@ -94,6 +97,7 @@ impl Titles {
     fn keep_only(&mut self, listed: &HashSet<&str>) {
         self.made.retain(|id, _| listed.contains(id.as_str()));
         self.given.retain(|id, _| listed.contains(id.as_str()));
+        self.stands.retain(|id, _| listed.contains(id.as_str()));
     }
 }
 
@@ -183,11 +187,17 @@ fn parse(kept: &Value) -> Titles {
         let titles = kept.get(name).and_then(Value::as_object).into_iter().flatten();
         titles.filter_map(|(id, title)| Some((id.clone(), title.as_str()?.to_string()))).collect()
     };
-    Titles { made: under("titles"), given: under("renamed") }
+    Titles { made: under("titles"), given: under("renamed"), stands: under("standing") }
 }
 
+/// How a conversation stands is written only while there is one to say it of,
+/// so that a file with nothing but titles in it is as it always was.
 fn written(titles: &Titles) -> Value {
-    json!({ "titles": &titles.made, "renamed": &titles.given })
+    let mut kept = json!({ "titles": &titles.made, "renamed": &titles.given });
+    if !titles.stands.is_empty() {
+        kept["standing"] = json!(&titles.stands);
+    }
+    kept
 }
 
 fn read(app: &AppHandle) -> Titles {
@@ -221,6 +231,17 @@ pub fn said(app: &AppHandle, id: &str, text: &str) {
             titles.made.extend(title_from(text).map(|title| (id.to_string(), title)));
         }
     });
+}
+
+/// Write down how the conversations stand that Null holds and has not shown:
+/// the id and one word for each, in place of what was written before.
+pub fn stand(app: &AppHandle, stands: BTreeMap<String, String>) {
+    titles(app, |titles| titles.stands = stands);
+}
+
+/// What was written down, for a start of Null.
+pub fn stood(app: &AppHandle) -> BTreeMap<String, String> {
+    titles(app, |titles| titles.stands.clone())
 }
 
 /// The title Null keeps for a conversation: the one the owner gave, or else
@@ -492,7 +513,7 @@ mod tests {
 
     #[test]
     fn the_harness_s_list_is_shown_as_it_comes_with_the_titles_null_made() {
-        let titles = Titles { made: BTreeMap::from([("c2".to_string(), "what is the capital of France?".to_string()), ("c3".to_string(), "never shown".to_string())]), given: BTreeMap::new() };
+        let titles = Titles { made: BTreeMap::from([("c2".to_string(), "what is the capital of France?".to_string()), ("c3".to_string(), "never shown".to_string())]), given: BTreeMap::new(), ..Default::default() };
         let shown = entries(&listed(), &titles, Path::new("/Users/me/Null/Workspace"), Some("c2"));
 
         // The conversation nothing was said in is left out. The order is the harness's.
@@ -517,7 +538,7 @@ mod tests {
 
     #[test]
     fn a_title_the_owner_gave_comes_before_the_harness_s_and_null_s() {
-        let mut titles = Titles { made: BTreeMap::from([("c2".to_string(), "what is the capital of France?".to_string())]), given: BTreeMap::new() };
+        let mut titles = Titles { made: BTreeMap::from([("c2".to_string(), "what is the capital of France?".to_string())]), given: BTreeMap::new(), ..Default::default() };
         let shown = |titles: &Titles| entries(&listed(), titles, Path::new("/own"), None).into_iter().map(|entry| entry.title).collect::<Vec<_>>();
 
         // One with the harness's title, one with Null's, one with none: each can be called something else.
@@ -536,10 +557,23 @@ mod tests {
     }
 
     #[test]
+    fn how_a_conversation_stood_is_written_beside_the_titles_and_read_back() {
+        let mut kept = parse(&json!({ "titles": { "c1": "a title" } }));
+        assert!(kept.stands.is_empty());
+        kept.stands = BTreeMap::from([("c1".to_string(), "working".to_string()), ("c9".to_string(), "done".to_string())]);
+        assert_eq!(written(&kept), json!({ "titles": { "c1": "a title" }, "renamed": {}, "standing": { "c1": "working", "c9": "done" } }));
+        assert_eq!(parse(&written(&kept)), kept);
+
+        // It does not outlive its conversation either.
+        kept.keep_only(&HashSet::from(["c1"]));
+        assert_eq!(kept.stands, BTreeMap::from([("c1".to_string(), "working".to_string())]));
+    }
+
+    #[test]
     fn titles_are_kept_in_the_file_as_they_were_with_the_owner_s_beside_them() {
         // The file as an older Null wrote it holds only the titles Null made.
         let older = parse(&json!({ "titles": { "c2": "made by Null" } }));
-        assert_eq!(older, Titles { made: BTreeMap::from([("c2".to_string(), "made by Null".to_string())]), given: BTreeMap::new() });
+        assert_eq!(older, Titles { made: BTreeMap::from([("c2".to_string(), "made by Null".to_string())]), given: BTreeMap::new(), stands: BTreeMap::new() });
 
         let mut titles = older;
         titles.rename("c3", "given by the owner");
@@ -558,7 +592,7 @@ mod tests {
         titles.rename("gone", "given");
         titles.rename("c3", "given");
         titles.keep_only(&HashSet::from(["c2", "c3"]));
-        assert_eq!(titles, Titles { made: BTreeMap::from([("c2".to_string(), "made".to_string())]), given: BTreeMap::from([("c3".to_string(), "given".to_string())]) });
+        assert_eq!(titles, Titles { made: BTreeMap::from([("c2".to_string(), "made".to_string())]), given: BTreeMap::from([("c3".to_string(), "given".to_string())]), ..Default::default() });
     }
 
     /// A folder of the test's own, laid out as Oh-my-pi 18.8.7 lays out its conversations.
