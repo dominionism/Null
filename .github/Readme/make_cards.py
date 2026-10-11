@@ -163,9 +163,6 @@ CHIPS = {
     "oh-my-pi": ("Oh-my-pi", "https://github.com/can1357/oh-my-pi", True),
     "rust": ("Rust toolchain", "https://rustup.rs/", True),
     "tauri": ("Tauri macOS prerequisites", "https://v2.tauri.app/start/prerequisites/#macos", True),
-    "voicebox": ("Voicebox", "https://github.com/jamiepine/voicebox", True),
-    "bun": ("Bun", "https://bun.sh", True),
-    "just": ("just", "https://github.com/casey/just", True),
     "page-html": ("Page/index.html", "Mini/Page/index.html", False),
     "harness-rs": ("harness.rs", "Mini/src/harness.rs", False),
     "translate-rs": ("translate.rs", "Mini/src/translate.rs", False),
@@ -175,9 +172,6 @@ CHIPS = {
     "panel-rs": ("panel.rs", "Mini/src/panel.rs", False),
     "settings-rs": ("settings.rs", "Mini/src/settings.rs", False),
     "license": ("MIT", "LICENSE", False),
-    "responsible": ("Responsible use", "RESPONSIBLE_USE.md", False),
-    "security": ("Security", "SECURITY.md", False),
-    "contributing": ("Contributing", "CONTRIBUTING.md", False),
     "nav-get-started": ("Get started", "#get-started", False),
     "nav-use-null": ("Use Null", "#use-null", False),
     "nav-privacy": ("Privacy", "#privacy-and-permissions", False),
@@ -195,9 +189,7 @@ LINK_ROWS = [
     ["oh-my-pi"],
     ["rust", "tauri"],
     ["page-html", "harness-rs", "engine-rs", "translate-rs", "markdown-rs", "panel-rs", "settings-rs", "check-rs"],
-    ["voicebox"],
-    ["bun", "just"],
-    ["license", "responsible", "security", "contributing"],
+    ["license"],
 ]
 
 
@@ -480,8 +472,7 @@ def development(c):
            "alone and unlocked meanwhile. "
            "NULL_MINI_ENGINE=<path> runs the harness check on another Oh-my-pi, and "
            "Mini/Scripts/engine --to <version> moves Null to that version only if it passes. "
-           "Repository CI runs all three on a Mac runner whenever Mini/ changes, beside the Voice "
-           "frontend typecheck and web build.")
+           "Repository CI runs all three on a Mac runner whenever Mini/ changes.")
 
 
 def dev_switches(c):
@@ -507,32 +498,6 @@ def dev_switches(c):
            "real tools. The startup-only check above sends no prompt. A run on a folder of its "
            "own reads none of that and leaves nothing behind but the folder; a local model server "
            "on this Mac, such as Ollama, is still found.")
-
-
-# ── Optional voice tools ──────────────────────────────────────────────────
-def voice(c):
-    c.sub("Voicebox is a separate tool the box can use for voice, not part of its text path.")
-    c.row("Voicebox", "Local voice cloning and synthesis, Whisper transcription, dictation, effects, stories and MCP speech tools")
-    c.row("Wiring", "Your text path never calls the Voice API. A configured voicebox MCP server can still let OMP request speech while that service runs, which is not an integrated voice-conversation mode")
-    c.row("Inference", "Runs locally, while model downloads, optional cloud features and connected agents can use the network")
-
-
-def voice_run(c):
-    c.sub("Needs Python 3.12+, Bun and just, in addition to Rust and the platform build tools.")
-    c.command("just setup                     # Python environment + JavaScript dependencies")
-    c.command("just dev                       # Voice backend + desktop app")
-    c.command("bun run dev:server             # API only, with the Python environment active")
-    c.command("just test                      # backend pytest suite")
-    c.command("bun run typecheck && bun run check")
-    c.row("API", "127.0.0.1:17493 owns SQLite, the models, the audio files and /mcp; development narration runs on 17494")
-    c.row("MCP", "voicebox.speak, voicebox.transcribe, voicebox.list_captures and voicebox.list_profiles; voicebox-mcp is the stdio-to-HTTP shim")
-    c.note("Packaged narration-worker startup has a known argument mismatch, and headless playback "
-           "covers queued speech, not unclaimed narration streams; see the research map. "
-           "Development data lives in data/, and the internals and updater still use upstream "
-           "Voicebox naming and releases. Do not expose the API as if it were authenticated: most "
-           "endpoints have none, and loopback binding with CORS is not an authorization layer. The "
-           "retained Python /mini/* and /harnesses routes need loopback plus an install token, and "
-           "they do not power the box.")
 
 
 # ── Status and direction ──────────────────────────────────────────────────
@@ -565,25 +530,15 @@ def status(c):
 
 
 def layout(c):
-    c.raw("Mini/                  Null app: Rust host, static Page/, install scripts\n"
-          "app/                   Shared Voice React UI\n"
-          "tauri/                 Voice desktop host\n"
-          "web/                   Voice browser host\n"
-          "backend/               Voice API, engines, MCP, SQLite and Python harness\n"
-          "scripts/               Voice lifecycle, packaging and development helpers\n"
-          "data/                  Voice development data\n"
-          "docs/ · landing/       Inherited documentation and marketing sites\n"
-          "CHANGELOG.md           Voice changelog, also read by the web build")
-    c.note("The unmerged capital-folders branch capitalizes the existing directories and removes the "
-           "inherited sites and other upstream material; the paths above describe the current "
-           "checkout. Context/ and Memories/ hold the owner's own plans, decisions, research and "
-           "handoffs, and are not tracked in Git.")
+    c.raw("Mini/                  Null: the Rust host in src/, the page in Page/, tests/, Scripts/\n"
+          ".github/workflows/     Null's tests, its releases, and the weekly Oh-my-pi check\n"
+          ".github/Readme/        The cards of this README, and the script that draws them")
+    c.note("Context/ and Memories/ hold the owner's own plans, decisions, research and handoffs, and "
+           "are not tracked in Git.")
 
 
 def license_card(c):
     c.row("MIT", "See LICENSE")
-    c.row("Voices", "Clone only voices you own or have permission to use")
-    c.row("Also", "RESPONSIBLE_USE.md · SECURITY.md · CONTRIBUTING.md")
     c.note("Built by dominionism. A small box, with your agent behind it.")
 
 
@@ -602,10 +557,8 @@ add("under-the-hood", "Under the hood", under_the_hood)
 add("source-map", "Source map", source_map, key_cols=31)
 add("development", "Development", development)
 add("dev-switches", "Development switches and smoke checks", dev_switches, key_cols=30)
-add("voice", "Optional voice tools", voice)
-add("voice-run", "Run or develop the Voice stack", voice_run)
 add("status", "Status and direction", status)
-add("layout", "Repository layout and ongoing cleanup", layout)
+add("layout", "Repository layout", layout)
 add("license", "License", license_card)
 
 for name, (title, svg) in CARDS.items():
