@@ -488,6 +488,37 @@ fn two_versions_take_turns_on_one_folder() {
     }
 }
 
+/// Deleting a conversation leans on things the harness promises nobody: that
+/// it keeps each conversation as one file, found by its id; that it has that
+/// file open only for as long as it holds the conversation, and lets go when
+/// asked; and that it stops listing a conversation whose file is gone and
+/// lists it again when the file is back, which is what "Put Back" in the Trash
+/// does. The file goes to the real Trash here and is taken out again.
+#[test]
+#[ignore]
+fn a_conversation_s_file_is_found_by_its_id_and_the_list_follows_the_file() {
+    let (_standin, folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", None);
+    assert!(translate::closes_conversations(&agent.hello), "the harness does not say that it closes a conversation: {}", agent.hello);
+    agent.say(&session, MESSAGE).expect("the message is answered");
+    let listed = |agent: &mut Agent| agent.conversations().iter().any(|kept| kept["sessionId"] == session.as_str());
+    assert!(listed(&mut agent), "the conversation is in the harness's list");
+
+    let file = history::file_of(&folder.settings().join("sessions"), &session).expect("one file for the conversation, found by its id");
+    assert_eq!(history::held_by(&file), vec![agent.child.id()], "the harness has the file open while it holds the conversation");
+    agent.request("session/close", json!({ "sessionId": session })).expect("the harness closes the conversation");
+    assert_eq!(history::held_by(&file), Vec::<u32>::new(), "nobody has the file open once the harness has closed the conversation");
+
+    let in_the_trash = history::to_trash(&file).expect("macOS moves the file to the Trash");
+    assert!(!file.exists() && in_the_trash.is_file(), "the file is in the Trash, at {}", in_the_trash.display());
+    assert!(!listed(&mut agent), "a conversation whose file is gone is listed no longer");
+    assert!(agent.load(&folder, &session).is_err(), "and does not load");
+    assert!(!file.exists(), "the harness does not write the file again");
+
+    std::fs::rename(&in_the_trash, &file).expect("the file is taken out of the Trash again");
+    assert!(listed(&mut agent), "put back, the conversation is listed again");
+    agent.load(&folder, &session).expect("and loads");
+}
+
 /// `/history` draws the harness's own list of the conversations it keeps, the
 /// ones made in a terminal in other folders among them: each with the folder
 /// it works in and when it was last used, the most recently used first. And a

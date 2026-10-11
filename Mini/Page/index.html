@@ -10,7 +10,8 @@
      agent a file with the next message, /history (and the button after the
      plus) lists the earlier conversations and opens one again, /rename and a
      title calls the open conversation that (the pencil on a row of the list
-     does it for any other), /pet shows the
+     does it for any other, and the x beside it moves a conversation to the
+     Trash), /pet shows the
      pet or puts it away, /new starts a new conversation, /quit quits the app
      and closes the conversation. A lone / and Enter lists these commands, and
      so does a command the box does not have. Ctrl+C stops a reply or, with
@@ -1833,6 +1834,7 @@
               startRename(entry);
             }),
           );
+          if (picker.deletes) tools.append(rowTool('move to the Trash', CROSS, () => deleteEarlier(entry)));
           const row = el('div', index === picker.index ? 'option past selected' : 'option past', title, el('span', 'id where', where), tools);
           row.addEventListener('click', () => {
             if (picker.renaming) return; // a title is being typed: Enter or Esc first
@@ -1851,6 +1853,7 @@
       // A mark at the end of a row. A press on it is not a press on the row, and
       // leaves the typing in the field.
       const PENCIL = 'M5.5 13.5l.7-2.9 6.4-6.4a1 1 0 0 1 1.4 0l.8.8a1 1 0 0 1 0 1.4l-6.4 6.4zM11.4 5.4l2.2 2.2';
+      const CROSS = 'M6.5 6.5l6 6M12.5 6.5l-6 6';
       const rowTool = (label, path, act) => {
         const button = el('button', 'rowtool');
         button.type = 'button';
@@ -1919,6 +1922,34 @@
         if (picker === list) endRename();
       };
 
+      // Deleting. The x on a row, or Command+Delete on the chosen one with
+      // nothing typed, moves the conversation to the Mac's Trash, where it can
+      // be put back. Nothing asks "are you sure": the Trash is what a slip is
+      // put right from. The harness has no way to delete, so the app moves the
+      // conversation's file itself, and refuses one that is still working or
+      // that another program has open.
+      const deleteEarlier = async (entry) => {
+        if (!entry || picker.opening || picker.renaming || picker.deleting) return;
+        const list = picker;
+        list.deleting = true;
+        let wasOpen;
+        try {
+          wasOpen = await invoke('delete_conversation', { id: entry.id });
+        } catch (error) {
+          list.deleting = false;
+          notice(String(error));
+          return;
+        }
+        list.deleting = false;
+        if (wasOpen) emptyBox(); // the box is on a new conversation now
+        if (picker !== list) return;
+        list.conversations = list.conversations.filter((kept) => kept.id !== entry.id);
+        list.folders = new Set(list.conversations.map((kept) => (kept.own ? '' : kept.folder))).size;
+        if (list.conversations.length) drawHistory();
+        else closeHistory();
+        notice(`moved to the Trash: ${entry.title || 'untitled'}`);
+      };
+
       // /rename and a title: the conversation open in the box is called that.
       const rename = async (title) => {
         if (!title) {
@@ -1967,7 +1998,7 @@
         }
         const conversations = dated(listed);
         const folders = new Set(conversations.map((entry) => (entry.own ? '' : entry.folder))).size;
-        picker = { history: true, conversations, folders, opening: false, renaming: null, narrowed: '', models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
+        picker = { history: true, conversations, folders, deletes: !!listed.deletes, deleting: false, opening: false, renaming: null, narrowed: '', models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
@@ -2038,6 +2069,10 @@
           }
           if (event.key === 'r' && event.metaKey) {
             startRename(picker.shown[picker.index]);
+          } else if (event.key === 'Backspace' && event.metaKey) {
+            // With words in the field, Command+Delete is the field's own: it clears them.
+            if (input.value || !picker.deletes) return;
+            deleteEarlier(picker.shown[picker.index]);
           } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             const step = event.key === 'ArrowDown' ? 1 : -1;
             picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
@@ -2399,6 +2434,18 @@
         true,
       );
 
+      // The box on a new conversation: nothing of the last one is shown.
+      const emptyBox = () => {
+        out.textContent = '';
+        out.style.display = 'none';
+        toolLines.clear();
+        reply = null;
+        steps = null;
+        anchor = null;
+        mood('rest'); // whatever the pet was saying of the last conversation is over
+        fit();
+      };
+
       const send = async (text) => {
         if (text === '/model' || text.startsWith('/model ')) {
           openPicker(text.slice(6).trim());
@@ -2453,14 +2500,7 @@
             notice(String(error));
             return;
           }
-          out.textContent = '';
-          out.style.display = 'none';
-          toolLines.clear();
-          reply = null;
-          steps = null;
-          anchor = null;
-          mood('rest'); // whatever the pet was saying of the last conversation is over
-          fit();
+          emptyBox();
           return;
         }
         // A lone slash-word that is not one of the box's commands is a slip, or a

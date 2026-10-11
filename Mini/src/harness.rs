@@ -23,7 +23,7 @@ use agent_client_protocol::schema::v1::{
     CancelNotification, InitializeRequest, LoadSessionRequest, NewSessionRequest, PromptRequest,
     RequestPermissionRequest, RequestPermissionResponse, SessionNotification, SetSessionConfigOptionRequest,
 };
-use agent_client_protocol::schema::v1::ListSessionsRequest;
+use agent_client_protocol::schema::v1::{CloseSessionRequest, ListSessionsRequest};
 use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo, Responder};
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt, StreamExt};
@@ -71,6 +71,9 @@ enum Command {
     Conversations { reply: oneshot::Sender<Result<Option<Vec<Value>>, String>> },
     /// Open one of them in the box, in place of the conversation that is open.
     OpenEarlier { id: String, reply: oneshot::Sender<Result<(), String>> },
+    /// Have the harness let go of a conversation, if it holds it, so that the
+    /// conversation's file is nobody's. Answers when that is done.
+    Close { id: String, reply: oneshot::Sender<()> },
 }
 
 /// What to do with the updates a harness replays while a conversation is loaded back.
@@ -250,6 +253,9 @@ fn refuse(app: &AppHandle, shared: &Arc<Mutex<Shared>>, command: Command, reason
         Command::OpenEarlier { reply, .. } => {
             let _ = reply.send(Err(reason.to_string()));
         }
+        Command::Close { reply, .. } => {
+            let _ = reply.send(());
+        }
         Command::Interrupt | Command::NewConversation | Command::Restart | Command::CheckModel => {}
     }
 }
@@ -264,6 +270,14 @@ async fn serve(
     if matches!(first, Command::Restart | Command::CheckModel) {
         return Ok(()); // nothing is running; the next order starts a fresh process anyway
     }
+    // No harness is running, so none holds the conversation. It is not started to be asked.
+    let first = match first {
+        Command::Close { reply, .. } => {
+            let _ = reply.send(());
+            return Ok(());
+        }
+        other => other,
+    };
     let Some((binary, origin)) = engine::in_use(app) else {
         refuse(app, shared, first, &format!("{HARNESS_NAME} is not installed"));
         return Ok(());
@@ -409,6 +423,8 @@ struct Conversation<'a> {
     can_load: bool,
     /// Whether the harness lists the conversations it keeps. If not, `/history` has nothing to show.
     can_list: bool,
+    /// Whether the harness lets go of a conversation when asked.
+    can_close: bool,
     /// Whether this harness process holds the conversation in memory.
     loaded: bool,
     /// The harness's answer to the greeting, until what it can do has been noted
@@ -455,6 +471,7 @@ async fn converse(
         mcp_capabilities: init.pointer("/agentCapabilities/mcpCapabilities").cloned().unwrap_or(Value::Null),
         can_load: init.pointer("/agentCapabilities/loadSession") == Some(&json!(true)),
         can_list: translate::lists_conversations(&init),
+        can_close: translate::closes_conversations(&init),
         loaded: false,
         unnoted: unnoted.then_some(init),
     };
@@ -579,8 +596,29 @@ impl Conversation<'_> {
             Command::OpenEarlier { id, reply } => {
                 let _ = reply.send(self.open_earlier(&id).await);
             }
+            Command::Close { id, reply } => {
+                self.close(&id).await;
+                let _ = reply.send(());
+            }
         }
         Ok(())
+    }
+
+    /// Have the harness let go of a conversation. One it does not hold is
+    /// closed like any other: the harness says nothing either way. If it was
+    /// the one open in the box, this process holds it no longer, and the next
+    /// message loads it back.
+    async fn close(&mut self, id: &str) {
+        if !self.can_close {
+            return;
+        }
+        let Ok(request) = typed::<CloseSessionRequest>(json!({ "sessionId": id })) else { return };
+        if let Err(error) = self.cx.send_request(request).block_task().await {
+            log!("could not close the conversation {id}: {}", describe(&error));
+        }
+        if lock(self.shared).session.as_deref() == Some(id) {
+            self.loaded = false;
+        }
     }
 
     /// Every conversation the harness keeps, each as the harness lists it, the
@@ -984,6 +1022,14 @@ pub fn new_conversation(app: AppHandle) -> Result<(), String> {
     }
     lock(&harness.shared).events.clear();
     order(&harness, Command::NewConversation)
+}
+
+/// Have the harness let go of a conversation, if one is running and holds it.
+pub async fn close(app: &AppHandle, id: String) {
+    let (reply, answer) = oneshot::channel();
+    if order(&app.state::<Harness>(), Command::Close { id, reply }).is_ok() {
+        let _ = answer.await;
+    }
 }
 
 /// The id of the conversation open in the box, once it has one.

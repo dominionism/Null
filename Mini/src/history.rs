@@ -15,6 +15,12 @@
 //! the harness no longer lists its conversation. No other word of a
 //! conversation is kept here, and the harness's own file is never changed:
 //! a terminal goes on showing the title it had.
+//!
+//! The harness offers no way to delete a conversation either. It keeps each
+//! as one file in its own folder and stops listing one whose file is gone, so
+//! to delete a conversation Null moves that file to the Mac's Trash, where it
+//! can be put back. This leans on where the harness keeps its files, which it
+//! promises nobody: the harness check asks it of every version.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -51,6 +57,9 @@ pub struct Entry {
 pub struct Listed {
     /// False when this harness does not list its conversations.
     pub lists: bool,
+    /// False when Null cannot find where this harness keeps them, and so has
+    /// nothing to move to the Trash.
+    pub deletes: bool,
     pub conversations: Vec<Entry>,
 }
 
@@ -229,7 +238,7 @@ pub fn opened(app: &AppHandle, id: &str, events: &[Value]) {
 pub async fn history(app: AppHandle) -> Result<Listed, String> {
     let (listed, open) = harness::conversations(&app).await?;
     let Some(listed) = listed else {
-        return Ok(Listed { lists: false, conversations: Vec::new() });
+        return Ok(Listed { lists: false, deletes: false, conversations: Vec::new() });
     };
     let own = harness::workspace(&app)?;
     let conversations = titles(&app, |titles| {
@@ -240,7 +249,7 @@ pub async fn history(app: AppHandle) -> Result<Listed, String> {
         }
         entries(&listed, titles, &own, open.as_deref())
     });
-    Ok(Listed { lists: true, conversations })
+    Ok(Listed { lists: true, deletes: sessions_folder().is_some_and(|sessions| sessions.is_dir()), conversations })
 }
 
 /// Open one of them in the box, in place of the conversation that is open. It
@@ -249,6 +258,129 @@ pub async fn history(app: AppHandle) -> Result<Listed, String> {
 #[tauri::command]
 pub async fn open_conversation(app: AppHandle, id: String) -> Result<(), String> {
     harness::open_earlier(&app, id).await
+}
+
+// ── Deleting ──────────────────────────────────────────────────────────────
+
+/// Where the harness keeps its conversations: `sessions` in its own folder.
+/// None for a run under a profile of the harness's, whose folder Null does
+/// not know.
+fn sessions_folder() -> Option<PathBuf> {
+    if !harness::extra_args().is_empty() {
+        return None;
+    }
+    let agent = match settings::harness_folder() {
+        Some(folder) => folder,
+        None => PathBuf::from(std::env::var_os("HOME")?).join(".omp/agent"),
+    };
+    Some(agent.join("sessions"))
+}
+
+/// The file the harness keeps a conversation in, found by its id: one each,
+/// `sessions/<the folder it works in>/<when>_<id>.jsonl`. None unless there is
+/// exactly one, which is a harness that keeps them some other way, and none
+/// for an id that could not be one.
+pub fn file_of(sessions: &Path, id: &str) -> Option<PathBuf> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return None;
+    }
+    let ending = format!("_{id}.jsonl");
+    let mut found = Vec::new();
+    for folder in std::fs::read_dir(sessions).ok()?.flatten() {
+        for file in std::fs::read_dir(folder.path()).into_iter().flatten().flatten() {
+            let name = file.file_name().to_string_lossy().into_owned();
+            if name.ends_with(&ending) && !name.starts_with('.') {
+                found.push(file.path());
+            }
+        }
+    }
+    (found.len() == 1).then(|| found.remove(0))
+}
+
+/// What the harness keeps beside a conversation's file, when it keeps
+/// anything: a folder of the same name, for the conversations of the helpers
+/// it started. It goes where the conversation goes.
+fn beside(file: &Path) -> Option<PathBuf> {
+    let folder = file.with_extension("");
+    folder.is_dir().then_some(folder)
+}
+
+/// The programs that have a file open, by their numbers. A harness has the
+/// file of each conversation it holds open for as long as it holds it. (The
+/// lock file the harness leaves beside a conversation says nothing: it stays
+/// when the harness has gone.)
+pub fn held_by(file: &Path) -> Vec<u32> {
+    let Ok(listed) = std::process::Command::new("/usr/sbin/lsof").arg("-t").arg("--").arg(file).output() else {
+        return Vec::new();
+    };
+    let mut programs: Vec<u32> = String::from_utf8_lossy(&listed.stdout).lines().filter_map(|line| line.trim().parse().ok()).collect();
+    programs.sort_unstable();
+    programs.dedup();
+    programs
+}
+
+/// Move a file or a folder to the Mac's Trash with macOS's own call for it,
+/// which writes down where it came from, so that the Trash can put it back.
+/// Gives where in the Trash it went.
+pub fn to_trash(what: &Path) -> Result<PathBuf, String> {
+    use objc::rc::autoreleasepool;
+    use objc::runtime::{Object, BOOL, NO};
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::ffi::{CStr, CString};
+    use std::os::raw::c_char;
+    use std::os::unix::ffi::OsStrExt;
+
+    let path = CString::new(what.as_os_str().as_bytes()).map_err(|_| "its name cannot be handed to macOS".to_string())?;
+    autoreleasepool(|| unsafe {
+        let words = |text: *mut Object| -> Option<String> {
+            if text.is_null() {
+                return None;
+            }
+            let utf8: *const c_char = msg_send![text, UTF8String];
+            (!utf8.is_null()).then(|| CStr::from_ptr(utf8).to_string_lossy().into_owned())
+        };
+        let text: *mut Object = msg_send![class!(NSString), stringWithUTF8String: path.as_ptr()];
+        let url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: text];
+        let manager: *mut Object = msg_send![class!(NSFileManager), defaultManager];
+        let mut landed: *mut Object = std::ptr::null_mut();
+        let mut error: *mut Object = std::ptr::null_mut();
+        let moved: BOOL = msg_send![manager, trashItemAtURL: url resultingItemURL: &mut landed error: &mut error];
+        if moved == NO {
+            let why: *mut Object = if error.is_null() { std::ptr::null_mut() } else { msg_send![error, localizedDescription] };
+            return Err(words(why).unwrap_or_else(|| "macOS would not move it to the Trash".to_string()));
+        }
+        let place: *mut Object = if landed.is_null() { std::ptr::null_mut() } else { msg_send![landed, path] };
+        Ok(words(place).map(PathBuf::from).unwrap_or_default())
+    })
+}
+
+/// The x on a row of the list, or Command+Delete: move a conversation to the
+/// Trash. Refused for one whose reply is still running, and for one that
+/// another program has open: Null's own harness lets go of it first, so
+/// whoever still has its file open is someone else. Says whether it was the
+/// conversation open in the box, which then has a new one.
+#[tauri::command]
+pub async fn delete_conversation(app: AppHandle, id: String) -> Result<bool, String> {
+    let open = harness::open_id(&app).as_deref() == Some(id.as_str());
+    if open && harness::busy(&app) {
+        return Err("stop the reply with ctrl+c before deleting this conversation".into());
+    }
+    let file = sessions_folder().and_then(|sessions| file_of(&sessions, &id)).ok_or("this harness keeps its conversations where Null cannot find them")?;
+    harness::close(&app, id.clone()).await;
+    if !held_by(&file).is_empty() {
+        return Err("that conversation is open in another program. close it there first".into());
+    }
+    let helpers = beside(&file);
+    to_trash(&file).map_err(|why| format!("it could not be moved to the Trash: {why}"))?;
+    // The conversation is gone from the list now. What was beside it follows; if it will not, it only takes room.
+    if let Some(Err(why)) = helpers.as_deref().map(to_trash) {
+        log!("what was kept beside a deleted conversation stayed where it was: {why}");
+    }
+    log!("a conversation was moved to the Trash");
+    if open {
+        let _ = harness::new_conversation(app.clone());
+    }
+    Ok(open)
 }
 
 /// `/rename`, or the pencil in the list: the owner gives a conversation a
@@ -361,6 +493,60 @@ mod tests {
         titles.rename("c3", "given");
         titles.keep_only(&HashSet::from(["c2", "c3"]));
         assert_eq!(titles, Titles { made: BTreeMap::from([("c2".to_string(), "made".to_string())]), given: BTreeMap::from([("c3".to_string(), "given".to_string())]) });
+    }
+
+    /// A folder of the test's own, laid out as Oh-my-pi 18.8.7 lays out its conversations.
+    fn kept(name: &str, files: &[&str]) -> PathBuf {
+        let sessions = std::env::temp_dir().join(format!("null-history-test-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&sessions);
+        for file in files {
+            let file = sessions.join(file);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, "{}\n").unwrap();
+        }
+        sessions
+    }
+
+    #[test]
+    fn a_conversation_s_file_is_found_by_its_id() {
+        let sessions = kept(
+            "found",
+            &[
+                "-Users-me-site-/2026-10-10T09-02-50-081Z_01a1-c3.jsonl",
+                "-Users-me-site-/.2026-10-10T09-02-50-081Z_01a1-c3.jsonl.lock.os",
+                "-Users-me-site-/2026-10-10T09-02-50-081Z_01a1-c3/2026-10-10T09-05-00-000Z_01a1-helper.jsonl",
+                "-Users-me-Null-Workspace-/2026-10-09T18-00-00-000Z_01a1-c2.jsonl",
+                "-Users-me-Null-Workspace-/2026-10-01T08-00-00-000Z_01a1-twice.jsonl",
+                "-Users-me-site-/2026-10-02T08-00-00-000Z_01a1-twice.jsonl",
+            ],
+        );
+        let found = file_of(&sessions, "01a1-c3").expect("the conversation's own file, not its lock");
+        assert_eq!(found, sessions.join("-Users-me-site-/2026-10-10T09-02-50-081Z_01a1-c3.jsonl"));
+        // What the harness keeps beside it, for the helpers it started, goes with it.
+        assert_eq!(beside(&found), Some(sessions.join("-Users-me-site-/2026-10-10T09-02-50-081Z_01a1-c3")));
+        assert_eq!(beside(&file_of(&sessions, "01a1-c2").unwrap()), None);
+        // A helper's conversation is not one of the list's. Two files for one id is a layout Null does not know.
+        assert_eq!(file_of(&sessions, "01a1-helper"), None);
+        assert_eq!(file_of(&sessions, "01a1-twice"), None);
+        assert_eq!(file_of(&sessions, "01a1-gone"), None);
+        // Nothing that is no id is looked for, whatever it would match.
+        for no_id in ["", "c3", "../01a1-c3", "01a1-c3.jsonl", "*"] {
+            assert_eq!(file_of(&sessions, no_id), None, "{no_id:?}");
+        }
+        assert_eq!(file_of(&sessions.join("nowhere"), "01a1-c3"), None);
+        let _ = std::fs::remove_dir_all(sessions);
+    }
+
+    #[test]
+    fn a_file_that_a_program_has_open_is_known_to_be_held() {
+        let sessions = kept("held", &["-w-/2026-10-10T09-02-50-081Z_01a1-c3.jsonl"]);
+        let file = file_of(&sessions, "01a1-c3").unwrap();
+        assert_eq!(held_by(&file), Vec::<u32>::new());
+        let open = std::fs::File::open(&file).unwrap();
+        assert_eq!(held_by(&file), vec![std::process::id()]);
+        drop(open);
+        assert_eq!(held_by(&file), Vec::<u32>::new());
+        let _ = std::fs::remove_dir_all(sessions);
     }
 
     #[test]
