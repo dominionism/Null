@@ -39,6 +39,10 @@
 > of the same plan) was written in where it belongs, by the session that built it. Nothing else
 > was traced again.
 
+> Tenth addition, 2026-10-10: how the box shows the way each conversation stands (item 10 of the
+> same plan: the command `work`, the event `mini:work`, "now" in `/history`) was written in where
+> it belongs, by the session that built it. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -318,7 +322,7 @@ Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and 
 
 | Module | Owns | Decides / does not decide |
 |---|---|---|
-| `main.rs` | Wiring: two plugins, state init, 35 `invoke_handler` commands, nine dev switches | Nothing else |
+| `main.rs` | Wiring: two plugins, state init, 36 `invoke_handler` commands, nine dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, or 662 with the pet's 46 px lane on its left, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize`, the commands `pet` and `set_pet` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
 | `harness.rs` | The ACP connection: one thread, one `omp … acp` process, and a record for each conversation this run holds (the open one, and any left working or waiting to be seen, four working at most), under a number Null gives it: its events (5,000 at most), its tools, its waiting approvals, its model | What the harness reported; never what a provider is or whether a model is good |
@@ -373,7 +377,7 @@ returns the session to `running`.
 
 Commands the page invokes (the `invoke_handler` list in `main.rs`): `page_ready`, `quit`, `layout`,
 `hide_box`, `resize`, `send`, `interrupt`, `respond`, `models`, `set_model`, `new_conversation`,
-`events_since`, `report`, `providers`, `backups`, `set_backups`, `harnesses`, `set_harness`,
+`events_since`, `work`, `report`, `providers`, `backups`, `set_backups`, `harnesses`, `set_harness`,
 `update_harness`, `signin_providers`, `signin_start`,
 `signin_answer`, `signin_cancel`, `open_url`, `pet`, `set_pet`, `history`, `open_conversation`,
 `rename_conversation`, `delete_conversation`, `search_conversations`, `attach_list`, `attach_file`,
@@ -386,7 +390,12 @@ Events: `mini:event` carries `user_message`, `text_delta` (`{text, thinking}`), 
 so a reloaded page catches up through `events_since`, and with the number of its `conversation`:
 the page draws an event only when it names the conversation the box shows. It learns that number
 from `events_since`, from `new_conversation`, from `delete_conversation` when the open one was
-deleted, and from `conversation_opened`. `mini:attached` carries what is attached to the
+deleted, and from `conversation_opened`. `mini:work` (`{told, conversations}`) says how the
+conversations stand at every change: each one that is working, asking or waiting to be seen, the
+most pressing first, with its number, the harness's id, the word for how it stands, and the title
+Null keeps. The command `work` gives the same to a page that has just loaded. From it the page
+draws "now" in `/history`, the line that says another conversation is done, asking or failed,
+and the pet. `mini:attached` carries what is attached to the
 next message. `mini:signin` carries the sign-in's lines,
 questions and `done`; `mini:welcome` (`{freely}`) is the first opening: the page says no provider is
 signed in, opens the sign-in list, and when that is over says whether the agent acts without asking;
@@ -603,8 +612,8 @@ this repository does not have. A plain `v` tag would set it off.
 - Full terminal parity is an objective, not a theorem: the original ACP spike reported a skills
   count difference, and lone harness slash commands are blocked by Null's unknown-command rule.
 - A conversation goes on working when the box turns away from it (`/new`, `/history`), but
-  nothing yet shows how each one stands, and quitting or a restart of the harness ends them
-  without a word (`BackgroundWork.md`, items 10 and 11). No folder chosen for a conversation,
+  the pet, "now" in `/history` and the notice line say how each one stands. Quitting or a
+  restart of the harness still ends them without a word (`BackgroundWork.md`, item 11). No folder chosen for a conversation,
   continuous voice conversation, automatic speaking of every Null reply or cross-harness handoff
   is built. The pet is built and shows only with the box. Voice requires a profile first;
   today's inventory is empty. Later voice transport/echo cancellation/engine choices remain open.

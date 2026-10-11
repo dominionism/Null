@@ -834,6 +834,43 @@
         color: var(--text);
         text-decoration: line-through;
       }
+      /* Another conversation has something to say: a press on the line opens it. */
+      #notice .go {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      #notice .go:hover {
+        color: var(--text);
+      }
+      /* How a conversation stands, where the open one has its dot, and in the
+         word for it: amber for one that asks, red for one that failed. The
+         sign is drawn over two spaces, the room the dot has, so that titles
+         line up whatever sign it is. */
+      .stands {
+        position: relative;
+        white-space: pre;
+      }
+      .stands::before {
+        content: attr(data-sign);
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      .stands.asking,
+      .where.asking,
+      #notice .asking {
+        color: rgb(var(--amber));
+      }
+      .stands.failed,
+      .where.failed,
+      #notice .failed {
+        color: var(--red);
+      }
       #out > .you > .with {
         grid-column: 2;
         margin-bottom: 5px;
@@ -1205,10 +1242,33 @@
       let petShown = false; // until the app has said
       let hopTimer = null;
       let noAnswer = false; // the reply that is ending brought the provider's refusal
+      // How the conversations stand, as the app tells it: each one that is
+      // working, asking or waiting to be seen, the most pressing first.
+      let work = [];
+      let workTold = -1;
+      // What the most pressing of the others has to say: the ones the box is not showing.
+      const elsewhere = () => (work.find((one) => !one.open) || { standing: '' }).standing;
+      // The pet speaks for every conversation. It makes the most pressing thing
+      // any of them has to say its own: one that asks, then one that failed,
+      // one that is done, one that is working. `here` is the open one's.
+      const PRESSING = ['asking', 'failed', 'done', 'working'];
+      const MOODS = { asking: 'ask', failed: 'fail', done: 'done', working: 'work' };
+      const allSay = (here) => {
+        const rank = (stands) => (PRESSING.includes(stands) ? PRESSING.indexOf(stands) : PRESSING.length);
+        const there = elsewhere();
+        return MOODS[rank(here) <= rank(there) ? here : there] || 'rest';
+      };
       const mood = (name) => {
         clearTimeout(hopTimer);
         pet.setAttribute('class', `pet ${name}`);
-        if (name === 'done') hopTimer = setTimeout(() => mood('rest'), HOP);
+        // The hop is made once. Then the pet goes back to what there is to say,
+        // and stays glad when that is a conversation that is done and not yet seen.
+        if (name === 'done') {
+          hopTimer = setTimeout(() => {
+            const next = allSay(shown());
+            if (next !== 'done') mood(next);
+          }, HOP);
+        }
       };
       const showPet = (shown) => {
         petShown = !!shown;
@@ -1217,6 +1277,8 @@
 
       // What the arrow says of the open conversation as it stands.
       const standing = () => (busy ? (pendingAsk ? 'asking' : 'working') : '');
+      // What the arrow is saying at this moment.
+      const shown = () => (caret.classList.contains('asking') ? 'asking' : caret.classList.contains('working') ? 'working' : '');
 
       // '' when idle, 'working' while the agent works, 'asking' while it waits for an answer.
       const mark = (state) => {
@@ -1224,7 +1286,7 @@
         caret.className = state ? `caret ${state}` : 'caret';
         // The pet moves when the arrow changes. Told again that nothing is
         // running, it keeps the gesture it is making.
-        if (caret.className !== before) mood(state === 'working' ? 'work' : state === 'asking' ? 'ask' : 'rest');
+        if (caret.className !== before) mood(allSay(state));
       };
 
       // The box's own commands take their own colour as they are typed, so it is
@@ -1451,7 +1513,7 @@
           // what was drawn again on the way here.
           if (whole) {
             if (!picker) mark(standing());
-            mood(busy ? (pendingAsk ? 'ask' : 'work') : 'rest');
+            mood(allSay(standing()));
           }
           if (!busy && !picker) mark('');
         } catch (error) {
@@ -1462,6 +1524,57 @@
           waiting.forEach(apply);
         }
       };
+
+      // ── How the other conversations stand ──────────────────────────────
+
+      // Open a conversation the app is holding, or any other by its id.
+      const openById = async (id) => {
+        // One the harness loads arrives as an event. One the app already held,
+        // working or waiting to be seen, is drawn from what the app kept of it.
+        const kept = await invoke('open_conversation', { id });
+        await catchUp(kept != null); // or should the event have been missed
+      };
+
+      // Another conversation has ended, or is asking: the notice line says so,
+      // and a press on it opens that conversation. `/history` does the same.
+      const announce = (one) => {
+        const go = document.createElement('button');
+        go.type = 'button';
+        go.className = 'go';
+        go.tabIndex = -1;
+        go.append(el('span', one.standing, one.standing), `: ${one.title || 'untitled'}`);
+        go.addEventListener('click', async () => {
+          if (picker || signin) return;
+          unnotice();
+          mark('working');
+          try {
+            await openById(one.id);
+          } catch (error) {
+            line('error', `could not open that conversation: ${error}`);
+          }
+          mark(standing());
+          input.focus();
+        });
+        notice('');
+        noticeLine.append(go);
+      };
+
+      // `quietly` for a page that has only just loaded: nothing it hears then is news.
+      const hearWork = (said, quietly = false) => {
+        if (!said || said.told < workTold) return; // an older telling that arrived late
+        const before = new Map(work.map((one) => [one.conversation, one.standing]));
+        const said_before = elsewhere();
+        workTold = said.told;
+        work = said.conversations || [];
+        // The most pressing piece of news about a conversation the box is not showing.
+        const news = work.find((one) => !one.open && one.id && ['asking', 'failed', 'done'].includes(one.standing) && before.get(one.conversation) !== one.standing);
+        // With `/history` open it is there to be seen, under "now".
+        if (news && !quietly && !signin && !(picker && picker.history)) announce(news);
+        // The pet says it too. What the open one does, it says with the arrow.
+        if (elsewhere() !== said_before) mood(allSay(shown()));
+        if (picker && picker.history && !picker.renaming && !picker.opening && !picker.deleting) drawWhereItStands();
+      };
+      listen('mini:work', (message) => hearWork(message.payload));
 
       // ── Choosing a model ───────────────────────────────────────────────
 
@@ -1859,20 +1972,31 @@
         const titled = new Set(matching.map((entry) => entry.id));
         const kept = new Map(picker.conversations.map((entry) => [entry.id, entry]));
         const inside = (picker.foundFor === words.join(' ') ? picker.found : []).filter((found) => kept.has(found.id) && !titled.has(found.id)).map((found) => ({ ...kept.get(found.id), piece: found.piece }));
-        picker.shown = matching.concat(inside);
+        // Now: every conversation that is working, asking or waiting to be
+        // seen comes first, the most pressing first, as the app lists them.
+        const stands = new Map(work.filter((one) => one.id).map((one, place) => [one.id, { standing: one.standing, place }]));
+        const now = matching.filter((entry) => stands.has(entry.id)).sort((a, b) => stands.get(a.id).place - stands.get(b.id).place);
+        picker.shown = now.concat(matching.filter((entry) => !stands.has(entry.id)), inside);
         picker.index = Math.min(picker.index, Math.max(picker.shown.length - 1, 0));
         pick.textContent = '';
         let under = null;
         picker.shown.forEach((entry, index) => {
           const said = index >= matching.length;
-          const heading = said ? 'said inside' : byFolder ? (entry.own ? 'the box' : folderPath(entry.folder) || 'no folder') : era(entry);
+          const stood = index < now.length ? stands.get(entry.id).standing : null;
+          const heading = stood ? 'now' : said ? 'said inside' : byFolder ? (entry.own ? 'the box' : folderPath(entry.folder) || 'no folder') : era(entry);
           if (heading !== under) {
             under = heading;
             pick.append(el('div', 'provider', heading));
           }
           // Found by what was said: a piece of it stands where the place and time do.
-          const where = said ? entry.piece : byFolder ? usedAt(entry, true) : [entry.own ? '' : folderName(entry.folder), usedAt(entry, false)].filter(Boolean).join(' · ');
-          const title = el('span', entry.title ? '' : 'id', `${entry.open ? '● ' : '  '}${entry.title || 'untitled'}`);
+          // Under "now", how the conversation stands is said there instead of when.
+          const where = said ? entry.piece : stood ? [entry.own ? '' : folderName(entry.folder), stood].filter(Boolean).join(' · ') : byFolder ? usedAt(entry, true) : [entry.own ? '' : folderName(entry.folder), usedAt(entry, false)].filter(Boolean).join(' · ');
+          // The open one has its dot. Another under "now" has a sign for how it
+          // stands, drawn over the two spaces every other row begins with, so
+          // that titles line up whatever the sign is.
+          const sign = stood && !entry.open ? { asking: '?', failed: '✗', done: '✓', working: '…', stopped: '–' }[stood] : null;
+          const title = el('span', entry.title ? '' : 'id', sign ? el('span', `stands ${stood}`, '  ') : entry.open ? '● ' : '  ', entry.title || 'untitled');
+          if (sign) title.firstChild.dataset.sign = sign;
           const tools = el(
             'span',
             'tools',
@@ -1883,7 +2007,7 @@
             }),
           );
           if (picker.deletes) tools.append(rowTool('move to the Trash', CROSS, () => deleteEarlier(entry)));
-          const row = el('div', `option past${said ? ' said' : ''}${index === picker.index ? ' selected' : ''}`, title, el('span', 'id where', where), tools);
+          const row = el('div', `option past${said ? ' said' : ''}${index === picker.index ? ' selected' : ''}`, title, el('span', `id where${stood ? ` ${stood}` : ''}`, where), tools);
           row.addEventListener('click', () => {
             if (picker.renaming) return; // a title is being typed: Enter or Esc first
             chooseEarlier(entry);
@@ -2100,10 +2224,7 @@
         list.opening = true;
         mark('working');
         try {
-          // One the harness loads arrives as an event. One the app already held,
-          // working or waiting to be seen, is drawn from what the app kept of it.
-          const kept = await invoke('open_conversation', { id: entry.id });
-          await catchUp(kept != null); // or should the event have been missed
+          await openById(entry.id);
         } catch (error) {
           // It would not load: the box stays on the conversation it had.
           if (picker === list) closeHistory();
@@ -2135,9 +2256,10 @@
         if (picker && picker.history) closeHistory();
         mark(busy ? 'working' : '');
         // Nothing has just happened here: the pet rests, whatever was replayed
-        // and whatever it was saying of the conversation before.
+        // and whatever it was saying of the conversation before, unless another
+        // conversation has something to say.
         noAnswer = false;
-        if (!busy) mood('rest');
+        if (!busy) mood(allSay(''));
         // It is on the model it was left on, which the next message goes to.
         if (event.model) line('note', `now on ${event.model}`);
         place();
@@ -2541,7 +2663,7 @@
         noAnswer = false;
         watchQuiet();
         if (!picker) mark('');
-        mood('rest'); // whatever the pet was saying of the last conversation is over
+        mood(allSay('')); // whatever the pet was saying of the last conversation is over
         fit();
       };
 
@@ -3061,6 +3183,10 @@
         .then(showPet)
         .catch(() => {});
       catchUp();
+      // How the other conversations stand, for a page that has only just loaded.
+      invoke('work')
+        .then((said) => hearWork(said, true))
+        .catch(() => {});
       fit();
       invoke('page_ready');
     </script>

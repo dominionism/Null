@@ -13,10 +13,11 @@
 > yet. Work in the background itself (items 7 to 14) has begun: the harness check asks what
 > it rests on (item 7, pull request #51), and Null keeps a record for each conversation it
 > holds (item 8, pull request #52). A conversation is left working with `/new` or
-> `/history` and found again, four at most (item 9, pull request #53). That is not to be
-> released before items 10 and 11: until then nothing shows how a conversation stands, and
-> quitting ends what works in the background without a word. Next: item 10. The owner
-> confirmed the goal and settled all twelve decisions.**
+> `/history` and found again, four at most (item 9, pull request #53). The pet, "now" in
+> `/history` and the notice line say how each conversation stands (item 10, pull request
+> #54). None of it is to be released before item 11: until then quitting ends what works in
+> the background without a word. Next: item 11. The owner confirmed the goal and settled all
+> twelve decisions.**
 
 ## Goal
 
@@ -808,7 +809,52 @@ both groups change the same list in the page: built one after the other, they do
       Know it by: pictures of every state, a scripted run, and the owner's eye.
     - Source: specified from user (the goal) + researched (`ChatGPTPetsAndMini.md`, the status
       order) + inferred from codebase (`history.rs`, `mark()` and `mood()` in the page).
-    - Status: Not started
+    - Status: Complete (2026-10-10). On `main` with pull request #54. Not looked at by the
+      owner yet, which this item asks for
+    - **Built:** `Mini/src/harness.rs` keeps how each conversation's last reply ended
+      (`Ended`: done, failed, stopped) and gives each its word (`standing`: working, asking
+      while it waits for an answer, or as it ended). `work()` lists every conversation that
+      is working, asking or unseen, the most pressing first. The page is told at every
+      change (`tell_work`, the event `mini:work`), each telling numbered so that a late one
+      is not taken for the newest, and asks for the same at load (the command `work`). In
+      the page: a first heading "now" in `/history`, each row with a sign where the open
+      one has its dot (`?` asking, `✗` failed, `✓` done, `…` working) and the word for how
+      it stands where other rows have their time, amber for asking and red for failed; the
+      notice line saying "done: title", "asking: title" or "failed: title" for another
+      conversation, and a press on it opening that conversation; and the pet making the
+      most pressing thing any conversation has to say its own (`allSay`).
+    - **Decided by the agent:**
+      - **A failed reply** is one that ended with an error, with a provider's refusal, or
+        with the model's own refusal. **Stopped** is one the person ended.
+      - **The signs** are the ones the box already uses for a step of the agent's work.
+        Each is drawn over the two spaces every row begins with, so that every title
+        starts at the same place whatever the sign is.
+      - **The pet and a conversation that is done and not yet seen:** it hops once and
+        then stays glad, without moving, until that conversation is opened. One that
+        failed keeps the pet sunk, with red eyes, until it is opened.
+      - **The open conversation's own gestures are kept:** the hop when its reply ends
+        and the sinking when it fails are made as before, and afterwards the pet goes
+        back to what the others have to say.
+      - **No news at load, and none while `/history` is open,** where "now" shows it.
+      - **The line stays its usual four seconds,** for asking as well. The pet and "now"
+        are what stay.
+      - **"Cut off" is left to item 11,** where it is first known.
+    - **Proven without a person:** 106 unit tests, one new: the page is told of what
+      works, asks or waits to be seen, the most pressing first, and of nothing else. Seven
+      states of the page drawn with stand-ins and read back: "now" with one asking, one
+      failed, one done and the open one working (every title starting at the same place,
+      rows 23 px, none cut off); news of one asking, one done and one failed, each with
+      the pet's mood; the pet at work for another conversation while the arrow rests; a
+      press on the line asking for that conversation; a telling that arrives late left
+      aside. Twelve other states the same byte for byte as on `main`. Three pictures
+      looked at, dark. On the real app, two scripted runs with the slow stand-in: a job
+      left with `/new` ended while a second conversation was shown, and the notice line
+      said "done:" with its title; then `/history` listed it first under "now" with the
+      word "done", ahead of the open one under "today".
+    - **Not proven:** the owner's eye on any of it: the signs, the colours, the pet when
+      several conversations work. A conversation that asks, since on this Mac the agent
+      acts without asking and the stand-in asks for nothing that needs a yes. A press on
+      the line in the real app. The light look was drawn and not looked at.
 
 11. **Quitting, restarting, and being cut off**
     - What: `/quit`, and Ctrl+C with the open conversation at rest, do not quit at once while
