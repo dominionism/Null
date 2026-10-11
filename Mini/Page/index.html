@@ -1035,7 +1035,9 @@
       }).observe(pick, { childList: true });
 
       const add = (element) => {
-        if (!picker) out.style.display = 'block'; // behind an open list until the list is put away
+        // Behind an open list until the list is put away: the list of providers
+        // to sign in to is one, and the two together are taller than the window.
+        if (!picker && !(signin && signin.stage === 'choose')) out.style.display = 'block';
         out.appendChild(element);
         place();
         fit();
