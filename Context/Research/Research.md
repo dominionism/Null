@@ -35,6 +35,10 @@
 > `Context/Plans/BackgroundWork.md` (a record for each, every event naming its conversation) was
 > written in where it belongs, by the session that built it. Nothing else was traced again.
 
+> Ninth addition, 2026-10-10: that a conversation goes on working when the box turns away (item 9
+> of the same plan) was written in where it belongs, by the session that built it. It is true of
+> `main` once pull request #53 is merged. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -317,7 +321,7 @@ Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and 
 | `main.rs` | Wiring: two plugins, state init, 35 `invoke_handler` commands, nine dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, or 662 with the pet's 46 px lane on its left, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize`, the commands `pet` and `set_pet` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
-| `harness.rs` | The ACP connection: one thread, one `omp … acp` process, and a record for each conversation this run knows (today one, the open one), under a number Null gives it: its events (5,000 at most), its tools, its waiting approvals, its model | What the harness reported; never what a provider is or whether a model is good |
+| `harness.rs` | The ACP connection: one thread, one `omp … acp` process, and a record for each conversation this run holds (the open one, and any left working or waiting to be seen, four working at most), under a number Null gives it: its events (5,000 at most), its tools, its waiting approvals, its model | What the harness reported; never what a provider is or whether a model is good |
 | `translate.rs` | ACP JSON → box events; the model list out of session config options; the owner's `mcp.json` → `session/new`; finding the `omp` binary | Pure functions over JSON; no process, no network |
 | `backups.rs` | The fallback order, in the form of the harness's settings | The order, not the switching — the harness moves on and re-sends by itself |
 | `attach.rs` | The files that go with the next message, and the list of the Mac's folders they are chosen from | Which files, as paths. Never a file's content: the agent reads it with its own tool |
@@ -516,7 +520,8 @@ beforehand with `{"model":"standin-anthropic/ok"}` in the folder's `null/setting
 `NULL_MINI_PROFILE=null-probe` still works and still reads the owner's MCP definitions.
 `NULL_MINI_SELFTEST` types into the real page a line at a time, each once the page has stopped
 working, then logs what the page shows (the transcript, an open list, the notice line) and quits. So
-a command, a choice from a list (a line narrows the list and takes the first entry left; an empty
+a command, a choice from a list (a line narrows the list and takes the first entry left; a line that
+ends in " &" is entered without that ending and the next does not wait for its reply; an empty
 line only presses Enter) and an answer to a sign-in can follow one another. `Mini/tests/keys.rs`
 uses that to prove a typed key reaches neither Null's log nor its settings. A local model
 server on the Mac is still found on a folder of its own: here, Ollama's `llama3.2`. A new folder has
@@ -597,7 +602,9 @@ this repository does not have. A plain `v` tag would set it off.
   that a typed key reaches neither Null's log nor its settings (`Providers.md`, item 9).
 - Full terminal parity is an objective, not a theorem: the original ACP spike reported a skills
   count difference, and lone harness slash commands are blocked by Null's unknown-command rule.
-- No work in the background (one conversation at a time), folder chosen for a conversation,
+- A conversation goes on working when the box turns away from it (`/new`, `/history`), but
+  nothing yet shows how each one stands, and quitting or a restart of the harness ends them
+  without a word (`BackgroundWork.md`, items 10 and 11). No folder chosen for a conversation,
   continuous voice conversation, automatic speaking of every Null reply or cross-harness handoff
   is built. The pet is built and shows only with the box. Voice requires a profile first;
   today's inventory is empty. Later voice transport/echo cancellation/engine choices remain open.

@@ -12,9 +12,11 @@
 > use found). The owner's Mac runs 0.3.1 from the release. The owner used deleting; the log shows no title given and no search
 > yet. Work in the background itself (items 7 to 14) has begun: the harness check asks what
 > it rests on (item 7, pull request #51), and Null keeps a record for each conversation it
-> holds (item 8, pull request #52). Nothing in the box looks or behaves differently yet.
-> Next: item 9, where a conversation is left working. The owner confirmed the goal and
-> settled all twelve decisions.**
+> holds (item 8, pull request #52). Item 9, where a conversation is left working, is built
+> and waits in pull request #53: it is not on `main` until two scripted runs through the
+> real page have passed, and those stand still while the Mac's screen is locked. Next: those
+> two runs, the merge, then item 10. The owner confirmed the goal and settled all twelve
+> decisions.**
 
 ## Goal
 
@@ -720,7 +722,68 @@ both groups change the same list in the page: built one after the other, they do
      stand-in (a slow job, `/new`, a quick question, back through `/history`, the slow reply
      whole), and memory and processes counted with the owner's own Oh-my-pi.
    - Source: specified from user (the goal) + researched finding + inferred from codebase.
-   - Status: Not started
+   - Status: Built (2026-10-10), in pull request #53, **not on `main` yet**. It waits for
+     the two scripted runs through the real page that are written out below
+   - **Built:** in `Mini/src/harness.rs`, the box turning to another conversation
+     (`turn_to`) no longer drops the one it showed: one that is working is kept and goes
+     on, and one at rest is held no longer and closed in the harness. A reply that ends
+     while the box shows another conversation is marked `unseen`, and its record is kept
+     until that conversation is opened. `/new` and opening from `/history` no longer
+     refuse while a reply runs. Opening a conversation this run holds is not asked of the
+     harness: the box turns to it and the page is given its number
+     (`open_conversation` now gives one, or nothing when the harness loads it). At most
+     four work at once (`MAX_WORKING`, `begin_reply`); a fifth is refused with
+     "four conversations are already working. wait for one to end, or stop one". In the
+     page: `/new` and `/history` while a reply runs; "still working. /history shows it";
+     a held conversation drawn again from what the app kept (`catchUp(true)`), with what it
+     says next following; nothing of the left conversation's reply staying behind
+     (`emptyBox`); a refused fifth put back in the field. `Mini/src/history.rs`: deleting
+     asks whether that conversation is working, not whether any is.
+   - **Decided by the agent:**
+     - **"Unseen" begins here,** since it decides what Null keeps. Item 10 shows it.
+     - **Only the conversation the box turns away from is ever let go,** and only at rest.
+       Nothing is closed at another moment.
+     - **The open conversation chosen again from `/history`:** at rest it is loaded afresh
+       by the harness, as before. Working, the box shows what it has.
+     - **"still working. /history shows it" is said each time** a working conversation is
+       left, not only the first time.
+     - **Deleting one that works but is not open** is refused with "that conversation is
+       still working. open it and stop it first".
+     - **A scripted run leaves a reply under way with " &"** at the end of a line: the
+       next line does not wait for the reply (`SELFTEST_TYPING`).
+   - **Proven without a person:** 105 unit tests, four new: a conversation left working
+     goes on and one left at rest is let go; a reply that ends while the box shows another
+     waits to be seen, and is seen once shown; one that ends in the open conversation has
+     been seen; a fifth is not set to work, and there is room again when one ends. The
+     harness check, 25 questions. Two runs of the app with no window: a message answered;
+     started again, a slow reply stopped. Five states of the page drawn with stand-ins
+     for the app: a working conversation left with `/new` (the box empty, the line said,
+     the arrow at rest); what the left one says afterwards not drawn, and what the new one
+     says drawn; a held conversation opened from `/history` and drawn from what was kept,
+     with its next words following and the arrow and the pet at work; a fifth refused, back
+     in the field; `/history` opened over a reply. Eight other states the same byte for
+     byte as on `main`.
+   - **Not proven, and the reason it is not merged:** the real app from end to end. Both
+     runs need the Mac's screen unlocked, show a second box for a few seconds and may
+     take the keyboard meanwhile. Each is on a folder of its own with
+     `{"model":"standin-anthropic/slow","welcomed":true,"asked_full_disk":true}` in its
+     `null/settings.json`, started as
+     `NULL_MINI_FOLDER=<folder> NULL_MINI_STANDIN=1 NULL_MINI_NO_SHORTCUT=1 NULL_MINI_SELFTEST=<lines> target/debug/null-mini`.
+     - **Left and found again.** The lines: twenty-four words and " &"; `/new`; `/model`;
+       `standin-anthropic/ok`; `quick`; `/history`; the first of the twenty-four words. To
+       see: "the page shows" the twenty-four words twice, the message and the reply said
+       back whole, and in the log a second conversation opened and answered in between.
+     - **A fifth refused.** The lines: four times forty words and " &", then `/new`; then
+       `five`. To see: "the notice says: four conversations are already working. wait for
+       one to end, or stop one", and nothing shown.
+   - **Also not proven:** one conversation stopped while another goes on, in the real app
+     (the harness check asks it of the harness). Memory and processes with the owner's own
+     Oh-my-pi and MCP servers. The owner's hand.
+   - **Open until items 10 and 11, and not to be released before them:** `/quit`, and
+     Ctrl+C at rest, quit at once and end what works in the background without a word. A
+     sign-in, `/harness`, `/update` or `/backup` while another conversation works starts
+     the harness again under it. A conversation that ends or asks while it is not open
+     shows nowhere but as a row in `/history`.
 
 10. **Seeing what is going on**
     - What: Null keeps how each conversation stands (working, asking, done, failed, stopped,
