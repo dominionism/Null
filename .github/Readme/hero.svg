@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="440" viewBox="0 0 960 440" fill="none" role="img" aria-labelledby="title description">
   <title id="title">Null. Your agent, a shortcut away.</title>
-  <desc id="description">A monochrome illustration of Null's floating input, with the prompt “What are we building?” and the Control plus Space shortcut. Decorative motion stops within five seconds and is disabled for reduced motion.</desc>
+  <desc id="description">A monochrome illustration of Null's pet above the floating input, with the prompt “What are we building?” and the Control plus Space shortcut. The pet moves as it does at rest in the app: it bobs, blinks and lifts its antenna, a square at a time. Motion is disabled for reduced motion.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="960" y2="440" gradientUnits="userSpaceOnUse">
       <stop stop-color="#171719"/>
@@ -21,29 +21,54 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; }
     .panel { animation: arrive .8s ease-out both; }
     .cursor { animation: blink 1.2s steps(1, end) 3; }
-    .signal { animation: breathe 1.6s ease-in-out 3; }
+    /* The pet at rest, as Mini/Page/index.html moves it: every movement is one whole square. */
+    .pet { shape-rendering: crispEdges; }
+    .pet .top { animation: pet-bob 2.6s steps(1) infinite; }
+    .pet .eyes { animation: pet-blink 4.4s steps(1) infinite; }
+    .pet .flag { animation: pet-twitch 5.2s steps(1) infinite; }
     @keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes blink { 0%, 49%, 100% { opacity: 1; } 50%, 99% { opacity: 0; } }
-    @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-    @media (prefers-reduced-motion: reduce) { .panel, .cursor, .signal { animation: none; } }
+    @keyframes pet-bob { 60% { transform: translateY(1px); } }
+    @keyframes pet-blink { 93% { opacity: 0; } 97% { opacity: 1; } }
+    @keyframes pet-twitch { 90% { transform: translateY(-1px); } 95% { transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .panel, .cursor, .pet .top, .pet .eyes, .pet .flag { animation: none; } }
   </style>
   <g clip-path="url(#frame)">
     <rect width="960" height="440" fill="url(#background)"/>
     <rect width="960" height="440" fill="url(#glow)"/>
     <g stroke="#ffffff" stroke-opacity=".045">
-      <circle cx="780" cy="144" r="80"/>
-      <circle cx="780" cy="144" r="132"/>
-      <circle cx="780" cy="144" r="184"/>
+      <circle cx="780" cy="170" r="104"/>
+      <circle cx="780" cy="170" r="156"/>
+      <circle cx="780" cy="170" r="208"/>
     </g>
     <path d="M54 45L65 56L54 67" stroke="#fafafa" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
     <text x="82" y="64" class="mono" font-size="24" font-weight="600" letter-spacing="2" fill="#fafafa">Null</text>
     <text x="907" y="61" class="mono" font-size="12" letter-spacing="2" text-anchor="end" fill="#a1a1aa">A SMALL BOX FOR REAL WORK</text>
     <text x="51" y="157" class="sans" font-size="66" font-weight="600" letter-spacing="-2.5" fill="#fafafa">Your agent.</text>
     <text x="51" y="229" class="sans" font-size="66" font-weight="600" letter-spacing="-2.5" fill="#a1a1aa">A shortcut away.</text>
-    <g transform="translate(717 115)">
-      <rect width="126" height="126" rx="34" fill="#19191c" stroke="#4a4a50"/>
-      <rect x="5" y="5" width="116" height="116" rx="30" stroke="#ffffff" stroke-opacity=".07"/>
-      <path class="signal" d="M49 36L77 64L49 92" stroke="#fafafa" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- The pet, drawn as the page draws it: a grid of 16 squares, its parts and their names from
+         Mini/Page/index.html. The light edge is each part again, a third of a square wider, under
+         all of the black, so that it follows whatever moves. -->
+    <g class="pet" transform="translate(676 40) scale(13)">
+      <g fill="#f4f4f7" stroke="#f4f4f7" stroke-width=".667" stroke-linejoin="miter">
+        <g class="top">
+          <path d="M6 5h4v1h-4zM4 6h8v2h-8zM3 8h10v4h-10zM4 12h8v2h-8zM6 14h4v1h-4z"/>
+          <path class="flag" d="M13 4h1v1h-1zM12 5h1v1h-1z"/>
+        </g>
+        <path d="M3 14h1v1h-1zM2 15h1v1h-1z"/>
+        <path d="M5 15h2v1h-2z"/>
+        <path d="M9 15h2v1h-2z"/>
+      </g>
+      <g fill="#0b0b0d">
+        <g class="top">
+          <path d="M6 5h4v1h-4zM4 6h8v2h-8zM3 8h10v4h-10zM4 12h8v2h-8zM6 14h4v1h-4z"/>
+          <path class="flag" d="M13 4h1v1h-1zM12 5h1v1h-1z"/>
+          <path class="eyes" fill="#ffffff" d="M5 9h1v2h-1zM10 9h1v2h-1z"/>
+        </g>
+        <path d="M3 14h1v1h-1zM2 15h1v1h-1z"/>
+        <path d="M5 15h2v1h-2z"/>
+        <path d="M9 15h2v1h-2z"/>
+      </g>
     </g>
     <g class="panel">
       <rect x="100" y="290" width="760" height="70" rx="17" fill="#000000" fill-opacity=".35"/>
