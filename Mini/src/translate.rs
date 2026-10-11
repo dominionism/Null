@@ -26,7 +26,7 @@ pub struct ModelChoice {
 pub fn event_from_update(update: &Value, tools: &mut HashMap<String, Value>) -> Option<Value> {
     match update.get("sessionUpdate")?.as_str()? {
         kind @ ("agent_message_chunk" | "agent_thought_chunk") => {
-            let text = update.pointer("/content/text")?.as_str()?;
+            let text = without_colour(update.pointer("/content/text")?.as_str()?);
             if text.is_empty() {
                 return None;
             }
@@ -62,6 +62,28 @@ pub fn event_from_update(update: &Value, tools: &mut HashMap<String, Value>) -> 
         }
         _ => None,
     }
+}
+
+/// Text without the sequences a program writes to colour a terminal. One of the
+/// harness's own commands answers as it would there, and the box draws words.
+fn without_colour(text: &str) -> String {
+    let mut kept = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\u{1b}' {
+            kept.push(c);
+            continue;
+        }
+        // A control sequence ends at its first letter or symbol from @ to ~.
+        if chars.next() == Some('[') {
+            for c in chars.by_ref() {
+                if ('@'..='~').contains(&c) {
+                    break;
+                }
+            }
+        }
+    }
+    kept
 }
 
 /// What a harness says it can carry out, as the box needs it: the name it
@@ -400,6 +422,15 @@ mod tests {
         );
         // An update that is not a harness saying so is still nobody's.
         assert_eq!(commands_said(&json!({ "sessionUpdate": "usage_update" })), None);
+    }
+
+    #[test]
+    fn the_colours_a_command_writes_for_a_terminal_are_dropped() {
+        let said = json!({ "sessionUpdate": "agent_message_chunk", "content": { "type": "text", "text": "System tools [\u{1b}[1m\u{1b}[38;2;0;180;255m█\u{1b}[22m\u{1b}[39m░] 3%\n" } });
+        assert_eq!(event_from_update(&said, &mut HashMap::new()), Some(json!({ "type": "text_delta", "text": "System tools [█░] 3%\n", "thinking": false })));
+        // Nothing but colour is nothing to show.
+        let empty = json!({ "sessionUpdate": "agent_message_chunk", "content": { "type": "text", "text": "\u{1b}[0m" } });
+        assert_eq!(event_from_update(&empty, &mut HashMap::new()), None);
     }
 
     #[test]
