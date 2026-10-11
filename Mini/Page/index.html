@@ -3014,6 +3014,7 @@
         // Whether a word is the harness's or a slip is not the box's to know
         // until the harness has said what it has, and on the first use of a run
         // it has not: the ask is also what starts it, so it is worth the wait.
+        const typed = text;
         const leading = /^\/([\w:-]*)([\s\S]*)$/.exec(text);
         if (leading && !harnessSaid.length) await harnessSaidBy(3000);
         const offered = leading && harnessSaid.find((one) => one.name === leading[1] || one.name === `skill:${leading[1]}`);
@@ -3029,6 +3030,12 @@
           return;
         }
         if (busy) {
+          // The reply under way has to end first. Nothing was sent, so what was
+          // typed goes back in the field, to be sent then.
+          if (!input.value) {
+            input.value = typed;
+            tint();
+          }
           notice('still working. ctrl+c stops it');
           return;
         }
