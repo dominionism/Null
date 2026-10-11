@@ -1644,6 +1644,13 @@ pub fn smoke(app: &AppHandle, text: String) {
 /// in " &" is entered without that ending, and the next line does not wait
 /// for its reply: that is how a conversation is left working. When the last
 /// line has been dealt with, the page says what it shows.
+///
+/// A line in angle brackets is something a person does besides that, and none
+/// of them waits for a reply: `<key ctrl+c>` presses a key, with `ctrl`, `meta`
+/// or `shift` held when named; `<type /mo>` writes in the field without Enter;
+/// `<click #history>` presses the first thing the selector finds; `<settle>`
+/// waits until the page has stopped working; and `<show name>` logs what the
+/// page has at that moment, under that name, and the run goes on.
 const SELFTEST_TYPING: &str = r#"async (lines) => {
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const settled = async () => {
@@ -1664,6 +1671,54 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
       if (act[1] === 'pet') await invoke('show_box');
       await pause(Number(act[2]) || 700);
       pets.push(`${act[1]}: ${pet.getAttribute('class')}, ${busy ? 'working' : 'at rest'}`);
+      continue;
+    }
+    // What a person does besides typing a line and Enter: a key, writing
+    // without Enter, a press on something, a wait, and a look at the page.
+    const more = /^<(key|type|click|settle|show)(?: (.*))?>$/.exec(line);
+    if (more) {
+      const [, what, rest = ''] = more;
+      if (what === 'key') {
+        const held = rest.split('+');
+        const key = held.pop() || '+';
+        const target = document.activeElement && document.activeElement !== document.body ? document.activeElement : input;
+        target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ctrlKey: held.includes('ctrl'), metaKey: held.includes('meta'), shiftKey: held.includes('shift') }));
+      }
+      if (what === 'type') {
+        input.value = rest;
+        input.dispatchEvent(new Event('input'));
+      }
+      if (what === 'click') {
+        const found = document.querySelector(rest);
+        if (found) found.click();
+        else await invoke('selftest_say', { name: rest, state: 'NOTHING TO CLICK' });
+      }
+      if (what === 'settle') await settled();
+      else await pause(300);
+      if (what === 'show') {
+        const seen = (element) => (element && getComputedStyle(element).display !== 'none' ? element.innerText : '');
+        await invoke('selftest_say', {
+          name: rest,
+          state: JSON.stringify({
+            field: input.value,
+            tinted: input.classList.contains('command'),
+            masked: input.type,
+            arrow: caret.className,
+            pet: pet.getAttribute('class'),
+            busy,
+            height: lastHeight,
+            transcript: out.clientHeight,
+            scrolls: out.scrollHeight > out.clientHeight,
+            focused: document.activeElement === input,
+            notice: seen(noticeLine),
+            chosen: (pick.querySelector('.selected') || { innerText: '' }).innerText,
+            list: seen(pick),
+            shows: out.innerText,
+            lines: [...out.children].map((one) => one.className).join(','),
+            tags: [...out.querySelectorAll('*')].reduce((count, one) => ({ ...count, [one.tagName]: (count[one.tagName] || 0) + 1 }), {}),
+          }),
+        });
+      }
       continue;
     }
     if (leftWorking) await pause(700); // long enough for the reply to have begun
@@ -1730,6 +1785,13 @@ pub fn report(app: AppHandle, shown: String, list: String, notice: String, arrow
     }
     log!("selftest: arrow is \"{arrow}\", window height asked {height}, busy {busy}");
     app.exit(0);
+}
+
+/// What the page has part of the way through a `selftest` (`<show name>`),
+/// logged and nothing more: the run goes on.
+#[tauri::command]
+pub fn selftest_say(name: String, state: String) {
+    log!("selftest: at {name}: {}", state.replace('\n', " | "));
 }
 
 #[cfg(test)]

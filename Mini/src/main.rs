@@ -135,6 +135,7 @@ fn main() {
             harness::events_since,
             harness::work,
             harness::report,
+            harness::selftest_say,
             history::history,
             history::open_conversation,
             history::rename_conversation,
