@@ -80,6 +80,11 @@ enum Command {
     /// Ask the harness which model a conversation is on now. It can move to a
     /// backup by itself in the middle of a reply, and does not always say so.
     CheckModel { which: u64 },
+    /// Have the harness say what it can carry out. It says so when a session
+    /// starts, so this is also what opens one: a box that has asked nothing yet
+    /// has not been told, and the list it offers would be the box's own only.
+    /// The answer arrives as an event like any other.
+    Commands { reply: oneshot::Sender<Result<(), String>> },
     /// List the conversations the harness keeps, for `/history`: each as the
     /// harness gives it. No list when this harness cannot give one.
     Conversations { reply: oneshot::Sender<Result<Option<Vec<Value>>, String>> },
@@ -574,6 +579,9 @@ fn refuse(app: &AppHandle, shared: &Arc<Mutex<Shared>>, command: Command, reason
         Command::Conversations { reply } => {
             let _ = reply.send(Err(reason.to_string()));
         }
+        Command::Commands { reply } => {
+            let _ = reply.send(Err(reason.to_string()));
+        }
         Command::OpenEarlier { reply, .. } => {
             let _ = reply.send(Err(reason.to_string()));
         }
@@ -910,6 +918,13 @@ impl Connection<'_> {
                 let _ = reply.send(result);
             }
             Command::CheckModel { which } => self.check_model(which).await,
+            Command::Commands { reply } => {
+                let which = lock(self.shared).open;
+                // Opening the conversation is the whole of it: the harness says
+                // what it can carry out as soon as the session is there, and that
+                // arrives as an event, not as this answer.
+                let _ = reply.send(self.open(which).await.map(|_| ()));
+            }
             Command::Conversations { reply } => {
                 let _ = reply.send(self.conversations().await);
             }
@@ -1416,6 +1431,17 @@ pub fn respond(app: AppHandle, request_id: String, answer: String) -> Result<(),
 pub async fn models(app: AppHandle) -> Result<ModelList, String> {
     let (reply, answer) = oneshot::channel();
     order(&app.state::<Harness>(), Command::Models { reply })?;
+    answer.await.map_err(|_| "the harness went away".to_string())?
+}
+
+/// Ask the harness to say what it can carry out, for the conversation the box
+/// shows. The box cannot know until it has been told, and the harness says so
+/// when a session starts: this is what starts one for a box that has asked
+/// nothing yet. The list itself arrives as an event.
+#[tauri::command]
+pub async fn harness_commands(app: AppHandle) -> Result<(), String> {
+    let (reply, answer) = oneshot::channel();
+    order(&app.state::<Harness>(), Command::Commands { reply })?;
     answer.await.map_err(|_| "the harness went away".to_string())?
 }
 

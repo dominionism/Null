@@ -124,6 +124,7 @@ fn main() {
             harness::interrupt,
             harness::respond,
             harness::models,
+            harness::harness_commands,
             harness::set_model,
             harness::new_conversation,
             harness::new_conversation_in,
