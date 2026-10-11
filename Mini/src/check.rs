@@ -856,3 +856,28 @@ fn a_closed_conversation_loads_back() {
     let (ended, words) = agent.say(&session, MESSAGE).unwrap_or_else(|error| panic!("the next message was answered with an error: {error}"));
     assert_eq!(words.trim(), "pong", "the next message continues it: {ended}");
 }
+
+/// `/folder` starts a conversation in a folder of the person's choosing, so
+/// that the agent has that project's own instructions and files, as in a
+/// terminal. The harness has to open it there: tell the model that this is
+/// where it works, and list the conversation under that folder, which is all
+/// Null reads to know where a conversation works.
+#[test]
+#[ignore]
+fn a_conversation_started_in_a_folder_works_there() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let project = folder.root.join("a project");
+    std::fs::create_dir_all(&project).unwrap();
+    let mut agent = Agent::start(&engine::under_test(), &folder, None);
+    let (session, _) = agent.open_in(&project);
+    agent.set(&session, "model", json!("standin-anthropic/ok"));
+    agent.say(&session, MESSAGE).expect("the message is answered");
+
+    let heard = standin.heard();
+    let told = heard.first().map(|request| request["messages"].as_array().into_iter().flatten().map(standin::words).collect::<String>()).unwrap_or_default();
+    assert!(told.contains(project.to_str().unwrap()), "the model was not told that it works in the folder: {told}");
+    let listed = agent.conversations();
+    assert_eq!(history::folder_of(&listed, &session), Some(project.clone()), "the harness lists it under that folder: {listed:?}");
+    assert_eq!(history::folders(&listed, &folder.work()), [project], "and that is a folder `/folder` offers");
+}

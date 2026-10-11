@@ -158,6 +158,9 @@ struct Conversation {
     unseen: bool,
     /// How its last reply ended. None until one has.
     ended: Option<Ended>,
+    /// The folder it works in, when that is not the box's own. It is chosen
+    /// when the conversation starts and does not change.
+    folder: Option<PathBuf>,
 }
 
 impl Conversation {
@@ -318,12 +321,17 @@ impl Shared {
         self.held.remove(&was).and_then(|left| left.session.filter(|_| left.loaded))
     }
 
-    /// Start over: the box turns to a new conversation, which the next message
-    /// opens on the model the last one was on. Gives its number, and what
-    /// `turn_to` gives of the one that was left.
+    /// Start over: the box turns to a new conversation in its own folder, which
+    /// the next message opens on the model the last one was on. Gives its
+    /// number, and what `turn_to` gives of the one that was left.
     fn start_over(&mut self) -> (u64, Option<String>) {
+        self.start_in(None)
+    }
+
+    /// The same, in a folder of the person's choosing when one is given.
+    fn start_in(&mut self, folder: Option<PathBuf>) -> (u64, Option<String>) {
         let model = self.open_one().model.clone();
-        let which = self.hold(Conversation { model, ..Default::default() });
+        let which = self.hold(Conversation { model, folder, ..Default::default() });
         (which, self.turn_to(which))
     }
 
@@ -385,7 +393,7 @@ impl Shared {
         let (conversation, last_seq) = (self.open, self.seq);
         let open = self.open_one();
         let events = open.events.iter().filter(|(seq, _)| *seq > after).map(|(seq, event)| json!({ "seq": seq, "conversation": conversation, "event": event })).collect();
-        Snapshot { conversation, busy: open.busy, model: open.model.clone(), last_seq, events }
+        Snapshot { conversation, busy: open.busy, model: open.model.clone(), folder: open.folder.as_deref().map(attach::said_path), last_seq, events }
     }
 }
 
@@ -1003,6 +1011,8 @@ impl Connection<'_> {
             return Err("this harness does not load a conversation back".into());
         }
         let folder = self.folder_of(id).await.ok_or("the harness no longer lists it")?;
+        // Said when it comes to the front, unless it is the box's own folder.
+        let elsewhere = workspace(self.app).ok().filter(|own| *own != folder).map(|_| folder.clone());
         let servers = mcp_servers(&self.mcp_capabilities);
         let request: LoadSessionRequest = typed(json!({ "sessionId": id, "cwd": folder, "mcpServers": servers }))?;
         lock(self.shared).opening = Some((id.to_string(), Vec::new()));
@@ -1025,7 +1035,7 @@ impl Connection<'_> {
             if let Some(recalled) = shared.named(id).filter(|which| *which != shared.open) {
                 shared.held.remove(&recalled);
             }
-            let which = shared.hold(Conversation { session: Some(id.to_string()), loaded: true, model: before.clone(), ..Default::default() });
+            let which = shared.hold(Conversation { session: Some(id.to_string()), loaded: true, model: before.clone(), folder: elsewhere.clone(), ..Default::default() });
             (which, before, shared.turn_to(which))
         };
         settings::update(self.app, |settings| settings.session = Some(id.to_string()));
@@ -1036,7 +1046,7 @@ impl Connection<'_> {
         history::opened(self.app, id, &events);
         // An earlier conversation is on the model it was left on, which may be another.
         let model = with(self.shared, which, |held| held.model.clone()).flatten().filter(|model| before.as_ref() != Some(model));
-        publish(self.app, self.shared, which, json!({ "type": "conversation_opened", "events": events, "model": model }));
+        publish(self.app, self.shared, which, json!({ "type": "conversation_opened", "events": events, "model": model, "folder": elsewhere.as_deref().map(attach::said_path) }));
         tell_work(self.app, self.shared);
         // The one that was left at rest, unless it is this same one, opened again.
         if let Some(left) = left.filter(|left| left != id) {
@@ -1072,12 +1082,15 @@ impl Connection<'_> {
         if let (Some(session), true) = (&saved, loaded) {
             return Ok(session.clone());
         }
-        let cwd = workspace(self.app)?;
+        // It works in the folder chosen for it when it was started, or else in the box's own.
+        let own = workspace(self.app)?;
+        let cwd = with(self.shared, which, |held| held.folder.clone()).flatten().unwrap_or_else(|| own.clone());
         let servers = mcp_servers(&self.mcp_capabilities);
 
         if let (Some(session), true) = (saved, self.can_load) {
             // One opened from `/history` may have been made in a terminal, in a folder of its own.
             let folder = self.folder_of(&session).await.unwrap_or_else(|| cwd.clone());
+            with(self.shared, which, |held| held.folder = (folder != own).then(|| folder.clone()));
             with(self.shared, which, |held| held.replay = if held.events.is_empty() { Replay::Show } else { Replay::Drop });
             let request: LoadSessionRequest = typed(json!({ "sessionId": session, "cwd": folder, "mcpServers": servers }))?;
             let loaded = self.cx.send_request(request).block_task().await;
@@ -1423,6 +1436,32 @@ pub fn new_conversation(app: AppHandle) -> Result<u64, String> {
     Ok(which)
 }
 
+/// The folders the harness's conversations work in, the most recently used
+/// first, without the box's own: what `/folder` offers. Each as it is, and as
+/// the box says it.
+#[tauri::command]
+pub async fn folders(app: AppHandle) -> Result<Vec<Value>, String> {
+    let (listed, _) = conversations(&app).await?;
+    let own = workspace(&app)?;
+    Ok(history::folders(&listed.unwrap_or_default(), &own).iter().map(|folder| json!({ "path": folder, "shown": attach::said_path(folder) })).collect())
+}
+
+/// Start a conversation in a folder: the box turns to a new one, which the
+/// next message opens there, and the one it showed goes on if it is working.
+/// In that folder the agent has the project's own instructions and files, as
+/// in a terminal. Gives the new one's number and the folder as the box says it.
+#[tauri::command]
+pub fn new_conversation_in(app: AppHandle, folder: String) -> Result<Value, String> {
+    let folder = attach::folder_typed(&folder)?;
+    let own = workspace(&app)?;
+    let harness = app.state::<Harness>();
+    let (which, left) = lock(&harness.shared).start_in((folder != own).then(|| folder.clone()));
+    settings::update(&app, |settings| settings.session = None);
+    let_go_of(&harness, left);
+    tell_work(&app, &harness.shared);
+    Ok(json!({ "conversation": which, "shown": attach::said_path(&folder) }))
+}
+
 /// How the conversations stand, for a page that has just loaded: the same as
 /// `mini:work` tells it at every change.
 #[tauri::command]
@@ -1473,6 +1512,8 @@ pub struct Snapshot {
     conversation: u64,
     busy: bool,
     model: Option<String>,
+    /// The folder it works in, as the box says it, when that is not the box's own.
+    folder: Option<String>,
     last_seq: u64,
     events: Vec<Value>,
 }
@@ -1844,6 +1885,20 @@ mod tests {
         finish(&shared, working, Ended::Done);
         assert!(lock(&shared).restart_at_last(), "until the reply has ended");
         assert!(!lock(&shared).restart_at_last(), "once");
+    }
+
+    #[test]
+    fn a_conversation_started_in_a_folder_is_new_and_keeps_that_folder() {
+        let mut shared = Shared::new(Some("one".into()), Some("a/model".into()));
+        let (which, _) = shared.start_in(Some(PathBuf::from("/Users/someone/site")));
+        let open = shared.open_one();
+        assert_eq!((open.session.as_deref(), open.model.as_deref(), open.folder.as_deref()), (None, Some("a/model"), Some(Path::new("/Users/someone/site"))));
+        assert_eq!(shared.since(0).conversation, which);
+        assert!(shared.since(0).folder.is_some_and(|said| said.ends_with("site")), "a page is told where the open one works");
+
+        // Starting over is in the box's own folder again, of which nothing is said.
+        shared.start_over();
+        assert_eq!((shared.open_one().folder.clone(), shared.since(0).folder), (None, None));
     }
 
     #[test]
