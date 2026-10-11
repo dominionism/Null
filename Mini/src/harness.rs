@@ -71,7 +71,9 @@ pub struct ModelList {
 }
 
 enum Command {
-    Send { which: u64, text: String, files: Vec<PathBuf> },
+    /// `after` is what the box is told once the conversation is open, when that
+    /// had to wait for what was said in it before (see `send_text`).
+    Send { which: u64, text: String, files: Vec<PathBuf>, after: Vec<Value> },
     Interrupt { which: u64 },
     /// Let the harness process go, so that the next order starts a fresh one.
     Restart,
@@ -182,6 +184,13 @@ impl Conversation {
             Ended::Stopped => "stopped",
             Ended::CutOff => "cut off",
         })
+    }
+
+    /// Whether what was said in it before this run is still to be shown. The
+    /// harness keeps it and has not loaded it back yet, and the box holds
+    /// nothing of it: loading it is what shows it (`open_quietly`).
+    fn comes_back(&self) -> bool {
+        self.session.is_some() && !self.loaded && self.events.is_empty()
     }
 }
 
@@ -424,6 +433,13 @@ fn publish(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, event: Valu
     let _ = app.emit_to(panel::LABEL, "mini:event", json!({ "seq": seq, "conversation": which, "event": event }));
 }
 
+/// Several events of one conversation, in their order.
+fn tell(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, events: Vec<Value>) {
+    for event in events {
+        publish(app, shared, which, event);
+    }
+}
+
 fn typed<T: DeserializeOwned>(value: Value) -> Result<T, String> {
     serde_json::from_value(value).map_err(|e| format!("could not build a request: {e}"))
 }
@@ -585,7 +601,8 @@ async fn run(app: AppHandle, shared: Arc<Mutex<Shared>>, mut orders: mpsc::Unbou
 /// Answer an order that cannot be carried out because there is no harness to give it to.
 fn refuse(app: &AppHandle, shared: &Arc<Mutex<Shared>>, command: Command, reason: &str) {
     match command {
-        Command::Send { which, .. } => {
+        Command::Send { which, after, .. } => {
+            tell(app, shared, which, after);
             fail_reply(app, shared, which, json!({ "type": "error", "message": reason, "code": null, "details": null }));
         }
         Command::Models { reply } => {
@@ -849,8 +866,11 @@ impl Connection<'_> {
     /// Carry out one order. An error here means the connection itself is no good.
     async fn handle(&mut self, command: Command) -> Result<(), String> {
         match command {
-            Command::Send { which, text, files } => {
-                let session = match self.open(which).await {
+            Command::Send { which, text, files, after } => {
+                let opened = self.open(which).await;
+                // What was said before has been shown by now: the message goes under it.
+                tell(self.app, self.shared, which, after);
+                let session = match opened {
                     Ok(session) => session,
                     Err(reason) => {
                         fail_reply(self.app, self.shared, which, json!({ "type": "error", "message": reason, "code": null, "details": null }));
@@ -1407,9 +1427,18 @@ pub fn send_text(app: &AppHandle, text: String) -> Result<u64, String> {
         with(&harness.shared, which, |held| held.busy = false);
     })?;
     tell_work(app, &harness.shared);
-    publish(app, &harness.shared, which, attach::said(&text, &files));
-    publish(app, &harness.shared, which, json!({ "type": "status_change", "status": "running", "reason": null }));
-    if let Err(reason) = order(&harness, Command::Send { which, text, files }) {
+    let saying = vec![attach::said(&text, &files), json!({ "type": "status_change", "status": "running", "reason": null })];
+    // A conversation kept from before this run is shown as the harness loads it
+    // back, and only while the box holds nothing of it. So the first message to
+    // one waits to be shown until that is done, and then stands under it.
+    let after = if with(&harness.shared, which, |held| held.comes_back()).unwrap_or(false) {
+        saying
+    } else {
+        tell(app, &harness.shared, which, saying);
+        Vec::new()
+    };
+    if let Err(reason) = order(&harness, Command::Send { which, text, files, after: after.clone() }) {
+        tell(app, &harness.shared, which, after);
         fail_reply(app, &harness.shared, which, json!({ "type": "error", "message": reason, "code": null, "details": null }));
     }
     Ok(cursor)
@@ -1970,5 +1999,22 @@ mod tests {
         shared.let_go();
         let held = shared.of(which).unwrap();
         assert!(!held.loaded && held.tools.is_empty() && held.session.as_deref() == Some("one"), "it is still known, and loads back with the next message");
+    }
+
+    #[test]
+    fn a_conversation_kept_from_before_is_shown_before_the_first_message_to_it() {
+        // Null starts again on the conversation it was left on. The harness keeps
+        // it, and the box holds nothing of it until the harness has loaded it back.
+        let mut shared = Shared::new(Some("kept".into()), None);
+        assert!(shared.open_one().comes_back());
+        // Once it is loaded, or the box holds something of it, a message is shown at once.
+        shared.open_one().loaded = true;
+        assert!(!shared.open_one().comes_back());
+        shared.open_one().loaded = false;
+        let open = shared.open;
+        shared.record(open, json!("said"));
+        assert!(!shared.open_one().comes_back());
+        // A new conversation has nothing that could come back.
+        assert!(!Shared::new(None, None).open_one().comes_back());
     }
 }
