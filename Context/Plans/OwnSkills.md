@@ -123,7 +123,8 @@ when it is taken up; do not build the folder before there is a first skill to pu
      already fill 78, and the harness's list is another ~65 rows.
    - Source: measured on this Mac (probe above) + researched finding
      (`omp://slash-command-internals.md` §5, §7; `omp://rpc.md`) + inferred from codebase.
-   - Status: Complete (2026-10-11), on the branch `harness-commands`. Nothing is installed or released.
+   - Status: Complete (2026-10-11). Installed for the owner's trial as 0.5.0, mended as 0.5.1; not
+     released, and no tag exists.
    - **Built:** `Mini/src/translate.rs` (`commands_said`, `command_from`, the match arm, one unit
      test); `Mini/src/harness.rs` (`open_earlier` keeps the frame a conversation's load brings);
      `Mini/src/history.rs` (`replayed` leaves a command frame out of a conversation's replay: it is
@@ -139,6 +140,20 @@ when it is taken up; do not build the folder before there is a first skill to pu
      a lone `/zzz` opens the list under `NO COMMAND LIKE /ZZZ` with `THE BOX` and `THE HARNESS`
      sections, so decision 7 stands; the harness's rows carry its own words, cut where the box has no
      room. Not yet seen by the owner's hand, and not run against a conversation in a project folder.
+   - **Mended, 0.5.1 (2026-10-11), after the owner's first look:** "I don't see my commands". The box
+     cannot know what the harness can carry out until a session has started, and a session starts
+     with the first thing asked of it. A box the person had asked nothing of yet therefore offered
+     its own commands only, and a bare `/word` typed as the very first thing was taken for a slip.
+     `harness.rs` gains the order `Commands` and the command `harness_commands`, which opens the
+     conversation and so starts the harness when nothing has been asked of it, letting the frame
+     arrive; `Page/index.html` asks when the list is opened and before deciding that a lone `/word`
+     is a slip, waits a moment for the answer, says `asking what it can carry out` in the harness's
+     place meanwhile, and never waits on the app forever (the ask is raced with a timeout, and the
+     wait ends as soon as the frame arrives). Proved: a run whose only action is opening the list
+     starts the harness where it previously started nothing; a bare `/blueprint` typed as the very
+     first thing is drawn as `/skill:blueprint` and carried out; the list that follows holds
+     `THE BOX` and then `THE HARNESS`. `cargo test` 112 pass, no test re-pinned. The first `/` of a
+     run now takes about a second while the harness starts, which is the cost of asking it.
 
 2. **The box's own words to the agent** (small, and only what the owner wants said)
    - What: when there is something the agent should know and the harness cannot tell it — starting
