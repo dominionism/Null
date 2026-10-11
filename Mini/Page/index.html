@@ -1851,7 +1851,7 @@
             'tools',
             rowTool('rename', PENCIL, () => {
               picker.index = index;
-              drawHistory();
+              drawWhereItStands();
               startRename(entry);
             }),
           );
@@ -1869,6 +1869,15 @@
         // The one key here that nothing else says.
         if (picker.folders > 1) notice(byFolder ? 'tab sorts by when' : 'tab sorts by folder', true);
         fit();
+      };
+
+      // The list drawn again without moving: after a row was taken out or given
+      // another title, the owner is still looking at the same place in it.
+      // Drawing it afresh starts it from its top, so it is put back where it was.
+      const drawWhereItStands = () => {
+        const scrolled = pick.scrollTop;
+        drawHistory();
+        pick.scrollTop = scrolled;
       };
 
       // Looking inside. A quarter of a second after the last key, the app is
@@ -1948,7 +1957,7 @@
         picker.renaming = null;
         tint();
         unnotice();
-        drawHistory();
+        drawWhereItStands();
       };
 
       const keepRename = async () => {
@@ -1988,9 +1997,13 @@
         list.deleting = false;
         if (wasOpen) emptyBox(); // the box is on a new conversation now
         if (picker !== list) return;
+        // The row that takes its place is the chosen one now, so that the list
+        // stays where the owner was looking and the next one can be dealt with.
+        const at = list.shown.indexOf(entry);
+        if (at >= 0) list.index = at;
         list.conversations = list.conversations.filter((kept) => kept.id !== entry.id);
         list.folders = new Set(list.conversations.map((kept) => (kept.own ? '' : kept.folder))).size;
-        if (list.conversations.length) drawHistory();
+        if (list.conversations.length) drawWhereItStands();
         else closeHistory();
         notice(`moved to the Trash: ${entry.title || 'untitled'}`);
       };
