@@ -117,8 +117,9 @@ tasks".
   (Nil), attached files, history, and the cursor level with the arrow.
 - `BackgroundWork.md` is step 3, the active plan: first the tools for history (the list of commands,
   renaming, deleting to the Trash, searching inside; built, for Null 0.3.0), then several
-  conversations working at once, seen at a glance, each in a folder of the owner's choosing (not
-  built, for Null 0.4.0).
+  conversations working at once, seen at a glance, each in a folder of the owner's choosing
+  (built, and released as Null 0.4.0 on 2026-10-11, before the owner had tried it by hand). Its
+  item 15, the pet staying on screen, is a prototype still to be made.
 - `NullMini.md` remains the umbrella for later background tasks, workspaces, voice and pet behavior.
   Its old Voice-server/React implementation sketches must be re-planned against the standalone app
   when those phases begin, not implemented literally.
@@ -568,7 +569,7 @@ issue naming the questions that failed. A push that changes the workflow only sa
 **Releases.** `.github/workflows/null-release.yml` builds `Null.app` on a Mac runner with the carried
 Oh-my-pi inside, seals it with no certificate and packs it with a checksum. A push that changes
 that file, or a run started by hand, keeps the app with the run; a tag `null-v<version>` publishes
-it. The releases so far are Null 0.1.0 (`null-v0.1.0`, 2026-10-09), and 0.1.1, 0.2.0, 0.3.0 and 0.3.1 (all four on 2026-10-10). **`release.yml` is not Null's:** it came with the Voice app,
+it. The releases so far are Null 0.1.0 (`null-v0.1.0`, 2026-10-09), and 0.1.1, 0.2.0, 0.3.0 and 0.3.1 (all four on 2026-10-10), and 0.4.0 (2026-10-11), which adds work in the background and `/folder`. **`release.yml` is not Null's:** it came with the Voice app,
 answers to any tag that starts with `v`, and builds that app for three systems with certificates
 this repository does not have. A plain `v` tag would set it off.
 
