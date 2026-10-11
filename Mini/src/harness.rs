@@ -1698,8 +1698,11 @@ pub fn smoke(app: &AppHandle, text: String) {
 /// of them waits for a reply: `<key ctrl+c>` presses a key, with `ctrl`, `meta`
 /// or `shift` held when named; `<type /mo>` writes in the field without Enter;
 /// `<click #history>` presses the first thing the selector finds; `<settle>`
-/// waits until the page has stopped working; and `<show name>` logs what the
-/// page has at that moment, under that name, and the run goes on.
+/// waits until the page has stopped working; `<until list words>` waits for
+/// words to stand in the list, and likewise in `shows` (the transcript), the
+/// `notice` or the `field`, or with `no` before it for that to be empty, which
+/// is what keeps a run from resting on how fast the Mac is; and `<show name>`
+/// logs what the page has at that moment, under that name, and the run goes on.
 const SELFTEST_TYPING: &str = r#"async (lines) => {
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const settled = async () => {
@@ -1709,6 +1712,8 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
       quiet = busy || caret.classList.contains('working') ? 0 : quiet + 50;
     }
   };
+  // What stands in a part of the page, as a person sees it: nothing when it is put away.
+  const seen = (element) => (element && getComputedStyle(element).display !== 'none' ? element.innerText : '');
   let leftWorking = false;
   const pets = []; // PROTOTYPE (item 15): what the pet said at each of the lines below
   for (const line of lines) {
@@ -1720,6 +1725,20 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
       if (act[1] === 'pet') await invoke('show_box');
       await pause(Number(act[2]) || 700);
       pets.push(`${act[1]}: ${pet.getAttribute('class')}, ${busy ? 'working' : 'at rest'}`);
+      continue;
+    }
+    // Waiting as a person does, with their eyes: for words in a part of the
+    // page, or for that part to be empty. Half a minute, and then it is said.
+    const until = /^<until (no )?(list|shows|notice|field)(?: (.*))?>$/.exec(line);
+    if (until) {
+      const [, none, where, words = ''] = until;
+      const there = () => {
+        const text = where === 'list' ? seen(pick) : where === 'shows' ? out.innerText : where === 'notice' ? seen(noticeLine) : input.value;
+        if (none) return !text.trim();
+        return words ? text.toLowerCase().includes(words.toLowerCase()) : !!text.trim();
+      };
+      for (let waited = 0; waited < 30000 && !there(); waited += 50) await pause(50);
+      if (!there()) await invoke('selftest_say', { name: line, state: 'NEVER SEEN' });
       continue;
     }
     // What a person does besides typing a line and Enter: a key, writing
@@ -1745,7 +1764,6 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
       if (what === 'settle') await settled();
       else await pause(300);
       if (what === 'show') {
-        const seen = (element) => (element && getComputedStyle(element).display !== 'none' ? element.innerText : '');
         await invoke('selftest_say', {
           name: rest,
           state: JSON.stringify({
@@ -1754,6 +1772,7 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
             masked: input.type,
             arrow: caret.className,
             pet: pet.getAttribute('class'),
+            petShown: document.body.classList.contains('with-pet'),
             busy,
             height: lastHeight,
             transcript: out.clientHeight,
