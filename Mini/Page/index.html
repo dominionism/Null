@@ -1377,11 +1377,14 @@
       // A command takes the command's colour as it is typed, so it is plain that it
       // will be carried out rather than sent as a message: the box's own and the
       // harness's alike, since both are commands. A word neither of them knows
-      // stays plain, which is what a slip looks like.
+      // stays plain, which is what a slip looks like. Under any other list, what
+      // is typed narrows that list and is no command; under the list of commands
+      // it is the command being written.
       const tint = () => {
         const text = input.value;
         const known = allAbout().some((one) => [one.name, one.sends].some((form) => form.startsWith(text) || text.startsWith(`${form} `)));
-        input.classList.toggle('command', !picker && !signin && text.startsWith('/') && known);
+        const narrowing = picker && !picker.commands;
+        input.classList.toggle('command', !narrowing && !signin && text.startsWith('/') && known);
       };
 
       // Words appear only for something the user has to know, and then go away.
@@ -1489,6 +1492,7 @@
             // whole: a skill's bare name is offered in the list and sent as the
             // harness spells it.
             harnessSaid = event.commands || [];
+            tint(); // a word only the harness knows is a command from now on
             if (picker && picker.commands) drawCommands();
             break;
           case 'model_changed':
