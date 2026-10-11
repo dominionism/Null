@@ -330,7 +330,7 @@ def use_null(c):
         ("Esc", "Close a picker, cancel sign-in, or hide the box"),
         ("Ctrl+C", "Stop the reply; when idle, quit and close the conversation, after one warning if others are still working"),
         ("↑", "Recall the last prompt in an empty field"),
-        ("/ then Enter", "List the box's commands, each with a few words"),
+        ("/ then Enter", "List the box's commands and the harness's, each with a few words"),
         ("Drag", "Move the box; click away hides it"),
     ]:
         c.row(key, value)
@@ -356,12 +356,15 @@ def commands(c):
         ("/folder [path]", "Start a new conversation in a folder of your choosing, where the agent has that project's files and instructions: pick one that conversations already work in, walk to another, or give its path. The box says where each time such a conversation comes to the front"),
         ("/new", "Start a fresh conversation on the last selected model, in the box's own folder. A conversation that is working goes on; at most four work at once"),
         ("/quit", "Quit and clear the saved conversation pointer. With conversations still working it says how many first, and quits when asked again"),
+        ("/<name>", "OMP's own commands and the skills it finds, your Playbook among them, are listed under the box's own, and one is carried out there when you type it by the name the list shows, arguments and all"),
     ]:
         c.row(key, value)
-    c.note("A lone unknown /word is not passed to the agent: it opens the list of the box's "
-           "commands, narrowed to the ones it could mean. Other messages go "
-           "through normally. A listed model is not a guarantee that your account can use it: "
-           "providers with reported limits exhausted are dimmed but stay selectable, and a model "
+    c.note("A lone /word is not sent to the agent as a message: it opens the list, which holds both "
+           "the box's own commands and the ones the harness says it can carry out, each with a few "
+           "words. A name only the harness knows is sent as the harness spells it, so a skill of "
+           "yours is typed by the name you know it by. A name neither has is not sent at all. Other "
+           "messages go through normally. A listed model is not a guarantee that your account can use "
+           "it: providers with reported limits exhausted are dimmed but stay selectable, and a model "
            "change waits until the current reply is stopped or finished.")
 
 
@@ -441,8 +444,10 @@ def under_the_hood(c):
         "own copy instead.",
         "Null carries OMP's approval mode and supported MCP definitions into the session: your "
         "terminal agent in a smaller surface, not a separate set of permissions.",
-        "Terminal parity has edges. The box does not pass through OMP's lone slash commands or show "
-        "its thinking and full tool output.",
+        "A command the harness itself offers, its skills among them, is carried out there when you "
+        "type it: the list shows both the box's commands and the harness's, and a name only the "
+        "harness knows is passed through as the harness spells it. Its thinking and full tool "
+        "output are still not shown.",
         "Replies are parsed into a Markdown tree in Rust and rendered with DOM elements and "
         "textContent, so model-authored HTML is never executed. **A Content Security Policy is not "
         "configured yet**, and careful rendering is not a substitute for one.",

@@ -74,12 +74,12 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="use-null"></a>
 <p align="center">
-  <img src=".github/Readme/use-null.svg" width="100%" alt="Use Null: Control+Space shows or hides the box, Enter sends or chooses, Esc closes or hides, Ctrl+C stops the reply or quits when idle, after one warning if other conversations are still working, the up arrow recalls the last prompt, a lone slash and Enter lists the commands, dragging moves the box, and the pet beside the box shows what the agent is doing; a conversation goes on working when you start or open another." />
+  <img src=".github/Readme/use-null.svg" width="100%" alt="Use Null: Control+Space shows or hides the box, Enter sends or chooses, Esc closes or hides, Ctrl+C stops the reply or quits when idle, after one warning if other conversations are still working, the up arrow recalls the last prompt, a lone slash and Enter lists the box's commands and the harness's, dragging moves the box, and the pet beside the box shows what the agent is doing; a conversation goes on working when you start or open another." />
 </p>
 
 <a id="commands"></a>
 <p align="center">
-  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /attach, /history, /rename, /pet, /folder, /new and /quit, with what each does; /history also finds a conversation by something said in it, renames one, moves one to the Trash, and lists first the ones that are working, asking or not yet looked at; /folder starts a conversation in a folder you choose; /quit warns once while conversations are working; an unknown command opens the list of commands." />
+  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /attach, /history, /rename, /pet, /folder, /new and /quit, with what each does; /history also finds a conversation by something said in it, renames one, moves one to the Trash, and lists first the ones that are working, asking or not yet looked at; /folder starts a conversation in a folder you choose; /quit warns once while conversations are working; the list also holds the commands the harness itself offers, the skills it finds among them, and typing one of those by the name the list shows has the harness carry it out, arguments and all; a name neither the box nor the harness knows opens that list." />
 </p>
 
 <a id="when-a-provider-stops-answering"></a>
@@ -104,7 +104,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="under-the-hood"></a>
 <p align="center">
-  <img src=".github/Readme/under-the-hood.svg" width="100%" alt="Under the hood: Control+Space reaches Null's page, Tauri commands reach OMP over ACP, and text, tools and approvals come back; one native Tauri app that carries and launches OMP, with a static page and no web server." />
+  <img src=".github/Readme/under-the-hood.svg" width="100%" alt="Under the hood: Control+Space reaches Null's page, Tauri commands reach OMP over ACP, and text, tools and approvals come back; one native Tauri app that carries and launches OMP, with a static page and no web server; a command the harness itself offers, its skills among them, is carried out there, while its thinking and full tool output are not shown." />
 </p>
 
 <a id="source-map"></a>
