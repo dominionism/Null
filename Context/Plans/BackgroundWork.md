@@ -10,9 +10,11 @@
 > 1 to 6, 2026-10-10): the list of commands, renaming, deleting to the Trash and searching
 > inside, each by its own pull request (#42 to #45, and #47 and #49 for two faults the owner's
 > use found). The owner's Mac runs 0.3.1 from the release. The owner used deleting; the log shows no title given and no search
-> yet. Work in the background itself (items 7 to 14) has begun: the harness check now asks
-> what it rests on (item 7, pull request #51), and nothing in the box has changed yet. Next:
-> item 8. The owner confirmed the goal and settled all twelve decisions.**
+> yet. Work in the background itself (items 7 to 14) has begun: the harness check asks what
+> it rests on (item 7, pull request #51), and Null keeps a record for each conversation it
+> holds (item 8, pull request #52). Nothing in the box looks or behaves differently yet.
+> Next: item 9, where a conversation is left working. The owner confirmed the goal and
+> settled all twelve decisions.**
 
 ## Goal
 
@@ -636,7 +638,70 @@ both groups change the same list in the page: built one after the other, they do
      scripted run of the real app that `PetAndBox.md` used (attach, `/new`, `/history`, a
      restart), and the same pictures as before.
    - Source: inferred from codebase.
-   - Status: Not started
+   - Status: Complete (2026-10-10). On `main` with pull request #52. Nothing in the box
+     looks or behaves differently
+   - **Built:** in `Mini/src/harness.rs`, what belonged to "the" conversation is a record
+     now (`Conversation`): the harness's id for it, whether the running harness holds it,
+     its events, whether it is working, its model, its tools and its waiting approvals.
+     `Shared` keeps one record for each conversation this run knows, and beside them what
+     belongs to the whole connection: which one is open, the models offered, `noted` and
+     `counts_tokens`. Every order to the harness thread (`Send`, `Interrupt`, `SetModel`,
+     `CheckModel`) and every event names its conversation. What the harness says
+     (`on_update`, `on_permission`) goes to the conversation it names, and is dropped only
+     when this run does not hold that one. The struct that was called `Conversation` is the
+     connection and is called `Connection`. `events_since` gives the open conversation's
+     events and says which conversation that is. In the page, an event that names another
+     conversation than the open one is not drawn.
+   - **Deviations, and the reasons:**
+     - **A conversation is known by a number Null gives it, not by the harness's id.** The
+       id comes only when the first message opens the conversation in the harness, and
+       events are kept before that: the message itself, and "working". With work in the
+       background a second new conversation can begin while the first is still being
+       opened, and the two have to be told apart. The id is kept in the record, and what
+       the harness says is matched by it.
+     - **Events keep one count between them, not one for each conversation.** They are kept
+       by conversation; only the numbering is shared. So the page asks for what it missed
+       with one number, whichever conversation it shows.
+     - **`opening` stayed with the connection.** A conversation being opened from the list
+       is not held until it has loaded, and the harness thread opens one at a time. While
+       one is being opened, what the harness says of the others is no longer dropped, since
+       from item 9 another may be working.
+     - **`/new` no longer waits its turn on the harness thread.** There is nothing to ask
+       the harness: the box turns to a new record at once, and the page is given its
+       number.
+   - **Decided by the agent:**
+     - **Still one conversation at a time.** Starting over, or opening an earlier one, lets
+       the last one go, as before, and each still refuses while a reply is under way. Item 9
+       changes that.
+     - **`busy`,** which `/update`, `/harness`, `/backup` and deleting ask, is true while
+       any conversation works. Today that is the same thing.
+     - **Two of the page's commands give something else:** `new_conversation` the number of
+       the new conversation, and `delete_conversation` that number when the open one was
+       deleted and nothing otherwise, where it gave yes or no.
+   - **Proven without a person:** 101 unit tests, five new: what a conversation says is kept
+     with it, under one count; a page is given only what the open one said; a conversation
+     is found by the harness's id; starting over leaves one new conversation on the same
+     model; nothing is loaded once the harness has gone. The harness check, 25 questions.
+     Scripted runs of the real app on folders of their own with the stand-in. With no
+     window: a message answered; the app started again and the conversation loaded back; a
+     slow reply stopped after a second, which ended as stopped with three of its eight
+     words; a slow reply left to its end; a used-up limit with a backup, and the box told
+     of the move; a file read by the harness's tool. Through the real page: a message,
+     `/new`, a message, `/history`, the first conversation opened again and continued
+     ("one | pong | three | pong"); then the app started again on that folder, the
+     conversation loaded back and answered, and the other was opened from history and
+     continued. Eight states of the page drawn with the page as it was and as it is: seven
+     the same byte for byte, the eighth a minute apart on the clock it shows.
+   - **Not proven:** an approval asked and answered. On this Mac the agent acts without
+     asking, and the stand-in asks for nothing that needs a yes even with the harness set
+     to ask. Attaching a file through the real page, and `/model` typed in it: the Mac's
+     screen had locked by then. The harness started again in the middle of a run (after a
+     sign-in, `/harness`, `/update` or `/backup`). Deleting the open conversation in the
+     real app: drawn with stand-ins only. The owner's own Oh-my-pi, "yours", and the
+     owner's hand.
+   - **Found on the way:** a scripted run through the page stands still for as long as the
+     Mac's screen is locked, and goes on when it is unlocked. The first one took five
+     minutes for that reason. Look at the log's "frontmost app" line before waiting on one.
 
 9. **Leaving a conversation working**
    - What: `/new` and choosing from `/history` no longer refuse while the open conversation is
