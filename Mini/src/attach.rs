@@ -59,6 +59,22 @@ fn home() -> PathBuf {
 
 // ── Paths ─────────────────────────────────────────────────────────────────
 
+/// A path as the box says it, with `~` for the home folder.
+pub fn said_path(path: &Path) -> String {
+    shown(path, &home())
+}
+
+/// A folder as typed after `/folder`: `~` is the home folder, and a path that
+/// does not start at the top is taken from there. It has to be a folder.
+pub fn folder_typed(typed: &str) -> Result<PathBuf, String> {
+    let home = home();
+    let folder = resolve(typed, &home, &home);
+    if !folder.is_dir() {
+        return Err(format!("{} is not a folder", shown(&folder, &home)));
+    }
+    Ok(folder)
+}
+
 /// A path as the box shows it: the home folder is `~`.
 fn shown(path: &Path, home: &Path) -> String {
     match path.strip_prefix(home) {
@@ -293,19 +309,24 @@ fn entries(folder: &Path, home: &Path) -> Result<Vec<Entry>, String> {
     Ok(entries)
 }
 
-/// A folder for the box's list: the one asked for, or the one the list last
-/// showed, or the home folder. A folder that has gone since is not an error.
+/// A folder for the box's list: the one asked for (`~` is the home folder),
+/// or the one the list last showed, or the home folder. A folder that has gone
+/// since is not an error. `/folder` walks the same folders `passing`: where it
+/// goes is not where `/attach` opens next.
 #[tauri::command(async)]
-pub fn attach_list(folder: Option<String>) -> Result<Listing, String> {
+pub fn attach_list(folder: Option<String>, passing: Option<bool>) -> Result<Listing, String> {
     let home = home();
     let folder = match folder {
+        Some(folder) if folder == "~" => home.clone(),
         Some(folder) => PathBuf::from(folder),
         None => held().folder.clone().filter(|folder| folder.is_dir()).unwrap_or_else(|| home.clone()),
     };
     let mut entries = entries(&folder, &home)?;
     let cut = entries.len().saturating_sub(MOST);
     entries.truncate(MOST);
-    held().folder = Some(folder.clone());
+    if passing != Some(true) {
+        held().folder = Some(folder.clone());
+    }
     Ok(Listing {
         path: folder.display().to_string(),
         shown: shown(&folder, &home),

@@ -123,6 +123,19 @@ pub fn page(answer: &Value) -> (Vec<Value>, Option<String>) {
 
 /// The folder the harness says a conversation works in. It loads one back
 /// only there.
+/// The folders conversations work in, by the harness's own list: the most
+/// recently used first, each once, without the box's own. Null keeps no list
+/// of folders; this is what `/folder` offers.
+pub fn folders(listed: &[Value], own: &Path) -> Vec<PathBuf> {
+    let mut folders: Vec<PathBuf> = Vec::new();
+    for folder in listed.iter().filter_map(|kept| kept.get("cwd").and_then(Value::as_str)).filter(|folder| !folder.is_empty()).map(PathBuf::from) {
+        if folder != own && !folders.contains(&folder) {
+            folders.push(folder);
+        }
+    }
+    folders
+}
+
 pub fn folder_of(listed: &[Value], id: &str) -> Option<PathBuf> {
     let kept = listed.iter().find(|kept| kept.get("sessionId").and_then(Value::as_str) == Some(id))?;
     kept.get("cwd").and_then(Value::as_str).filter(|folder| !folder.is_empty()).map(PathBuf::from)
@@ -554,6 +567,19 @@ mod tests {
         assert_eq!(shown(&titles)[..2], [Some("Fix the linker error".to_string()), Some("what is the capital of France?".to_string())]);
         // Taking away a title that was never given changes nothing.
         assert_eq!(titles.rename("c3", ""), None);
+    }
+
+    #[test]
+    fn the_folders_conversations_work_in_are_each_offered_once_the_last_used_first() {
+        let listed = [
+            json!({ "sessionId": "c1", "cwd": "/Users/someone/site" }),
+            json!({ "sessionId": "c2", "cwd": "/box" }),
+            json!({ "sessionId": "c3", "cwd": "/Users/someone/app" }),
+            json!({ "sessionId": "c4", "cwd": "/Users/someone/site" }),
+            json!({ "sessionId": "c5", "cwd": "" }),
+            json!({ "sessionId": "c6" }),
+        ];
+        assert_eq!(folders(&listed, Path::new("/box")), [PathBuf::from("/Users/someone/site"), PathBuf::from("/Users/someone/app")]);
     }
 
     #[test]

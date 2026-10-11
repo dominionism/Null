@@ -126,6 +126,8 @@ fn main() {
             harness::models,
             harness::set_model,
             harness::new_conversation,
+            harness::new_conversation_in,
+            harness::folders,
             harness::events_since,
             harness::work,
             harness::report,

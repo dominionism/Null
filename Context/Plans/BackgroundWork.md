@@ -16,9 +16,12 @@
 > `/history` and found again, four at most (item 9, pull request #53). The pet, "now" in
 > `/history` and the notice line say how each conversation stands (item 10, pull request
 > #54). No work is stopped silently: `/quit` warns once, a restart of the harness waits,
-> and work that was cut off is found again (item 11, pull request #55). With that, items 9
-> to 11 are fit to be released together. Next: item 12, `/folder`. The owner confirmed the
-> goal and settled all twelve decisions.**
+> and work that was cut off is found again (item 11, pull request #55). `/folder` starts a
+> conversation in a folder of the owner's choosing (item 12, pull request #56). All of work
+> in the background is built; none of it has been tried by the owner. Next: item 13, the
+> README, the research map and the glossary; then item 14, Null 0.4.0, tried by the owner
+> first and released only at the owner's word. The owner confirmed the goal and settled all
+> twelve decisions.**
 
 ## Goal
 
@@ -962,7 +965,46 @@ both groups change the same list in the page: built one after the other, they do
       folder. Know it by: the folder said each time, and a trial by the owner.
     - Source: specified from user (the goal, decision 4) + inferred from codebase (`attach.rs`,
       `harness::workspace`, `history.rs`).
-    - Status: Not started
+    - Status: Complete (2026-10-10). On `main` with pull request #56
+    - **Built:** a conversation's record keeps the folder it was started in
+      (`Conversation.folder`, `start_in`), and the first message opens it there. The
+      command `new_conversation_in` takes a folder as typed (`attach::folder_typed`: `~`
+      is the home folder), and `folders` gives the folders the harness's conversations
+      work in, the most recently used first and each once (`history::folders`). The page
+      is told where the open conversation works (`folder` in what `events_since` gives,
+      and in `conversation_opened`). In the page: `/folder` and a path; `/folder` alone,
+      a list of those folders and "another folder", which walks the Mac's folders as
+      `/attach` does, with "start in" as its first row; and "in ~/Developer/Null" on the
+      notice line each time a conversation outside the box's own folder comes to the
+      front (`sayFolder`). `/folder` is the thirteenth command in the list of commands.
+      A new question in the harness check, 26 in all: a conversation started in a folder
+      works there.
+    - **Decided by the agent:**
+      - **How the question is asked:** the model is told the folder with the first
+        message, and the harness lists the conversation under it. That list is all Null
+        reads to know where a conversation works.
+      - **A folder typed without a `/` at its start** is taken from the home folder.
+      - **Walking the folders for `/folder` does not move where `/attach` opens next**
+        (`passing` in `attach_list`).
+      - **Left with `/folder` while working,** the line says both things: "in ~/x. the
+        other is still working. /history shows it".
+      - **Hidden folders are not listed** when walking; a typed path reaches them.
+    - **Proven without a person:** 111 unit tests, two new: the folders conversations work
+      in are each offered once, the last used first, without the box's own; a
+      conversation started in a folder is new, keeps that folder, and a page is told of
+      it, while starting over is in the box's own again. The new question passed on the
+      carried Oh-my-pi. Nine states of the page drawn with stand-ins: the list; Enter on
+      a folder; a typed path; one that is no folder (said, and the command handed back);
+      "another folder" and the walk; "start in"; left while working; the folder said as
+      the box comes up; narrowing by typing. Fifteen other states the same as on `main`.
+      On the real app, two scripted runs: `/folder` and a path, then a message, and the
+      log said the conversation was opened in that folder; `/new` and a message, opened
+      in the box's own; `/folder` listed that folder, read from the harness. Started
+      again, that conversation opened from `/history`, and the notice said "in" and the
+      folder.
+    - **Not proven:** macOS asking about Desktop, Documents or Downloads when the list
+      walks into them. A real project with its own instructions. Enter on a listed
+      folder in the real app (drawn only). The owner's hand.
 
 13. **Say it: work in the background**
     - What: the README's commands and what Null keeps. The research map. The glossary's

@@ -47,6 +47,10 @@
 > waits, and what is written down of work left behind (item 11 of the same plan) were written in
 > where they belong, by the session that built them. Nothing else was traced again.
 
+> Twelfth addition, 2026-10-10: `/folder` (item 12 of the same plan: the commands
+> `new_conversation_in` and `folders`, and the folder said on the notice line) was written in
+> where it belongs, by the session that built it. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -326,7 +330,7 @@ Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and 
 
 | Module | Owns | Decides / does not decide |
 |---|---|---|
-| `main.rs` | Wiring: two plugins, state init, 36 `invoke_handler` commands, nine dev switches | Nothing else |
+| `main.rs` | Wiring: two plugins, state init, 38 `invoke_handler` commands, nine dev switches | Nothing else |
 | `panel.rs` | The window: 616 px wide, or 662 with the pet's 46 px lane on its left, 76-314 px tall, transparent, always on top, non-activating NSPanel, label `mini`; placement, show/hide, `resize`, the commands `pet` and `set_pet` | Where and whether the box is visible, not what it shows |
 | `shortcut.rs` | Control+Space, registered with macOS as an ordinary system-wide shortcut (no permission to ask) | That the chord fired, not what it means |
 | `harness.rs` | The ACP connection: one thread, one `omp … acp` process, and a record for each conversation this run holds (the open one, and any left working or waiting to be seen, four working at most), under a number Null gives it: its events (5,000 at most), its tools, its waiting approvals, its model | What the harness reported; never what a provider is or whether a model is good |
@@ -381,6 +385,7 @@ returns the session to `running`.
 
 Commands the page invokes (the `invoke_handler` list in `main.rs`): `page_ready`, `quit`, `layout`,
 `hide_box`, `resize`, `send`, `interrupt`, `respond`, `models`, `set_model`, `new_conversation`,
+`new_conversation_in`, `folders`,
 `events_since`, `work`, `report`, `providers`, `backups`, `set_backups`, `harnesses`, `set_harness`,
 `update_harness`, `signin_providers`, `signin_start`,
 `signin_answer`, `signin_cancel`, `open_url`, `pet`, `set_pet`, `history`, `open_conversation`,
@@ -512,7 +517,7 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 | Surface | Commands |
 | --- | --- |
 | Null | `Mini/Scripts/engine` once, then `cargo build`, `cargo test`, `cargo tauri build` from `Mini/` |
-| Null harness check | `cargo test -- --ignored` (25 live tests, and the key check in `Mini/tests/keys.rs`, which opens the box for a few seconds); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
+| Null harness check | `cargo test -- --ignored` (26 live tests, and the key check in `Mini/tests/keys.rs`, which opens the box for a few seconds); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
 | Null install | `Mini/Scripts/install` builds/signs/replaces the app and login agent; mutating, not a check |
 | Voice desktop dev | `just dev` starts backend if needed; `bun run dev` expects it separately |
 | Voice server/web | `bun run dev:server`, `bun run dev:web`, `just dev-web` |
@@ -622,7 +627,8 @@ this repository does not have. A plain `v` tag would set it off.
   the pet, "now" in `/history` and the notice line say how each one stands. `/quit` says how
   many are working and quits only when asked again; a restart of the harness waits until
   nothing is working; and what was working when Null went away is found cut off at the next
-  start (`BackgroundWork.md`, items 9 to 11). No folder chosen for a conversation,
+  start (`BackgroundWork.md`, items 9 to 11). `/folder` starts a conversation in a folder of the
+  owner's choosing, read from the harness's own list or walked to (item 12). No
   continuous voice conversation, automatic speaking of every Null reply or cross-harness handoff
   is built. The pet is built and shows only with the box. Voice requires a profile first;
   today's inventory is empty. Later voice transport/echo cancellation/engine choices remain open.
