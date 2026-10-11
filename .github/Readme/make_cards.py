@@ -164,12 +164,8 @@ CHIPS = {
     "rust": ("Rust toolchain", "https://rustup.rs/", True),
     "tauri": ("Tauri macOS prerequisites", "https://v2.tauri.app/start/prerequisites/#macos", True),
     "voicebox": ("Voicebox", "https://github.com/jamiepine/voicebox", True),
-    "adr-0002": ("ADR 0002", "Context/ADR/0002-NullMiniIsItsOwnApp.md", False),
-    "adr-0001": ("ADR 0001", "Context/ADR/0001-CapitalizedFolderNames.md", False),
     "bun": ("Bun", "https://bun.sh", True),
     "just": ("just", "https://github.com/casey/just", True),
-    "research": ("Research map", "Context/Research/Research.md", False),
-    "cleanup-plan": ("Cleanup plan", "Context/Plans/CapitalFolders.md", False),
     "page-html": ("Page/index.html", "Mini/Page/index.html", False),
     "harness-rs": ("harness.rs", "Mini/src/harness.rs", False),
     "translate-rs": ("translate.rs", "Mini/src/translate.rs", False),
@@ -178,12 +174,6 @@ CHIPS = {
     "markdown-rs": ("markdown.rs", "Mini/src/markdown.rs", False),
     "panel-rs": ("panel.rs", "Mini/src/panel.rs", False),
     "settings-rs": ("settings.rs", "Mini/src/settings.rs", False),
-    "miniapp": ("App design", "Context/Plans/MiniApp.md", False),
-    "providers": ("Providers", "Context/Plans/Providers.md", False),
-    "own-harness": ("Own harness", "Context/Plans/OwnHarness.md", False),
-    "display": ("Conversation display", "Context/Plans/ConversationDisplay.md", False),
-    "phases": ("Future phases", "Context/Plans/NullMini.md", False),
-    "adrs": ("Decisions", "Context/ADR/", False),
     "license": ("MIT", "LICENSE", False),
     "responsible": ("Responsible use", "RESPONSIBLE_USE.md", False),
     "security": ("Security", "SECURITY.md", False),
@@ -199,14 +189,14 @@ CHIPS = {
 NAV = ["nav-get-started", "nav-use-null", "nav-privacy", "nav-architecture", "nav-development"]
 
 # Which chips sit under which card, in the README's order.
+# The Context/ chips are gone: the owner's plans, decisions and research are his
+# own and are not published, so nothing links to them.
 LINK_ROWS = [
     ["oh-my-pi"],
     ["rust", "tauri"],
     ["page-html", "harness-rs", "engine-rs", "translate-rs", "markdown-rs", "panel-rs", "settings-rs", "check-rs"],
-    ["voicebox", "adr-0002"],
-    ["bun", "just", "research"],
-    ["cleanup-plan", "adr-0001"],
-    ["miniapp", "providers", "own-harness", "display", "phases", "adrs", "research"],
+    ["voicebox"],
+    ["bun", "just"],
     ["license", "responsible", "security", "contributing"],
 ]
 
@@ -579,24 +569,11 @@ def layout(c):
           "scripts/               Voice lifecycle, packaging and development helpers\n"
           "data/                  Voice development data\n"
           "docs/ · landing/       Inherited documentation and marketing sites\n"
-          "Context/               Plans, decisions and research\n"
           "CHANGELOG.md           Voice changelog, also read by the web build")
     c.note("The unmerged capital-folders branch capitalizes the existing directories and removes the "
            "inherited sites and other upstream material; the paths above describe the current "
-           "checkout. Memories/ holds local handoffs and is not tracked in Git.")
-
-
-def reasoning(c):
-    for key, value in [
-        ("MiniApp.md", "The app design"),
-        ("Providers.md", "Sign-in, usage and fallbacks"),
-        ("OwnHarness.md", "Why Null carries its harness, and the check that guards it"),
-        ("ConversationDisplay.md", "How a reply is laid out"),
-        ("NullMini.md", "The later phases"),
-        ("ADR/", "The decisions that constrain changes"),
-        ("Research.md", "The codebase map, including what was never traced"),
-    ]:
-        c.row(key, value)
+           "checkout. Context/ and Memories/ hold the owner's own plans, decisions, research and "
+           "handoffs, and are not tracked in Git.")
 
 
 def license_card(c):
@@ -625,7 +602,6 @@ add("voice", "Optional voice tools", voice)
 add("voice-run", "Run or develop the Voice stack", voice_run)
 add("status", "Status and direction", status)
 add("layout", "Repository layout and ongoing cleanup", layout)
-add("reasoning", "Read the reasoning", reasoning)
 add("license", "License", license_card)
 
 for name, (title, svg) in CARDS.items():
