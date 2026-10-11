@@ -1215,6 +1215,9 @@
         document.body.classList.toggle('with-pet', petShown);
       };
 
+      // What the arrow says of the open conversation as it stands.
+      const standing = () => (busy ? (pendingAsk ? 'asking' : 'working') : '');
+
       // '' when idle, 'working' while the agent works, 'asking' while it waits for an answer.
       const mark = (state) => {
         const before = caret.className;
@@ -1422,16 +1425,34 @@
       });
 
       // Everything that happened while the page was not listening: before it
-      // loaded, or while the box was hidden.
-      const catchUp = async () => {
-        if (held) return;
+      // loaded, or while the box was hidden. Asked for `whole`, the box has
+      // turned to a conversation the app already held, one that is working or
+      // waiting to be seen: all the app kept of it is drawn again from its
+      // start, and what it says next follows.
+      const catchUp = async (whole = false) => {
+        if (held && !whole) return;
+        while (held) await new Promise((resolve) => setTimeout(resolve, 20));
         held = [];
         try {
-          const snapshot = await invoke('events_since', { after: lastSeq });
+          const snapshot = await invoke('events_since', { after: whole ? 0 : lastSeq });
           openConversation = snapshot.conversation;
-          snapshot.events.forEach(apply);
+          if (whole) {
+            emptyBox();
+            snapshot.events.forEach((item) => show(item.event));
+            lastSeq = Math.max(lastSeq, snapshot.last_seq);
+            following = true;
+            place();
+          } else {
+            snapshot.events.forEach(apply);
+          }
           busy = snapshot.busy;
           watchQuiet();
+          // The arrow and the pet say how this conversation stands now, not
+          // what was drawn again on the way here.
+          if (whole) {
+            if (!picker) mark(standing());
+            mood(busy ? (pendingAsk ? 'ask' : 'work') : 'rest');
+          }
           if (!busy && !picker) mark('');
         } catch (error) {
           line('error', `could not reach the app: ${error}`);
@@ -1507,7 +1528,7 @@
         }
         input.value = '';
         tint();
-        mark(busy ? 'working' : '');
+        mark(standing());
         fit();
         filesClosed();
       };
@@ -2040,10 +2061,6 @@
 
       const openHistory = async (filter = '') => {
         if (picker || signin) return;
-        if (busy) {
-          notice('stop the reply with ctrl+c before opening another conversation');
-          return;
-        }
         mark('working');
         let listed;
         try {
@@ -2053,8 +2070,8 @@
           mark('');
           return;
         }
-        mark(busy ? 'working' : '');
-        if (picker || signin || busy) return; // something else was begun meanwhile
+        mark(standing());
+        if (picker || signin) return; // something else was begun meanwhile
         if (!listed.lists) {
           line('note', 'this harness does not list earlier conversations');
           return;
@@ -2083,8 +2100,10 @@
         list.opening = true;
         mark('working');
         try {
-          await invoke('open_conversation', { id: entry.id }); // it arrives as an event
-          await catchUp(); // should the event have been missed
+          // One the harness loads arrives as an event. One the app already held,
+          // working or waiting to be seen, is drawn from what the app kept of it.
+          const kept = await invoke('open_conversation', { id: entry.id });
+          await catchUp(kept != null); // or should the event have been missed
         } catch (error) {
           // It would not load: the box stays on the conversation it had.
           if (picker === list) closeHistory();
@@ -2104,6 +2123,9 @@
         steps = null;
         anchor = null;
         pendingAsk = null;
+        // It is at rest, whatever the conversation shown before it is doing.
+        busy = false;
+        running.clear();
         event.events.forEach(show);
         // What was replayed is over, whatever it ended on.
         reply = null;
@@ -2503,7 +2525,9 @@
         true,
       );
 
-      // The box on a new conversation: nothing of the last one is shown.
+      // The box on a new conversation: nothing of the last one is shown. If the
+      // last one was working, it goes on where it is, and none of that is this
+      // conversation's: not the reply, not a question it asked, not the wait.
       const emptyBox = () => {
         out.textContent = '';
         out.style.display = 'none';
@@ -2511,6 +2535,12 @@
         reply = null;
         steps = null;
         anchor = null;
+        busy = false;
+        running.clear();
+        pendingAsk = null;
+        noAnswer = false;
+        watchQuiet();
+        if (!picker) mark('');
         mood('rest'); // whatever the pet was saying of the last conversation is over
         fit();
       };
@@ -2563,6 +2593,7 @@
           return;
         }
         if (text === '/new') {
+          const left = busy; // the conversation that is left goes on working
           try {
             openConversation = await invoke('new_conversation');
           } catch (error) {
@@ -2570,6 +2601,7 @@
             return;
           }
           emptyBox();
+          if (left) notice('still working. /history shows it');
           return;
         }
         // A lone slash-word that is not one of the box's commands is a slip, or a
@@ -2592,8 +2624,18 @@
           await invoke('send', { text }); // the reply arrives as events
         } catch (error) {
           busy = false;
-          line('error', `could not send: ${error}`);
           mark('');
+          // One conversation too many at work. Nothing was sent, so what was
+          // typed goes back in the field, to be sent when one has ended.
+          if (String(error).startsWith('four conversations are already working')) {
+            if (!input.value) {
+              input.value = text;
+              tint();
+            }
+            notice(String(error));
+          } else {
+            line('error', `could not send: ${error}`);
+          }
         }
       };
 
