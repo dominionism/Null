@@ -119,6 +119,7 @@ fn main() {
             history::history,
             history::open_conversation,
             history::rename_conversation,
+            history::delete_conversation,
             layout,
             providers::providers,
             backups::backups,

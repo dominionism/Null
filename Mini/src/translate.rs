@@ -111,6 +111,9 @@ pub struct Abilities {
     pub loads_back: bool,
     /// Whether it lists the conversations it keeps. If not, `/history` has nothing to show.
     pub lists: bool,
+    /// Whether it lets go of a conversation when asked. If not, one it holds
+    /// cannot be told from one open in another program, and is not deleted.
+    pub closes: bool,
 }
 
 /// Read those out of the harness's answer to the greeting and a conversation's settings.
@@ -120,7 +123,14 @@ pub fn abilities(greeting: &Value, options: &Value) -> Abilities {
         asks_through: other_option(options).map(|(setting, _)| setting),
         loads_back: greeting.pointer("/agentCapabilities/loadSession") == Some(&json!(true)),
         lists: lists_conversations(greeting),
+        closes: closes_conversations(greeting),
     }
+}
+
+/// Whether a harness says, in its answer to the greeting, that it closes a
+/// conversation when asked: lets go of it and of its file.
+pub fn closes_conversations(greeting: &Value) -> bool {
+    greeting.pointer("/agentCapabilities/sessionCapabilities/close").is_some_and(|close| !close.is_null())
 }
 
 /// Whether a harness says, in its answer to the greeting, that it lists the
@@ -144,8 +154,12 @@ impl std::fmt::Display for Abilities {
             false => write!(f, "; does not list earlier conversations, so /history has nothing to show")?,
         }
         match self.loads_back {
-            true => write!(f, "; loads a conversation back"),
-            false => write!(f, "; does not load a conversation back, so a restart begins a new one"),
+            true => write!(f, "; loads a conversation back")?,
+            false => write!(f, "; does not load a conversation back, so a restart begins a new one")?,
+        }
+        match self.closes {
+            true => write!(f, "; closes a conversation"),
+            false => write!(f, "; does not close a conversation, so one it holds cannot be deleted"),
         }
     }
 }
@@ -275,31 +289,34 @@ mod tests {
 
     #[test]
     fn what_a_harness_can_do_is_read_from_its_greeting_and_a_conversation_s_settings() {
-        let greeting = json!({ "protocolVersion": 1, "agentCapabilities": { "loadSession": true, "sessionCapabilities": { "list": {} } } });
+        let greeting = json!({ "protocolVersion": 1, "agentCapabilities": { "loadSession": true, "sessionCapabilities": { "list": {}, "close": {} } } });
         let settings = json!([
             { "id": "model", "category": "model", "currentValue": "a/one", "options": [{ "value": "a/one", "name": "One" }, { "value": "b/two", "name": "Two" }] },
             { "id": "thinking", "currentValue": "low", "options": [] }
         ]);
         let found = abilities(&greeting, &settings);
-        assert_eq!(found, Abilities { models: 2, asks_through: Some("thinking".into()), loads_back: true, lists: true });
-        assert_eq!(found.to_string(), "a list of 2 models; says which model is in use when asked through thinking; lists earlier conversations; loads a conversation back");
+        assert_eq!(found, Abilities { models: 2, asks_through: Some("thinking".into()), loads_back: true, lists: true, closes: true });
+        assert_eq!(found.to_string(), "a list of 2 models; says which model is in use when asked through thinking; lists earlier conversations; loads a conversation back; closes a conversation");
     }
 
     #[test]
     fn a_harness_that_offers_less_loses_only_what_it_lacks() {
         // No settings at all, and no word about loading a conversation back.
         let bare = abilities(&json!({ "protocolVersion": 1 }), &Value::Null);
-        assert_eq!(bare, Abilities { models: 0, asks_through: None, loads_back: false, lists: false });
+        assert_eq!(bare, Abilities { models: 0, asks_through: None, loads_back: false, lists: false, closes: false });
         assert!(bare.to_string().starts_with("no model list"), "{bare}");
         assert!(bare.to_string().contains("; does not list earlier conversations, so /history has nothing to show;"), "{bare}");
 
         // A model setting and nothing else: the list is there, only the asking is lost.
         let only_models = json!([{ "id": "model", "currentValue": "a/one", "options": [{ "value": "a/one" }] }]);
-        assert_eq!(abilities(&json!({}), &only_models), Abilities { models: 1, asks_through: None, loads_back: false, lists: false });
+        assert_eq!(abilities(&json!({}), &only_models), Abilities { models: 1, asks_through: None, loads_back: false, lists: false, closes: false });
 
-        // It loads a conversation back and says nothing of a list: only /history is lost.
+        // It loads a conversation back and closes one, and says nothing of a list: only /history is lost.
         let no_list = json!({ "agentCapabilities": { "loadSession": true, "sessionCapabilities": { "close": {} } } });
-        assert_eq!(abilities(&no_list, &only_models), Abilities { models: 1, asks_through: None, loads_back: true, lists: false });
+        let found = abilities(&no_list, &only_models);
+        assert_eq!(found, Abilities { models: 1, asks_through: None, loads_back: true, lists: false, closes: true });
+        assert!(found.to_string().ends_with("; loads a conversation back; closes a conversation"), "{found}");
+        assert!(bare.to_string().ends_with("; does not close a conversation, so one it holds cannot be deleted"), "{bare}");
     }
 
     #[test]
