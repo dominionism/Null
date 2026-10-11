@@ -20,7 +20,7 @@
 //! harness process is started on the first order and started again, with the
 //! conversation loaded back, if it has gone away.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -42,6 +42,9 @@ use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::history;
 use crate::{access, attach, backups, panel, providers, settings};
+
+/// What the box says when the harness has to be started again while conversations are working.
+const RESTART_WAITS: &str = "that takes effect once nothing is working: the harness starts again then";
 
 /// What the box says to a message that would be one conversation too many at work.
 pub const TOO_MANY: &str = "four conversations are already working. wait for one to end, or stop one";
@@ -108,6 +111,8 @@ enum Ended {
     Failed,
     /// By the person.
     Stopped,
+    /// By Null or the harness going away while it was working.
+    CutOff,
 }
 
 /// One conversation with something to say for itself, as the page is told of it.
@@ -117,7 +122,7 @@ pub struct Work {
     conversation: u64,
     /// The harness's id for it, once it has one: what `/history` lists it under.
     id: Option<String>,
-    /// How it stands: working, asking, done, failed or stopped.
+    /// How it stands: working, asking, done, failed, stopped or cut off.
     standing: &'static str,
     /// It ended while the box showed another conversation, and has not been shown since.
     unseen: bool,
@@ -167,6 +172,7 @@ impl Conversation {
             Ended::Done => "done",
             Ended::Failed => "failed",
             Ended::Stopped => "stopped",
+            Ended::CutOff => "cut off",
         })
     }
 }
@@ -198,15 +204,66 @@ struct Shared {
     /// times it has been told: a page that hears two tellings out of their
     /// order keeps the later one.
     told: (u64, Vec<Work>),
+    /// The harness is to be started again as soon as nothing is working: after
+    /// a sign-in, or a change of harness or of backups, made while something was.
+    restart_due: bool,
+    /// Null is quitting at the person's word. What is still working then is
+    /// stopped by them, and is not written down as work that was cut off.
+    quitting: bool,
 }
 
 impl Shared {
     /// A box with one conversation in it: the one that was open last, to be
     /// loaded back, or a new one that the first message opens.
     fn new(session: Option<String>, model: Option<String>) -> Shared {
-        let mut shared = Shared { held: HashMap::new(), open: 0, numbered: 0, seq: 0, models: Vec::new(), approvals: 0, noted: None, counts_tokens: false, opening: None, told: (0, Vec::new()) };
+        let mut shared = Shared { held: HashMap::new(), open: 0, numbered: 0, seq: 0, models: Vec::new(), approvals: 0, noted: None, counts_tokens: false, opening: None, told: (0, Vec::new()), restart_due: false, quitting: false };
         shared.open = shared.hold(Conversation { session, model, ..Default::default() });
         shared
+    }
+
+    /// At a start of Null: what was written down of the conversations it held
+    /// and had not shown. One that was working then was cut off, by Null or
+    /// the Mac going away; one that had ended is as it ended. Each waits to be
+    /// seen. The harness has what was said in them; Null has kept none of it.
+    fn recall(&mut self, stood: BTreeMap<String, String>) {
+        for (id, word) in stood {
+            let ended = match word.as_str() {
+                "done" => Ended::Done,
+                "failed" => Ended::Failed,
+                "stopped" => Ended::Stopped,
+                _ => Ended::CutOff,
+            };
+            match self.named(&id).and_then(|which| self.of(which)) {
+                Some(open) => (open.ended, open.unseen) = (Some(ended), true),
+                None => {
+                    self.hold(Conversation { session: Some(id), ended: Some(ended), unseen: true, ..Default::default() });
+                }
+            }
+        }
+    }
+
+    /// What is written down of the conversations this run holds: for one that
+    /// is working, that it was, and for one that waits to be seen, how it
+    /// ended. Quitting at the person's word leaves the working ones out.
+    fn stands(&self) -> BTreeMap<String, String> {
+        let word = |one: &Work| if one.unseen { one.standing } else { "working" };
+        self.work().iter().filter(|one| one.unseen || !self.quitting).filter_map(|one| Some((one.id.clone()?, word(one).to_string()))).collect()
+    }
+
+    /// The harness is wanted afresh. True when that can be now; with
+    /// something working it is put off until nothing is.
+    fn restart_now(&mut self) -> bool {
+        self.restart_due = self.working() > 0;
+        !self.restart_due
+    }
+
+    /// A reply has ended. True when the harness was waiting for that to be started again.
+    fn restart_at_last(&mut self) -> bool {
+        let now = self.restart_due && self.working() == 0;
+        if now {
+            self.restart_due = false;
+        }
+        now
     }
 
     /// Come to hold a conversation. Gives the number it is known by from now on.
@@ -269,7 +326,8 @@ impl Shared {
 
     /// Every conversation with something to say for itself: one that is working
     /// or asking, and one that waits to be seen. The most pressing first: one
-    /// that asks, then one that failed, one that is done, one that is working.
+    /// that asks, then one that failed or was cut off, one that is done, one
+    /// that is working.
     /// Among equals, the newer first.
     fn work(&self) -> Vec<Work> {
         let mut work: Vec<Work> = self
@@ -278,7 +336,7 @@ impl Shared {
             .filter(|(_, held)| held.busy || held.unseen)
             .filter_map(|(which, held)| Some(Work { conversation: *which, id: held.session.clone(), standing: held.standing()?, unseen: held.unseen, open: *which == self.open, title: None }))
             .collect();
-        let pressing = |standing: &str| ["asking", "failed", "done", "working"].iter().position(|known| *known == standing).unwrap_or(4);
+        let pressing = |standing: &str| ["asking", "failed", "cut off", "done", "working"].iter().position(|known| *known == standing).unwrap_or(5);
         work.sort_by_key(|one| (pressing(one.standing), std::cmp::Reverse(one.conversation)));
         work
     }
@@ -302,6 +360,7 @@ impl Shared {
             return Err(TOO_MANY.into());
         }
         open.busy = true;
+        open.unseen = false;
         Ok((which, cursor))
     }
 
@@ -389,7 +448,14 @@ fn tell_work(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
         shared.told = (shared.told.0 + 1, work.clone());
         (shared.told.0, work)
     };
+    // And it is written down, for a start of Null that finds work left behind.
+    write_down(app, shared);
     let _ = app.emit_to(panel::LABEL, "mini:work", json!({ "told": told, "conversations": titled(app, work) }));
+}
+
+fn write_down(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
+    let stands = lock(shared).stands();
+    history::stand(app, stands);
 }
 
 /// The same with the title Null keeps for each, which is what the notice line calls it by.
@@ -402,13 +468,27 @@ fn titled(app: &AppHandle, mut work: Vec<Work>) -> Vec<Work> {
 
 /// End a conversation's reply in flight, if there is one, with an error the box can show.
 fn fail_reply(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, event: Value) {
+    end_reply(app, shared, which, event, Ended::Failed);
+}
+
+/// The same, saying how it ended: failed, or cut off when the harness went away under it.
+fn end_reply(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, event: Value, ended: Ended) {
     if !with(shared, which, |held| held.busy).unwrap_or(false) {
         return;
     }
     publish(app, shared, which, json!({ "type": "status_change", "status": "blocked", "reason": event["message"] }));
     publish(app, shared, which, event);
-    finish(shared, which, Ended::Failed);
+    finish(shared, which, ended);
     tell_work(app, shared);
+    restart_if_due(app, shared);
+}
+
+/// A reply has ended: if the harness was waiting for nothing to be working, it is started again now.
+fn restart_if_due(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
+    if lock(shared).restart_at_last() {
+        log!("nothing is working any more; the harness is started again, as was asked");
+        let _ = order(&app.state::<Harness>(), Command::Restart);
+    }
 }
 
 /// The reply is over, and this is how it ended: free the conversation and
@@ -438,7 +518,9 @@ fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) {
 /// Start the harness thread. Nothing is launched until the first order arrives.
 pub fn init(app: &AppHandle) {
     let saved = settings::get(app);
-    let shared = Arc::new(Mutex::new(Shared::new(saved.session, saved.model)));
+    let mut shared = Shared::new(saved.session, saved.model);
+    shared.recall(history::stood(app));
+    let shared = Arc::new(Mutex::new(shared));
     let (commands, orders) = mpsc::unbounded();
     app.manage(Harness { shared: shared.clone(), commands });
 
@@ -455,10 +537,10 @@ async fn run(app: AppHandle, shared: Arc<Mutex<Shared>>, mut orders: mpsc::Unbou
     while let Some(first) = orders.next().await {
         if let Err(reason) = serve(&app, &shared, first, &mut orders).await {
             log!("the harness connection ended: {reason}");
-            // Every reply that was under way ends with it.
+            // Every reply that was under way is cut off with it, and says so in one line.
             let working: Vec<u64> = lock(&shared).held.iter().filter(|(_, held)| held.busy).map(|(which, _)| *which).collect();
             for which in working {
-                fail_reply(&app, &shared, which, json!({ "type": "error", "message": reason, "code": null, "details": null }));
+                end_reply(&app, &shared, which, json!({ "type": "error", "message": reason, "code": null, "details": null }), Ended::CutOff);
             }
         }
     }
@@ -774,6 +856,7 @@ impl Connection<'_> {
                                 };
                                 finish(&shared, which, ended);
                                 tell_work(&app, &shared);
+                                restart_if_due(&app, &shared);
                                 // The user has now seen Null answer: the moment to ask for Full Disk Access.
                                 if !failed && reason == "completed" {
                                     access::after_reply(&app);
@@ -896,6 +979,8 @@ impl Connection<'_> {
             match shared.named(id) {
                 // The open one, at rest, is loaded afresh: after a restart the box shows little of it.
                 Some(which) if which == shared.open && !shared.open_one().busy => None,
+                // One recalled from before Null was started: Null kept nothing of it, and the harness has it all.
+                Some(which) if shared.of(which).is_some_and(|held| !held.busy && held.events.is_empty()) => None,
                 Some(which) => Some((which, shared.turn_to(which))),
                 None => None,
             }
@@ -931,6 +1016,10 @@ impl Connection<'_> {
         let (which, before, left) = {
             let mut shared = lock(self.shared);
             let before = shared.open_one().model.clone();
+            // What was only recalled of it gives way to the conversation itself.
+            if let Some(recalled) = shared.named(id).filter(|which| *which != shared.open) {
+                shared.held.remove(&recalled);
+            }
             let which = shared.hold(Conversation { session: Some(id.to_string()), loaded: true, model: before.clone(), ..Default::default() });
             (which, before, shared.turn_to(which))
         };
@@ -1017,6 +1106,8 @@ impl Connection<'_> {
         if open {
             settings::update(self.app, |settings| settings.session = Some(session.clone()));
         }
+        // It has the harness's id now: what `/history` lists it under, and what is written down of it.
+        tell_work(self.app, self.shared);
         log!("opened the conversation {session} in {}", cwd.display());
 
         // New conversations start on the model last chosen, when the harness still offers it.
@@ -1194,11 +1285,6 @@ fn order(harness: &Harness, command: Command) -> Result<(), String> {
     harness.commands.unbounded_send(command).map_err(|_| "the harness thread has stopped".to_string())
 }
 
-/// True while a reply is in flight, in any conversation.
-pub fn busy(app: &AppHandle) -> bool {
-    lock(&app.state::<Harness>().shared).working() > 0
-}
-
 /// True while the conversation the harness knows by this id is working.
 pub fn working(app: &AppHandle, id: &str) -> bool {
     let harness = app.state::<Harness>();
@@ -1228,9 +1314,30 @@ fn let_go_of(harness: &Harness, left: Option<String>) {
 }
 
 /// Let the running harness process go. The next order starts a fresh one and
-/// loads the conversation back; a fresh process sees a provider just signed in to.
+/// loads the conversation back; a fresh process sees a provider just signed in
+/// to. With conversations working, that would end them: it waits until
+/// nothing is working, and the box says so.
 pub fn restart(app: &AppHandle) {
-    let _ = order(&app.state::<Harness>(), Command::Restart);
+    let harness = app.state::<Harness>();
+    if lock(&harness.shared).restart_now() {
+        let _ = order(&harness, Command::Restart);
+    } else {
+        log!("the harness is to be started again, once nothing is working");
+        let _ = app.emit_to(panel::LABEL, "mini:notice", json!({ "text": RESTART_WAITS, "stay": false }));
+    }
+}
+
+/// How many conversations are working.
+pub fn working_now(app: &AppHandle) -> usize {
+    lock(&app.state::<Harness>().shared).working()
+}
+
+/// Null is quitting at the person's word. Whatever is still working is
+/// stopped by that, and what is written down says only what still waits to be seen.
+pub fn quitting(app: &AppHandle) {
+    let harness = app.state::<Harness>();
+    lock(&harness.shared).quitting = true;
+    write_down(app, &harness.shared);
 }
 
 /// Send a message to the open conversation. The reply arrives as events; the
@@ -1675,6 +1782,56 @@ mod tests {
         // Shown, one has been seen; at rest, it has nothing more to say.
         shared.turn_to(left[1]);
         assert!(!told(&shared).iter().any(|one| one.0 == "failed"));
+    }
+
+    #[test]
+    fn what_was_working_when_null_went_away_is_cut_off_and_waits_to_be_seen() {
+        // What one run writes down.
+        let shared = Arc::new(Mutex::new(Shared::new(None, None)));
+        let ended = {
+            let mut shared = lock(&shared);
+            *shared.open_one() = Conversation { busy: true, ..opened("ended") };
+            let which = shared.open;
+            shared.start_over();
+            *shared.open_one() = Conversation { busy: true, ..opened("working") };
+            shared.start_over();
+            which
+        };
+        finish(&shared, ended, Ended::Done);
+        let written = lock(&shared).stands();
+        assert_eq!(written, BTreeMap::from([("ended".to_string(), "done".to_string()), ("working".to_string(), "working".to_string())]));
+
+        // What the next one makes of it, with the box on a conversation of its own.
+        let mut next = Shared::new(Some("open".into()), None);
+        next.recall(written.clone());
+        let told: Vec<_> = next.work().iter().map(|one| (one.id.clone().unwrap_or_default(), one.standing, one.unseen, one.open)).collect();
+        assert_eq!(told, [("working".to_string(), "cut off", true, false), ("ended".to_string(), "done", true, false)]);
+        assert_eq!(next.stands(), BTreeMap::from([("ended".to_string(), "done".to_string()), ("working".to_string(), "cut off".to_string())]), "and it stays written down until it has been seen");
+
+        // The one the box was on, if that was working: cut off too, and it is the open one.
+        let mut next = Shared::new(Some("working".into()), None);
+        next.recall(written);
+        assert_eq!(next.held.len(), 2, "it is not held twice");
+        assert!(next.work().iter().any(|one| one.open && one.standing == "cut off"));
+        next.begin_reply().expect("it may work");
+        assert!(next.work().iter().any(|one| one.open && one.standing == "working" && !one.unseen), "a message to it, and it has been seen");
+
+        // Quitting at the person's word stops what works: only what waits to be seen stays written down.
+        let mut shared = lock(&shared);
+        shared.quitting = true;
+        assert_eq!(shared.stands(), BTreeMap::from([("ended".to_string(), "done".to_string())]));
+    }
+
+    #[test]
+    fn the_harness_is_started_again_only_once_nothing_is_working() {
+        let shared = Arc::new(Mutex::new(Shared::new(None, None)));
+        assert!(lock(&shared).restart_now(), "with nothing working it is started again at once");
+        let working = lock(&shared).begin_reply().expect("it may work").0;
+        assert!(!lock(&shared).restart_now(), "with something working it waits");
+        assert!(!lock(&shared).restart_at_last(), "and goes on waiting while that works");
+        finish(&shared, working, Ended::Done);
+        assert!(lock(&shared).restart_at_last(), "until the reply has ended");
+        assert!(!lock(&shared).restart_at_last(), "once");
     }
 
     #[test]

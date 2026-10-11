@@ -103,9 +103,6 @@ pub fn backups(app: AppHandle) -> Vec<String> {
 /// is loaded back.
 #[tauri::command]
 pub fn set_backups(app: AppHandle, ids: Vec<String>) -> Result<Vec<String>, String> {
-    if harness::busy(&app) {
-        return Err("stop the reply before changing the backups".into());
-    }
     let order = tidy(&ids);
     settings::update(&app, |settings| settings.backups = order.clone());
     log!("backup order: {}", if order.is_empty() { "none".to_string() } else { order.join(", then ") });
