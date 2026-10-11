@@ -1317,7 +1317,9 @@ pub fn smoke(app: &AppHandle, text: String) {
 /// What `selftest` runs in the page. Each line goes into the field and is
 /// entered, as a person would, once the page has stopped working: after a
 /// reply, when a list has opened, or when a sign-in asks for something. In a
-/// list, a line narrows it and chooses the first entry left. When the last
+/// list, a line narrows it and chooses the first entry left. A line that ends
+/// in " &" is entered without that ending, and the next line does not wait
+/// for its reply: that is how a conversation is left working. When the last
 /// line has been dealt with, the page says what it shows.
 const SELFTEST_TYPING: &str = r#"async (lines) => {
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1328,8 +1330,12 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
       quiet = busy || caret.classList.contains('working') ? 0 : quiet + 50;
     }
   };
-  for (const text of lines) {
-    await settled();
+  let leftWorking = false;
+  for (const line of lines) {
+    if (leftWorking) await pause(700); // long enough for the reply to have begun
+    else await settled();
+    leftWorking = line.endsWith(' &');
+    const text = leftWorking ? line.slice(0, -2) : line;
     // An empty line only presses Enter, on whatever is chosen or typed already.
     if (text) {
       input.value = text;
