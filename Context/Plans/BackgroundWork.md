@@ -6,10 +6,10 @@
 > history and the pet. It replaces those three items, which were written for a mini inside the
 > Voice desktop app and its server.
 >
-> Status: **The tools for history are built and released as Null 0.3.0 (items 1 to 6,
-> 2026-10-10): the list of commands, renaming, deleting to the Trash and searching inside, each
-> by its own pull request (#42 to #45, and #47 for a fault the owner's use found). The owner's
-> Mac runs the release. The owner used deleting; the log shows no title given and no search
+> Status: **The tools for history are built and released, as Null 0.3.0 and then 0.3.1 (items
+> 1 to 6, 2026-10-10): the list of commands, renaming, deleting to the Trash and searching
+> inside, each by its own pull request (#42 to #45, and #47 and #49 for two faults the owner's
+> use found). The owner's Mac runs 0.3.1 from the release. The owner used deleting; the log shows no title given and no search
 > yet. Next: work in the background itself (items 7 to 14), which is not started. The owner
 > confirmed the goal and settled all twelve decisions.**
 
@@ -540,7 +540,15 @@ both groups change the same list in the page: built one after the other, they do
      it was, and the row that took the deleted one's place is the chosen one, so that the x
      can be pressed again at the same spot. Drawn with forty conversations and the list
      400 px down: it stayed at 400 after one deletion, after three in a row, and through a
-     rename kept or left. The version is 0.3.1 on `main`; its release waits for the owner.
+     rename kept or left. Pull request #49; `main` built at `cb48e62` and installed.
+   - **Null 0.3.1, released at the owner's word ("Release it.", 2026-10-10):** the tag
+     `null-v0.3.1` on `main` at `cb48e62`. Only Null's own workflows answered. The published
+     file's checksum matched, its seal held, it says 0.3.1, and the Oh-my-pi inside is the
+     one `Engine.toml` names, with its author's signature. The one-line install found 0.3.1
+     as the newest and replaced the build made here; afterwards the same checks as before,
+     all as they should be. By the log, the box had not been opened between the install of
+     the mended build and the word to release it, so the owner had not yet seen the list
+     stay in place.
    - **Still not proven by anyone's hand:** `/update` on an installed 0.2.0 saying that 0.3.0
      is out (the owner's Mac went from 0.2.0 to builds of 0.3.0 without asking it).
    - **To try by hand, since nothing but the owner's hand proves it:** a lone `/`; a mistyped
