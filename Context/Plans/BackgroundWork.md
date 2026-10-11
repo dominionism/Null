@@ -15,11 +15,10 @@
 > holds (item 8, pull request #52). A conversation is left working with `/new` or
 > `/history` and found again, four at most (item 9, pull request #53). The pet, "now" in
 > `/history` and the notice line say how each conversation stands (item 10, pull request
-> #54). Item 11, which stops no work silently (quitting, restarting, being cut off), is
-> built and waits in pull request #55 for three scripted runs through the real page, which
-> stand still while the Mac's screen is locked. Nothing of items 9 and 10 is to be released
-> before it is merged. Next: those three runs and the merge, then item 12. The owner
-> confirmed the goal and settled all twelve decisions.**
+> #54). No work is stopped silently: `/quit` warns once, a restart of the harness waits,
+> and work that was cut off is found again (item 11, pull request #55). With that, items 9
+> to 11 are fit to be released together. Next: item 12, `/folder`. The owner confirmed the
+> goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -873,8 +872,7 @@ both groups change the same list in the page: built one after the other, they do
       scripted run that kills Null under a slow job and finds it "cut off" at the next start.
     - Source: specified from user (decision 3) + inferred from codebase (`harness::restart`,
       the page's `/quit` and Ctrl+C).
-    - Status: Built (2026-10-10), in pull request #55, **not on `main` yet**. It waits for
-      the three scripted runs through the real page that are written out below
+    - Status: Complete (2026-10-10). On `main` with pull request #55
     - **Built:**
       - **Quitting.** The command `quit` (`Mini/src/main.rs`) gives how many conversations
         are working and does not quit, unless asked with `anyway`. The page (`quit` in
@@ -919,19 +917,30 @@ both groups change the same list in the page: built one after the other, they do
       second asks with `anyway`); `/quit`, another message, `/quit` (asked afresh);
       "cut off" under "now" with its sign; the line "cut off: title"; the app's line about
       the restart. Fourteen other states the same byte for byte as on `main`.
-    - **Not proven, and the reason it is not merged:** the real app through its page. The
-      Mac's screen was locked. Each run is on a folder of its own with
+    - **Proven on the real app, by script (2026-10-10, the screen unlocked):** each run on
+      a folder of its own with
       `{"model":"standin-anthropic/slow","welcomed":true,"asked_full_disk":true}` in its
-      `null/settings.json`, and shows a second box for a few seconds.
-      - **Cut off and found.** On the folder where the app was killed under a job whose
-        message begins with `job`, the lines: `/history`; `job`. To see: "the list shows:
-        NOW" with that conversation and "cut off", and in the log "opened the earlier
-        conversation", not "which this run held".
-      - **The warning.** The lines: sixty words and " &"; `/new`; `/quit`. To see: "the
-        notice says: 1 conversation is still working. /quit again stops it and quits."
-      - **Quitting anyway.** The same lines and `/quit` once more. To see: the app ends by
-        itself with "quit from the box; the conversation is closed, and what was working
-        is stopped" in the log, and no `standing` in that folder's `history.json`.
+      `null/settings.json`. The pull request was held back until they had passed.
+      - **The warning.** The lines: `job`, fifty-nine words and " &"; `/new`; `/quit`. The
+        notice said "1 conversation is still working. /quit again stops it and quits."
+        and nothing was stopped.
+      - **Quitting anyway.** The same lines and `/quit` once more. The app ended by itself
+        with "quit from the box; the conversation is closed, and what was working is
+        stopped" in the log, nothing was written down, and no harness was left running.
+      - **Cut off and found, a job left behind.** The job left with `/new`, and the app
+        ended under it: `history.json` said "working". Started again, `/history` showed
+        "NOW | job … | cut off" and the file said "cut off". Started again with the lines
+        `/history`; `job`; `/history`: the harness loaded the conversation ("opened the
+        earlier conversation" in the log), the box showed its message, the list showed it
+        under "today" with the dot and no "now", and nothing was written down any more.
+      - **Cut off and found, the job that was on screen.** The same, where the box was on
+        the job when Null went away: opened again from `/history`, it stood under "today"
+        afterwards and nothing was written down.
+    - **A fault those runs found, and mended:** a conversation found cut off went on
+      standing under "now" after it had been opened, and stayed written down. The page is
+      told only of a change, and the list at a start was taken to be empty although the
+      page is handed what was recalled. What is recalled is now where the telling starts
+      from, and it is written down at once. The unit test for being cut off asks it.
     - **Also not proven:** a restart that waits, in the real app (a sign-in, `/harness`,
       `/update` or `/backup` while another conversation works): the unit test and the
       drawn line only. A harness that goes away by itself under several replies.
