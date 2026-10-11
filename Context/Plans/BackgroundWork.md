@@ -83,16 +83,19 @@ conversations only their number, their sizes and how long a look through them ta
 | Where conversations work | All in one folder, `…/Workspace` (`harness::workspace`). The harness takes a folder for each (`cwd` in `session/new`), and history already loads a terminal conversation in its own |
 | A list of folders to choose from | `attach.rs` already walks the Mac's folders in a list in the box, and the harness's list of conversations names every folder one works in |
 | Can the harness delete, rename or search a conversation | No. Over the protocol it lists, forks, resumes and closes; it has no command of its own for any of the three either |
-| How the harness keeps a conversation | One file each, `sessions/<its folder>/<when>_<id>.jsonl` in the harness's folder, found by the id. A lock file sits beside it while a harness holds it open. Each line is one thing: a `title` line, a `session` line, and a `message` line for each thing said, with who said it (`user`, `assistant`) and the words as plain text |
+| How the harness keeps a conversation | One file each, `sessions/<its folder>/<when>_<id>.jsonl` in the harness's folder, found by the id. Beside it there may be a folder of the same name, for the conversations of the helpers the agent started (113 of the owner's 275 files are in such folders). Each line is one thing: a `title` line, a `session` line, and a `message` line for each thing said, with who said it (`user`, `assistant`) and the words as plain text |
 | What happens when that file is taken away | The harness stops listing the conversation at once, does not write the file again, and will not load it. Put back, it is listed and loads again |
+| How to tell that a program has a conversation open | Not by the lock file beside it: that file is empty, nothing locks it, and it stays when the harness has gone (169 of them lie in the owner's folder). A harness has the conversation's own file open for as long as it holds the conversation, and lets go when it closes it or ends; macOS says which program has a file open (`lsof`), in about a tenth of a second |
+| A harness that still holds a conversation whose file was moved | It goes on answering and writes into the moved file, wherever that now is. So a conversation deleted while a terminal has it open would lose nothing, and putting it back would bring all of it |
+| Whether the Trash can put back a file a program moved there | Yes, by the Trash's own record: a scratch file moved with macOS's call for it was written down there with the folder it came from |
 | How long it takes to look through every conversation for a word | On the owner's Mac, 275 conversations in 37 folders, 363 MB (half of them under 308 KB, the largest 41 MB): 0.03 s for a fast look that uses every core, 1.3 s for a simple one, both with the files in memory. Only how long it took was read, never what was found |
 | The line for a mistyped command | It holds about 81 characters and the eleven commands take 78. A twelfth does not fit |
 | The pet and the hidden box | `panel::hide` takes the whole window away. The pet is drawn by the page in a 46 px lane of the same window |
 
 Not found out: the owner's own MCP servers with several conversations (each conversation attaches
 them again, and one that runs as a program may be started once for each); a real provider's
-limit with several replies at once; whether closing gives memory back after a while; whether a
-file that Null moves to the Trash can be put back from there with the Trash's own "Put Back".
+limit with several replies at once; whether closing gives memory back after a while. "Put Back"
+itself was not pressed: that is the owner's hand.
 
 ## Design rules
 
@@ -194,7 +197,10 @@ additions.
      Trash at once and the box says "moved to the Trash" with the title. Every row can be
      deleted, the terminal's conversations too, and one of those then leaves the terminal's
      own list as well. Refused: a conversation that is still working, and one that is open in
-     a terminal at that moment (its lock file is there).
+     a terminal at that moment. How that is known was put wrongly here at first, as "its lock
+     file is there": the lock file says nothing (see "What was found"). Null has its own
+     harness let go of the conversation and then asks macOS whether any program still has the
+     file open.
 10. **Renaming a conversation. Settled (owner, 2026-10-10: "I agree with the two
     recommendations").** Null keeps the new title itself, beside the titles it already makes
     in `history.json`, and a title the owner typed comes before the harness's own. The
@@ -341,7 +347,53 @@ both groups change the same list in the page: built one after the other, they do
      Trash itself, which is why nothing is erased.
    - Source: specified from user (decision 9) + researched finding (the trial) + inferred
      from codebase.
-   - Status: Not started
+   - Status: In progress. Built on the branch `delete-conversation` (2026-10-10); not yet
+     tried by the owner
+   - **Built:** `history.rs` finds a conversation's file by its id (`file_of`), asks macOS
+     which programs have it open (`held_by`) and moves it to the Trash with macOS's own call
+     (`to_trash`). A new command, `delete_conversation`: it refuses a conversation whose
+     reply is running, has Null's own harness close the conversation (`harness::close`, a new
+     order, which starts no harness to ask it), refuses if any program still has the file
+     open, moves the file, and gives the box a new conversation if that one was open. In the
+     page: an x after the pencil on the row under the pointer or chosen, and Command+Delete
+     on the chosen row; the row goes, and the notice line says "moved to the Trash" with the
+     title. A refusal is said on the notice line and the list stays as it was.
+     `translate::abilities` now says whether a harness closes a conversation.
+   - **Deviation, and the reason:** "open in a terminal" is not read from the lock file,
+     which says nothing, but from macOS (decision 9; "What was found").
+   - **Decided by the agent:**
+     - **What is beside the conversation goes with it:** when the harness kept a folder of
+       helpers' conversations beside the file, that folder is moved to the Trash too, as a
+       second thing there. If it will not move, the conversation is deleted all the same and
+       the log says so.
+     - **Command+Delete deletes only with nothing typed in the field.** With words there it
+       is the field's own key and clears them, as everywhere on a Mac, so that clearing a
+       narrowing never deletes a conversation.
+     - **The lock file is left where it is.** It is empty, and Null erases nothing.
+     - **A run under a profile of the harness's own** offers no x: Null does not know that
+       folder.
+     - **The log** says that a conversation was moved to the Trash, never which.
+   - **Proven without a person:** 89 unit tests, two new: a conversation's file is found by
+     its id, with what is beside it, and nothing that is no id is looked for; a file that a
+     program has open is known to be held, and by which. A new question in the harness
+     check, on the carried Oh-my-pi: the file is found by its id; the harness has it open
+     while it holds the conversation and lets go when asked; moved to the real Trash by
+     Null's own code, the conversation is listed no longer and does not load; taken out
+     again, it is listed and loads. Fifteen states drawn in the app's web engine and read
+     back: the x beside the pencil, a row's height unchanged, Command+Delete on the chosen
+     row, the x pressed on another, words in the field (nothing deleted), the open
+     conversation deleted (the box emptied), the last one deleted (the list goes), a refusal
+     said, a harness that offers no deleting (pencil only), and a title being typed (nothing
+     deleted). Two pictures looked at.
+   - **Not proven:** "Put Back" pressed in the Trash by the owner. The real app from end to
+     end: the x pressed, and the row gone after a restart. A conversation that really is
+     open in a terminal being refused (proven for a harness holding the file, not with the
+     owner's terminal). The owner's own Oh-my-pi, "yours", which is what the installed Null
+     runs.
+   - **What the owner will meet:** a conversation put back from the Trash has lost the title
+     Null kept for it, made or given, once the list was shown without it; one made in the
+     box is "untitled" until it is opened. A conversation with helpers' conversations is two
+     things in the Trash, and both want putting back.
 
 4. **Searching inside conversations**
    - What: a new module, `Mini/src/search.rs`. First a fast look through every conversation
