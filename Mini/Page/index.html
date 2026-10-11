@@ -10,9 +10,9 @@
      agent a file with the next message, /history (and the button after the
      plus) lists the earlier conversations and opens one again, /pet shows the
      pet or puts it away, /new starts a new conversation, /quit quits the app
-     and closes the conversation, Ctrl+C
-     stops a reply or, with nothing running, does what /quit does, Esc hides the
-     box.
+     and closes the conversation. A lone / and Enter lists these commands, and
+     so does a command the box does not have. Ctrl+C stops a reply or, with
+     nothing running, does what /quit does, Esc hides the box.
 
      Nothing is shown but the arrow and the text box until there is something
      to say. The arrow is the status: it pulses while the agent works and turns
@@ -714,6 +714,10 @@
       .option.spent {
         opacity: 0.4;
       }
+      /* A command in the list of commands, in the colour it has when it is typed. */
+      .option > .command {
+        color: var(--command);
+      }
       /* /usage: one row a limit, in columns: its name, how much is used, when it
          starts over. The words are the harness's own. */
       .left {
@@ -1170,8 +1174,22 @@
 
       // The box's own commands take their own colour as they are typed, so it is
       // plain they will be carried out here. Anything else that starts with "/"
-      // stays white: it goes to the agent as typed.
-      const COMMANDS = ['/model', '/backup', '/usage', '/login', '/harness', '/update', '/attach', '/history', '/pet', '/new', '/quit'];
+      // stays white: it goes to the agent as typed. Each has a few words for the
+      // list that a lone "/" or a mistyped command opens.
+      const ABOUT = [
+        ['/model', 'choose the model'],
+        ['/backup', 'the models to carry on with'],
+        ['/usage', 'what each provider has left'],
+        ['/login', 'sign in to a provider'],
+        ['/harness', 'which Oh-my-pi the box runs'],
+        ['/update', 'the newest checked Oh-my-pi'],
+        ['/attach', 'hand the agent a file'],
+        ['/history', 'earlier conversations'],
+        ['/pet', 'show the pet or put it away'],
+        ['/new', 'start a new conversation'],
+        ['/quit', 'quit Null'],
+      ];
+      const COMMANDS = ABOUT.map(([name]) => name);
       const tint = () => {
         const text = input.value;
         const command =
@@ -2117,6 +2135,125 @@
         openSignin();
       });
 
+      // ── The box's commands, as a list ──────────────────────────────────
+      //
+      // A lone "/" and Enter lists the commands, each with a few words. So does
+      // a slash-word that is not one of them, narrowed by what was typed: the
+      // commands that start with it come first, then those that have it in
+      // their name, then those with a word beside them that starts with it, then
+      // those a slip of the fingers away. Enter carries out the one chosen.
+      //
+      // Like the history list, this one takes the keys and the typing before
+      // the field's own handlers see them.
+
+      // How many single slips lie between two words: a letter wrong, missing or
+      // added, or two letters swapped.
+      const slips = (a, b) => {
+        const rows = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+        for (let j = 1; j <= b.length; j += 1) rows[0][j] = j;
+        for (let i = 1; i <= a.length; i += 1) {
+          for (let j = 1; j <= b.length; j += 1) {
+            const same = a[i - 1] === b[j - 1] ? 0 : 1;
+            rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + same);
+            if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) rows[i][j] = Math.min(rows[i][j], rows[i - 2][j - 2] + 1);
+          }
+        }
+        return rows[a.length][b.length];
+      };
+
+      // The commands that what was typed could mean, the likeliest first. All
+      // of them for a lone slash.
+      const commandsLike = (typed) => {
+        const word = typed.trim().toLowerCase().replace(/^\//, '');
+        if (!word) return ABOUT;
+        const rank = ([name, words]) => {
+          const bare = name.slice(1);
+          if (bare.startsWith(word)) return 0;
+          if (bare.includes(word)) return 1;
+          if (words.toLowerCase().split(' ').some((part) => part.startsWith(word))) return 2;
+          const off = slips(word, bare);
+          return off <= 2 ? 2 + off : null;
+        };
+        return ABOUT.map((command) => [rank(command), command])
+          .filter(([place]) => place !== null)
+          .sort((a, b) => a[0] - b[0])
+          .map(([, command]) => command);
+      };
+
+      const drawCommands = () => {
+        const like = commandsLike(input.value);
+        // Nothing like it: say so, and show them all, which is what was wanted.
+        picker.shown = like.length ? like : ABOUT;
+        picker.index = Math.min(picker.index, picker.shown.length - 1);
+        pick.textContent = '';
+        pick.append(el('div', 'provider', like.length ? 'commands' : `no command like ${input.value.trim()}`));
+        picker.shown.forEach((command, index) => {
+          const [name, words] = command;
+          const row = el('div', index === picker.index ? 'option selected' : 'option', el('span', 'command', name.padEnd(10)), el('span', 'id', words));
+          row.addEventListener('click', () => {
+            chooseCommand(command);
+            input.focus();
+          });
+          pick.append(row);
+        });
+        fit();
+      };
+
+      const openCommands = (typed) => {
+        if (picker || signin) return;
+        picker = { commands: true, models: [], current: null, shown: [], index: 0, backups: null, saved: [], spent: new Set(), left: new Map() };
+        out.style.display = 'none';
+        pick.style.display = 'block';
+        input.value = typed; // still there to be put right, and typing narrows the list
+        tint();
+        drawCommands();
+      };
+
+      const chooseCommand = (command) => {
+        if (!command) return;
+        closePicker();
+        send(command[0]);
+      };
+
+      window.addEventListener(
+        'keydown',
+        (event) => {
+          if (!picker || !picker.commands) return;
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            picker.index = Math.max(0, Math.min(picker.shown.length - 1, picker.index + step));
+            drawCommands();
+          } else if (event.key === 'Enter' && !event.isComposing) {
+            // A command typed out whole, with or without more after it, is
+            // carried out as typed. Anything else means the row chosen.
+            const typed = input.value.trim();
+            if (COMMANDS.some((name) => typed === name || typed.startsWith(`${name} `))) {
+              closePicker();
+              send(typed);
+            } else {
+              chooseCommand(picker.shown[picker.index]);
+            }
+          } else {
+            return; // Esc, Ctrl+C and typing are the page's own
+          }
+          event.preventDefault();
+          event.stopPropagation();
+        },
+        true,
+      );
+
+      window.addEventListener(
+        'input',
+        (event) => {
+          if (!picker || !picker.commands) return;
+          event.stopPropagation();
+          tint();
+          picker.index = 0;
+          drawCommands();
+        },
+        true,
+      );
+
       const send = async (text) => {
         if (text === '/model' || text.startsWith('/model ')) {
           openPicker(text.slice(6).trim());
@@ -2179,13 +2316,10 @@
         }
         // A lone slash-word that is not one of the box's commands is a slip, or a
         // command the box does not have. Sent on, the agent takes it for a message
-        // and sets off trying to work out what was meant. Hand it back instead.
-        if (/^\/[\w:-]+$/.test(text)) {
-          input.value = text;
-          tint();
-          // The line holds about 81 characters, and the commands alone are 78: a
-          // sentence around them would be cut off before the last of them.
-          notice(COMMANDS.join(' '));
+        // and sets off trying to work out what was meant. List the commands
+        // instead, the likeliest first. A lone slash asks for all of them.
+        if (/^\/[\w:-]*$/.test(text)) {
+          openCommands(text);
           return;
         }
         if (busy) {
