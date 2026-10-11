@@ -1314,6 +1314,29 @@
         ['/quit', 'quit Null'],
       ];
       const COMMANDS = ABOUT.map(([name]) => name);
+
+      // The commands the harness says it can carry out itself, as it last said
+      // so: one frame for each conversation, at its start and when the list
+      // changes. A skill it offers as "skill:<name>" is offered here by its bare
+      // name and sent as the harness spells it; anything else is sent as it is
+      // named. Nothing is copied: the harness finds the skills, and the box
+      // draws what it was told.
+      let harnessSaid = [];
+      // The harness's own words for one command, one line of them: what it says
+      // first, cut where the list has no room.
+      const saying = (words) => {
+        const first = (words || '').split('. ')[0].replace(/\.$/, '').trim();
+        return first.length > 48 ? `${first.slice(0, 47)}…` : first;
+      };
+      const harnessAbout = () =>
+        harnessSaid.map((one) => {
+          const bare = one.name.startsWith('skill:') ? one.name.slice('skill:'.length) : null;
+          return { name: `/${bare || one.name}`, sends: `/${one.name}`, words: saying(one.words), harness: true };
+        });
+      // Everything the box can carry out, the box's own first: one list, in the
+      // order the keys walk it, so a heading never sends the choice backwards.
+      const allAbout = () => ABOUT.map(([name, words]) => ({ name, sends: name, words, harness: false })).concat(harnessAbout());
+
       const tint = () => {
         const text = input.value;
         const command =
@@ -1423,6 +1446,13 @@
               busy = true;
               mark('working');
             }
+            break;
+          case 'commands':
+            // What the harness can carry out itself, as it last said so. Kept
+            // whole: a skill's bare name is offered in the list and sent as the
+            // harness spells it.
+            harnessSaid = event.commands || [];
+            if (picker && picker.commands) drawCommands();
             break;
           case 'model_changed':
             reply = null;
@@ -2572,40 +2602,56 @@
         return rows[a.length][b.length];
       };
 
-      // The commands that what was typed could mean, the likeliest first. All
-      // of them for a lone slash.
+      // The commands that what was typed could mean, the likeliest first: the
+      // box's own before the harness's, since the box's own are the ones carried
+      // out here. All of them for a lone slash.
       const commandsLike = (typed) => {
         const word = typed.trim().toLowerCase().replace(/^\//, '');
-        if (!word) return ABOUT;
-        const rank = ([name, words]) => {
-          const bare = name.slice(1);
+        if (!word) return allAbout();
+        const rank = (one) => {
+          const bare = one.name.slice(1).toLowerCase();
           if (bare.startsWith(word)) return 0;
           if (bare.includes(word)) return 1;
-          if (words.toLowerCase().split(' ').some((part) => part.startsWith(word))) return 2;
+          if (one.words.toLowerCase().split(' ').some((part) => part.startsWith(word))) return 2;
           const off = slips(word, bare);
           return off <= 2 ? 2 + off : null;
         };
-        return ABOUT.map((command) => [rank(command), command])
+        return allAbout()
+          .map((one) => [rank(one), one])
           .filter(([place]) => place !== null)
-          .sort((a, b) => a[0] - b[0])
-          .map(([, command]) => command);
+          .sort((a, b) => (a[1].harness ? 1 : 0) - (b[1].harness ? 1 : 0) || a[0] - b[0])
+          .map(([, one]) => one);
       };
 
       const drawCommands = () => {
         const like = commandsLike(input.value);
         // Nothing like it: say so, and show them all, which is what was wanted.
-        picker.shown = like.length ? like : ABOUT;
+        picker.shown = like.length ? like : allAbout();
         picker.index = Math.min(picker.index, picker.shown.length - 1);
         pick.textContent = '';
         pick.append(el('div', 'provider', like.length ? 'commands' : `no command like ${input.value.trim()}`));
-        picker.shown.forEach((command, index) => {
-          const [name, words] = command;
-          const row = el('div', index === picker.index ? 'option selected' : 'option', el('span', 'command', name.padEnd(10)), el('span', 'id', words));
-          row.addEventListener('click', () => {
-            chooseCommand(command);
-            input.focus();
+        // The box's own first, then the harness's: two sections, the first named
+        // and the second marked as the harness's, each lining its words up with
+        // its own widest name. With one kind only, the heading above is enough.
+        const sections = [
+          ['the box', picker.shown.filter((one) => !one.harness)],
+          ['the harness', picker.shown.filter((one) => one.harness)],
+        ].filter(([, rows]) => rows.length);
+        sections.forEach(([title, rows]) => {
+          if (sections.length > 1) pick.append(el('div', 'provider', title));
+          const wide = Math.max(...rows.map((one) => one.name.length));
+          rows.forEach((one) => {
+            const selected = picker.shown.indexOf(one) === picker.index;
+            // The harness's names stay white: it is the harness that carries them
+            // out, not the box.
+            const name = el('span', one.harness ? null : 'command', one.name.padEnd(wide));
+            const row = el('div', selected ? 'option selected' : 'option', name, el('span', 'id', one.words));
+            row.addEventListener('click', () => {
+              chooseCommand(one);
+              input.focus();
+            });
+            pick.append(row);
           });
-          pick.append(row);
         });
         fit();
       };
@@ -2623,7 +2669,7 @@
       const chooseCommand = (command) => {
         if (!command) return;
         closePicker();
-        send(command[0]);
+        send(command.sends);
       };
 
       window.addEventListener(
@@ -2636,11 +2682,13 @@
             drawCommands();
           } else if (event.key === 'Enter' && !event.isComposing) {
             // A command typed out whole, with or without more after it, is
-            // carried out as typed. Anything else means the row chosen.
+            // carried out as typed — in the harness's own spelling when it is
+            // one of the harness's. Anything else means the row chosen.
             const typed = input.value.trim();
-            if (COMMANDS.some((name) => typed === name || typed.startsWith(`${name} `))) {
+            const whole = allAbout().find((one) => typed === one.name || typed.startsWith(`${one.name} `));
+            if (whole) {
               closePicker();
-              send(typed);
+              send(whole.sends + typed.slice(whole.name.length));
             } else {
               chooseCommand(picker.shown[picker.index]);
             }
@@ -2681,6 +2729,7 @@
         noAnswer = false;
         watchQuiet();
         openFolder = null; // a new conversation is in the box's own folder, unless told otherwise
+        harnessSaid = []; // its own harness says what it can carry out, if it has not already
         if (!picker) mark('');
         mood(allSay('')); // whatever the pet was saying of the last conversation is over
         fit();
@@ -2867,11 +2916,21 @@
           if (left) notice('still working. /history shows it');
           return;
         }
-        // A lone slash-word that is not one of the box's commands is a slip, or a
-        // command the box does not have. Sent on, the agent takes it for a message
-        // and sets off trying to work out what was meant. List the commands
-        // instead, the likeliest first. A lone slash asks for all of them.
-        if (/^\/[\w:-]*$/.test(text)) {
+        // A command the harness says it can carry out goes to the harness, in the
+        // harness's own spelling: a skill it offers as "skill:<name>" is offered
+        // in the box by its bare name, so "/research" is sent as
+        // "/skill:research", with whatever follows it following that. The box's
+        // own commands were carried out above, and are not touched by this.
+        const leading = /^\/([\w:-]*)([\s\S]*)$/.exec(text);
+        const offered = leading && harnessSaid.find((one) => one.name === leading[1] || one.name === `skill:${leading[1]}`);
+        if (offered) {
+          text = `/${offered.name}${leading[2]}`;
+        } else if (/^\/[\w:-]*$/.test(text)) {
+          // A lone slash-word that is not one of the box's commands, and not one
+          // the harness offers, is a slip. Sent on, the agent takes it for a
+          // message and sets off trying to work out what was meant. List the
+          // commands instead, the likeliest first. A lone slash asks for all of
+          // them. (`BackgroundWork.md`, decision 7.)
           openCommands(text);
           return;
         }
