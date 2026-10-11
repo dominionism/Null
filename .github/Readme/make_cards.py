@@ -474,10 +474,14 @@ def development(c):
            "cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a "
            "stand-in provider, one of which reaches a real provider with a dummy key. With them "
            "runs the key check, which opens the box for a few seconds, signs in with a marked "
-           "dummy key and searches Null's log and settings for it. "
-           "NULL_MINI_ENGINE=<path> runs them on another Oh-my-pi, and Mini/Scripts/engine --to "
-           "<version> moves Null to that version only if they pass. Repository CI runs both on a Mac "
-           "runner whenever Mini/ changes, beside the Voice frontend typecheck and web build.")
+           "dummy key and searches Null's log and settings for it, and the box check: about thirty "
+           "runs of the real app, each one thing a person does in the box, on folders of their own "
+           "with the stand-in provider. Those take the keyboard for some minutes, so leave the Mac "
+           "alone and unlocked meanwhile. "
+           "NULL_MINI_ENGINE=<path> runs the harness check on another Oh-my-pi, and "
+           "Mini/Scripts/engine --to <version> moves Null to that version only if it passes. "
+           "Repository CI runs all three on a Mac runner whenever Mini/ changes, beside the Voice "
+           "frontend typecheck and web build.")
 
 
 def dev_switches(c):
