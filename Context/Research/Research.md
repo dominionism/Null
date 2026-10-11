@@ -27,6 +27,10 @@
 > renaming, deleting, searching inside, `Context/Plans/BackgroundWork.md`, items 1 to 4) were
 > written in where they belong, by the session that built the second. Nothing else was traced again.
 
+> Seventh addition, 2026-10-10: the stand-in's fifth answer, `slow`, and the five questions the
+> harness check asks about work in the background (`Context/Plans/BackgroundWork.md`, item 7) were
+> written in where they belong, by the session that built them. Nothing else was traced again.
+
 **Evidence boundary.** Source, manifests, relevant tests, research, ADRs and plans were read in this
 pass. Runtime evidence is limited to the installed Null startup/page-ready probe, Voice status and
 health, profile inventory, and unauthenticated API probes listed below. No test suite, build, model,
@@ -316,7 +320,7 @@ Twelve when this section was written; `engine.rs`, `check.rs`, `standin.rs` and 
 | `search.rs` | Finding a conversation by something said in it: the harness's conversation files are looked through as the owner types | Which conversations, and a piece of what was said. It keeps nothing and logs no word |
 | `engine.rs` | Which Oh-my-pi runs: the built-in one (beside Null's executable, or a newer checked one that `/update` fetched into the support folder), or the user's own by the `harness` setting; the commands `harnesses`, `set_harness` and `update_harness` | Which program, never what it does |
 | `check.rs` | Test-only: the harness check, with a stand-in provider and a throwaway folder (`cargo test -- --ignored`) | Whether a version answers as Null needs; nothing at run time |
-| `standin.rs` | The stand-in provider: a server on this Mac that answers by the model's name (`ok`, `limit`, `auth`, `noaccess`) in three ways of talking; used by the check, and by a scripted run of the app with `NULL_MINI_STANDIN` | What a provider would send; never a real provider, and never a file among the user's own |
+| `standin.rs` | The stand-in provider: a server on this Mac that answers by the model's name (`ok`, `limit`, `auth`, `noaccess`, `slow`) in three ways of talking; used by the check, and by a scripted run of the app with `NULL_MINI_STANDIN` | What a provider would send; never a real provider, and never a file among the user's own |
 | `providers.rs` | `omp usage --json --redact` (15 s limit, 60 s cache) set beside the model list | What is left; never an account name |
 | `signin.rs` | `omp login` on ordinary pipes: its list, its lines, its questions in, answers out | Nothing about provider semantics and nothing about steps having run |
 | `access.rs` | Full Disk Access: a file only it unlocks, one ask after the first reply that ended well, then the user's decision | That macOS asks folder by folder, not whether the user agrees |
@@ -478,7 +482,7 @@ margin); `resize` clamps to 76-314 and keeps the top-left corner; a saved positi
 | Surface | Commands |
 | --- | --- |
 | Null | `Mini/Scripts/engine` once, then `cargo build`, `cargo test`, `cargo tauri build` from `Mini/` |
-| Null harness check | `cargo test -- --ignored` (20 live tests, and the key check in `Mini/tests/keys.rs`, which opens the box for a few seconds); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
+| Null harness check | `cargo test -- --ignored` (25 live tests, and the key check in `Mini/tests/keys.rs`, which opens the box for a few seconds); `NULL_MINI_ENGINE=<path>` for another program; `Mini/Scripts/engine --to <version>` |
 | Null install | `Mini/Scripts/install` builds/signs/replaces the app and login agent; mutating, not a check |
 | Voice desktop dev | `just dev` starts backend if needed; `bun run dev` expects it separately |
 | Voice server/web | `bun run dev:server`, `bun run dev:web`, `just dev-web` |
@@ -491,7 +495,10 @@ own, made if missing: the harness's folder (`agent/`), its MCP definitions, Null
 the log (`null/`) are all under it, no `--profile` is passed, and removing the folder removes the
 run. A new one is a Mac with nothing signed in. `NULL_MINI_STANDIN=1` offers the stand-in provider
 (`Mini/src/standin.rs`, the one the harness check uses) in that folder, on a free port, as
-`standin-<anthropic|openai|codex>/<ok|limit|auth|noaccess>`. It refuses to start without a folder
+`standin-<anthropic|openai|codex>/<ok|limit|auth|noaccess|slow>`. `slow` says back the last line of
+the message it was sent, a word each quarter of a second, so a reply lasts as long as the message
+has words and something else can be asked while it is under way (not in the `codex` way of talking,
+which only refuses). It refuses to start without a folder
 and never overwrites a `models.yml` it did not write. Then `NULL_MINI_SMOKE` with
 `NULL_MINI_SMOKE_MODEL` (the harness alone), `NULL_MINI_SELFTEST` (the real page; choose the model
 beforehand with `{"model":"standin-anthropic/ok"}` in the folder's `null/settings.json`) or

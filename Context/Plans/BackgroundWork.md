@@ -10,8 +10,9 @@
 > 1 to 6, 2026-10-10): the list of commands, renaming, deleting to the Trash and searching
 > inside, each by its own pull request (#42 to #45, and #47 and #49 for two faults the owner's
 > use found). The owner's Mac runs 0.3.1 from the release. The owner used deleting; the log shows no title given and no search
-> yet. Next: work in the background itself (items 7 to 14), which is not started. The owner
-> confirmed the goal and settled all twelve decisions.**
+> yet. Work in the background itself (items 7 to 14) has begun: the harness check now asks
+> what it rests on (item 7, pull request #51), and nothing in the box has changed yet. Next:
+> item 8. The owner confirmed the goal and settled all twelve decisions.**
 
 ## Goal
 
@@ -572,7 +573,50 @@ both groups change the same list in the page: built one after the other, they do
    - Risk: a question that measures seconds fails on a slow runner. Know it by: the questions
      ask about order (a word of one arrives between two words of the other), not about time.
    - Source: researched finding (the trial) + inferred from codebase (`check.rs`).
-   - Status: Not started
+   - Status: Complete (2026-10-10). On `main` with pull request #51. Nothing in the box
+     changes with it
+   - **Built:** the stand-in has a fifth answer, `slow` (`Mini/src/standin.rs`), in
+     Anthropic's way of talking and in OpenAI's: it says back the last line of the message it
+     was sent, a quarter of a second and then a word, written as it comes. A harness that
+     stops the reply hangs up, and the rest is left unsaid. `ok` and `slow` are one reply
+     now, sent whole or a word at a time. The check's `Agent` (`Mini/src/check.rs`) sends a
+     message without waiting for the reply (`begin`, `ended`), stops one (`stop`), listens
+     until something has been heard (`hear_until`), and keeps each thing it hears with the
+     conversation it came from. Five new questions, 25 in all:
+     - two conversations in two folders answer at the same time;
+     - stopping one conversation leaves the other working;
+     - a second message to a conversation still answering stops the first reply;
+     - a conversation loads back while another is working;
+     - a closed conversation loads back.
+   - **Already there:** `translate::abilities` has said "closes a conversation" since item 3.
+   - **Decided by the agent:**
+     - **What `slow` says:** the message back, so that a reply shows which message it
+       answers and lasts as long as the message has words. Ten words are two and a half
+       seconds. Only the last line, because the harness puts a note of its own (the date and
+       the folder) in front of the first message of a conversation.
+     - **A quarter of a second for a word,** not the second of the trials, so that the check
+       stays quick: the five questions take four seconds together.
+     - **The ChatGPT way of talking has no `slow`,** as it has no `ok`: its stand-in only
+       refuses.
+     - **"While another is working" is asked with a conversation from an earlier run,** which
+       the harness does not hold. That is what opening from `/history` is, and the question
+       then does not lean on closing, which has a question of its own.
+     - **A question says when it can no longer tell.** Each of the four that need a reply
+       under way fails with "this can no longer be told" if the slow reply was over too
+       soon, where it could have passed by luck.
+   - **Proven without a person:** 96 unit tests, one new: `slow` says back the last line a
+     word at a time in both ways of talking, and no faster than its waits. The harness check
+     on the carried Oh-my-pi 18.8.7, 25 questions, four at a time as the runner asks them:
+     all passed, in 20 seconds. On this Mac the word passed from one reply to the other 19
+     times, where 2 would do; and when one conversation was stopped, or another loaded back,
+     the reply under way had said one word of its ten. With the wait taken out of `slow`,
+     the four questions that need a reply under way all failed and said why, so they ask
+     what they say.
+   - **Not proven:** the key check (`Mini/tests/keys.rs`) was left to the runner, since it
+     opens the box on the owner's screen. The owner's own Oh-my-pi, "yours". A newer
+     Oh-my-pi: the weekly job asks it these questions from its next run.
+   - **Left for item 13:** the README's card of the development switches names four answers
+     of the stand-in, not five.
 
 8. **`harness.rs` holds many conversations, and nothing looks different**
    - What: what is now one conversation's state (`Shared`: `busy`, the kept events and their
