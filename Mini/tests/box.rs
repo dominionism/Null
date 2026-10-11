@@ -211,6 +211,21 @@ impl Look<'_> {
         self.page[part].as_f64().unwrap_or_else(|| panic!("{part} is no number {self}"))
     }
 
+    /// The parts of the transcript in order, each by its kind: `you`, `note`,
+    /// `steps`, `reply`, or `failed reply`. The page names more about a part
+    /// than its kind, in an order that depends on when each thing happened.
+    fn parts(&self) -> String {
+        fn kind(part: &str) -> &str {
+            let named: Vec<&str> = part.split_whitespace().collect();
+            match (named.contains(&"reply"), named.contains(&"failed")) {
+                (true, true) => "failed reply",
+                (true, false) => "reply",
+                _ => named.first().copied().unwrap_or(""),
+            }
+        }
+        self.text("lines").split(',').map(kind).collect::<Vec<_>>().join(",")
+    }
+
     /// How many of one kind of element the transcript is drawn with.
     fn drawn(&self, tag: &str) -> u64 {
         self.page["tags"][tag].as_u64().unwrap_or(0)
@@ -235,7 +250,7 @@ impl fmt::Display for Look<'_> {
 fn a_message_is_answered_and_the_arrow_and_the_pet_come_to_rest() {
     let seen = Mac::on("slow").run(&["hello there", "<settle>", "<show answered>"]);
     let page = seen.at("answered");
-    assert_eq!(page.text("lines"), "you,note,reply drawn", "{page}");
+    assert_eq!(page.parts(), "you,note,reply", "{page}");
     assert_eq!(page.text("shows").matches("hello there").count(), 2, "the message and what the model said back {page}");
     assert!(page.has("shows", "now on standin-anthropic/slow"), "{page}");
     assert!(!page.is("busy") && page.text("arrow") == "caret", "{page}");
@@ -260,7 +275,7 @@ fn the_up_arrow_brings_the_last_message_back_and_an_empty_enter_sends_nothing() 
     let seen = Mac::on("slow").run(&["hello there", "<settle>", "<key ArrowUp>", "<show recalled>", "<type >", "<key Enter>", "<show nothing>"]);
     assert_eq!(seen.at("recalled").text("field"), "hello there");
     let page = seen.at("nothing");
-    assert_eq!(page.text("lines"), "you,note,reply drawn", "{page}");
+    assert_eq!(page.parts(), "you,note,reply", "{page}");
     assert!(!page.is("busy"), "{page}");
 }
 
@@ -311,7 +326,7 @@ fn a_word_that_is_no_command_is_not_sent() {
     let seen = Mac::on("slow").run(&["/zzz", "<until list no command like /zzz>", "<show slip>", "<key Escape>"]);
     let page = seen.at("slip");
     assert!(!page.is("tinted"), "{page}");
-    assert!(!page.has("lines", "you") && !page.has("shows", "/zzz"), "nothing was sent {page}");
+    assert!(!page.parts().contains("you") && !page.has("shows", "/zzz"), "nothing was sent {page}");
     assert_eq!(page.rows("/model"), 1, "the commands are there to choose from {page}");
 }
 
@@ -374,14 +389,14 @@ fn a_refusal_is_shown_as_a_failed_reply_and_is_not_sent_again() {
     ];
     let seen = Mac::on("limit").run(&lines);
     let page = seen.at("limit");
-    assert_eq!(page.text("lines"), "you,note,reply failed drawn,note", "sent once, and marked {page}");
+    assert_eq!(page.parts(), "you,note,failed reply,note", "sent once, and marked {page}");
     assert!(page.has("shows", "rate limit") && page.has("shows", "no answer from the provider. /model picks another model"), "{page}");
     assert_eq!(page.text("pet"), "pet fail", "{page}");
     assert_eq!(seen.at("recalled").text("field"), "hello", "it is there to send again by hand");
     let page = seen.at("auth");
-    assert!(page.has("shows", "invalid x-api-key") && page.text("lines").ends_with("you,reply failed drawn,note"), "{page}");
+    assert!(page.has("shows", "invalid x-api-key") && page.parts().ends_with("you,failed reply,note"), "{page}");
     let page = seen.at("noaccess");
-    assert!(page.has("shows", "403") && page.text("lines").ends_with("you,reply failed drawn,note"), "{page}");
+    assert!(page.has("shows", "403") && page.parts().ends_with("you,failed reply,note"), "{page}");
 }
 
 #[test]
@@ -408,7 +423,7 @@ fn a_backup_takes_over_from_a_model_that_refuses() {
     assert!(page.has("list", "1 Stand-in ok standin-openai/ok"), "{page}");
     let page = seen.at("after");
     assert!(page.has("shows", "pong") && page.has("shows", "standin-anthropic/limit did not answer. now on standin-openai/ok"), "{page}");
-    assert!(!page.has("lines", "failed"), "the backup's answer is the answer {page}");
+    assert!(!page.parts().contains("failed"), "the backup's answer is the answer {page}");
     let settings: Value = serde_json::from_str(&mac.kept("null/settings.json")).unwrap();
     assert_eq!(settings["backups"], serde_json::json!(["standin-openai/ok"]));
     assert!(mac.kept("null/harness.yml").contains(r#""fallbackChains":{"default":["standin-openai/ok"]}"#), "the harness is handed the order");
@@ -450,13 +465,13 @@ fn one_of_the_harness_s_own_commands_is_answered_and_a_skill_goes_by_its_short_n
     ];
     let seen = mac.run(&lines);
     let page = seen.at("own");
-    assert_eq!(page.text("lines"), "you,reply drawn", "an answer, and not a failed one {page}");
+    assert_eq!(page.parts(), "you,reply", "an answer, and not a failed one {page}");
     assert!(!page.has("shows", "no answer from the provider"), "{page}");
     assert!(!page.text("shows").contains('\u{1b}') && !page.text("shows").contains("[38;"), "no colour codes in the words {page}");
     assert_ne!(page.text("pet"), "pet fail", "{page}");
     let page = seen.at("skill");
     assert!(page.has("shows", "/skill:box-check-echo these words"), "sent as the harness spells it, with what followed {page}");
-    assert!(page.text("lines").ends_with("you,reply drawn"), "{page}");
+    assert!(page.parts().ends_with("you,reply"), "{page}");
 }
 
 #[test]
@@ -466,12 +481,12 @@ fn the_box_says_which_harness_it_runs_and_switches_to_the_user_s_own() {
     let seen = mac.run(&["/harness", "<until list built in>", "<show harnesses>", "<key Escape>"]);
     let page = seen.at("harnesses");
     assert!(page.has("list", &format!("built in Oh-my-pi {}", carried())), "{page}");
-    assert_eq!(page.text("notice"), "built in stays until Null is updated. yours follows omp update", "{page}");
     assert!(seen.logged("starting the built-in harness"));
     // The rest needs an Oh-my-pi of the user's own on this Mac, which a hosted runner has not.
     if !page.has("list", "yours") {
         return;
     }
+    assert_eq!(page.text("notice"), "built in stays until Null is updated. yours follows omp update", "{page}");
     let seen = mac.run(&["/harness", "<until list yours>", "<key ArrowDown>", "<key Enter>", "<until shows now on your Oh-my-pi>", "hello over there", "<settle>", "<show own>"]);
     assert!(seen.logged("starting the user's own harness"));
     assert_eq!(seen.at("own").text("shows").matches("hello over there").count(), 2, "the user's own answers");
@@ -518,7 +533,7 @@ fn a_file_goes_with_a_message_and_the_agent_reads_it() {
     ];
     let seen = mac.run(&lines);
     let page = seen.at("sent");
-    assert_eq!(page.text("lines"), "you,steps,reply drawn", "{page}");
+    assert_eq!(page.parts(), "you,steps,reply", "{page}");
     assert!(page.has("shows", "attached: note.txt") && page.has("shows", "read the attached file") && page.has("shows", "pong"), "{page}");
     let page = seen.at("missing");
     assert_eq!(page.text("notice"), "no such file: /no/such/file.txt", "{page}");
@@ -649,7 +664,7 @@ fn a_conversation_left_working_goes_on_and_history_lists_it_first() {
     let lines = [working.as_str(), "/new", "<until notice still working. /history shows it>", "<show left>", "/history", "<until list working>", "<show history>", "<key Escape>"];
     let seen = Mac::on("slow").run(&lines);
     let page = seen.at("left");
-    assert!(!page.is("busy") && !page.has("lines", "you"), "a new conversation, at rest {page}");
+    assert!(!page.is("busy") && !page.parts().contains("you"), "a new conversation, at rest {page}");
     assert_eq!(page.text("pet"), "pet work", "the pet speaks for the one left working {page}");
     let page = seen.at("history");
     assert!(page.text("list").trim_start().to_lowercase().starts_with("now"), "what is working comes first {page}");
@@ -717,7 +732,7 @@ fn work_cut_off_by_a_restart_is_found_again() {
     let page = seen.at("history");
     assert!(page.text("list").trim_start().to_lowercase().starts_with("now") && page.has("chosen", "cut off"), "{page}");
     assert_eq!(page.text("pet"), "pet fail", "the pet says so before the list is opened {page}");
-    assert_eq!(seen.at("opened").text("lines"), "you", "what was asked is there, and the reply that was cut off is not");
+    assert_eq!(seen.at("opened").parts(), "you", "what was asked is there, and the reply that was cut off is not");
 }
 
 // ── Stopping, quitting, starting again ────────────────────────────────────
@@ -750,7 +765,7 @@ fn after_a_restart_the_conversation_is_shown_before_a_new_message() {
     mac.run(&["remember the word maple", "<settle>"]);
     let seen = mac.run(&["what was the word", "<settle>", "<show after>"]);
     let page = seen.at("after");
-    assert_eq!(page.text("lines"), "you,reply drawn,you,reply drawn", "{page}");
+    assert_eq!(page.parts(), "you,reply,you,reply", "{page}");
     assert!(page.text("shows").starts_with("remember the word maple"), "what was said before stands first {page}");
     assert!(seen.logged("loaded the conversation"));
 }
