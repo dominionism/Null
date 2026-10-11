@@ -11,18 +11,6 @@
   <code>macOS 13+</code> &nbsp; <code>Oh-my-pi</code> &nbsp; <code>Rust + Tauri</code> &nbsp; <code>MIT</code>
 </p>
 
-<p align="center">
-  <a href="#get-started"><img src=".github/Readme/link-nav-get-started.svg" height="30" alt="Get started" /></a>
-  &nbsp;
-  <a href="#use-null"><img src=".github/Readme/link-nav-use-null.svg" height="30" alt="Use Null" /></a>
-  &nbsp;
-  <a href="#privacy-and-permissions"><img src=".github/Readme/link-nav-privacy.svg" height="30" alt="Privacy" /></a>
-  &nbsp;
-  <a href="#under-the-hood"><img src=".github/Readme/link-nav-architecture.svg" height="30" alt="Architecture" /></a>
-  &nbsp;
-  <a href="#development"><img src=".github/Readme/link-nav-development.svg" height="30" alt="Development" /></a>
-</p>
-
 <a id="small-surface-real-agent"></a>
 <p align="center">
   <img src=".github/Readme/surface.svg" width="100%" alt="Small surface. Real agent. Press Control+Space from the app you are in: your tools, not just chat; your providers in one conversation; readable without getting bigger; today, a standalone macOS text app with a small pet beside it, installed with one command, in which several conversations can work at once, each in a folder you choose." />
@@ -32,10 +20,6 @@
 <a id="step-1-the-harness-comes-with-null"></a>
 <p align="center">
   <img src=".github/Readme/step-harness.svg" width="100%" alt="1. The harness comes with Null: nothing to install first; Null carries one checked version of Oh-my-pi and works from OMP's usual folder, with your existing sign-ins, skills and MCP servers; OMP manages providers, subscriptions and keys; /harness switches to your own copy and back; Apple Silicon Macs only, for now." />
-</p>
-
-<p align="center">
-  <a href="https://github.com/can1357/oh-my-pi"><img src=".github/Readme/link-oh-my-pi.svg" height="30" alt="Oh-my-pi (opens https://github.com/can1357/oh-my-pi)" /></a>
 </p>
 
 <a id="step-2-install"></a>
@@ -49,12 +33,6 @@ To copy:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/null | sh -s install
 ```
-
-<p align="center">
-  <a href="https://rustup.rs/"><img src=".github/Readme/link-rust.svg" height="30" alt="Rust toolchain (opens https://rustup.rs/)" /></a>
-  &nbsp;
-  <a href="https://v2.tauri.app/start/prerequisites/#macos"><img src=".github/Readme/link-tauri.svg" height="30" alt="Tauri macOS prerequisites (opens https://v2.tauri.app/start/prerequisites/#macos)" /></a>
-</p>
 
 <a id="step-3-open-the-box"></a>
 <p align="center">
@@ -112,24 +90,6 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
   <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, search.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
 </p>
 
-<p align="center">
-  <a href="Mini/Page/index.html"><img src=".github/Readme/link-page-html.svg" height="30" alt="Page/index.html" /></a>
-  &nbsp;
-  <a href="Mini/src/harness.rs"><img src=".github/Readme/link-harness-rs.svg" height="30" alt="harness.rs" /></a>
-  &nbsp;
-  <a href="Mini/src/engine.rs"><img src=".github/Readme/link-engine-rs.svg" height="30" alt="engine.rs" /></a>
-  &nbsp;
-  <a href="Mini/src/translate.rs"><img src=".github/Readme/link-translate-rs.svg" height="30" alt="translate.rs" /></a>
-  &nbsp;
-  <a href="Mini/src/markdown.rs"><img src=".github/Readme/link-markdown-rs.svg" height="30" alt="markdown.rs" /></a>
-  &nbsp;
-  <a href="Mini/src/panel.rs"><img src=".github/Readme/link-panel-rs.svg" height="30" alt="panel.rs" /></a>
-  &nbsp;
-  <a href="Mini/src/settings.rs"><img src=".github/Readme/link-settings-rs.svg" height="30" alt="settings.rs" /></a>
-  &nbsp;
-  <a href="Mini/src/check.rs"><img src=".github/Readme/link-check-rs.svg" height="30" alt="check.rs" /></a>
-</p>
-
 <a id="development"></a>
 <p align="center">
   <img src=".github/Readme/development.svg" width="100%" alt="Development: Mini/Scripts/engine once to fetch the Oh-my-pi the build takes in, cd Mini and cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle, why not to use bunx tauri, the harness check, the key check and the box check." />
@@ -153,6 +113,49 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 <a id="license"></a>
 <p align="center">
   <img src=".github/Readme/license.svg" width="100%" alt="License: MIT, see LICENSE. Built by dominionism. A small box, with your agent behind it." />
+</p>
+
+<a id="links"></a>
+<p align="center">
+  <img src=".github/Readme/links.svg" width="100%" alt="Links: the cards above are pictures, so nothing in them can be pressed, and everything on this page that can be is in the rows below: the sections of this page, Oh-my-pi, the Rust toolchain and what Tauri needs on macOS, the files of the source map, and the license." />
+</p>
+
+<p align="center">
+  <a href="#get-started"><img src=".github/Readme/link-nav-get-started.svg" height="30" alt="Get started" /></a>
+  &nbsp;
+  <a href="#use-null"><img src=".github/Readme/link-nav-use-null.svg" height="30" alt="Use Null" /></a>
+  &nbsp;
+  <a href="#privacy-and-permissions"><img src=".github/Readme/link-nav-privacy.svg" height="30" alt="Privacy" /></a>
+  &nbsp;
+  <a href="#under-the-hood"><img src=".github/Readme/link-nav-architecture.svg" height="30" alt="Architecture" /></a>
+  &nbsp;
+  <a href="#development"><img src=".github/Readme/link-nav-development.svg" height="30" alt="Development" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/can1357/oh-my-pi"><img src=".github/Readme/link-oh-my-pi.svg" height="30" alt="Oh-my-pi (opens https://github.com/can1357/oh-my-pi)" /></a>
+  &nbsp;
+  <a href="https://rustup.rs/"><img src=".github/Readme/link-rust.svg" height="30" alt="Rust toolchain (opens https://rustup.rs/)" /></a>
+  &nbsp;
+  <a href="https://v2.tauri.app/start/prerequisites/#macos"><img src=".github/Readme/link-tauri.svg" height="30" alt="Tauri macOS prerequisites (opens https://v2.tauri.app/start/prerequisites/#macos)" /></a>
+</p>
+
+<p align="center">
+  <a href="Mini/Page/index.html"><img src=".github/Readme/link-page-html.svg" height="30" alt="Page/index.html" /></a>
+  &nbsp;
+  <a href="Mini/src/harness.rs"><img src=".github/Readme/link-harness-rs.svg" height="30" alt="harness.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/engine.rs"><img src=".github/Readme/link-engine-rs.svg" height="30" alt="engine.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/translate.rs"><img src=".github/Readme/link-translate-rs.svg" height="30" alt="translate.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/markdown.rs"><img src=".github/Readme/link-markdown-rs.svg" height="30" alt="markdown.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/panel.rs"><img src=".github/Readme/link-panel-rs.svg" height="30" alt="panel.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/settings.rs"><img src=".github/Readme/link-settings-rs.svg" height="30" alt="settings.rs" /></a>
+  &nbsp;
+  <a href="Mini/src/check.rs"><img src=".github/Readme/link-check-rs.svg" height="30" alt="check.rs" /></a>
 </p>
 
 <p align="center">
