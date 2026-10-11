@@ -154,6 +154,13 @@ when it is taken up; do not build the folder before there is a first skill to pu
      first thing is drawn as `/skill:blueprint` and carried out; the list that follows holds
      `THE BOX` and then `THE HARNESS`. `cargo test` 112 pass, no test re-pinned. The first `/` of a
      run now takes about a second while the harness starts, which is the cost of asking it.
+   - **Look, 0.5.2 (2026-10-11), after the owner's second look:** "But they don't turn blue like the
+     rest of the actual commands." The harness's commands were left plain in the list and untinted as
+     they were typed, on the old rule that the command's colour meant the box's own commands. Blue is
+     now a command the box can carry out, whichever of the two carries it out; a word neither of them
+     knows stays plain, which is what a slip looks like. The palette rule in `ConversationDisplay.md`
+     records the widening, the list's two headings still say whose each one is, and the now-unused
+     list of the box's own names in the page was removed with it.
 
 2. **The box's own words to the agent** (small, and only what the owner wants said)
    - What: when there is something the agent should know and the harness cannot tell it — starting

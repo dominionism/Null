@@ -39,6 +39,10 @@ where nothing wraps back under the arrow, without making the box bigger or busie
 - **Verbatim (user, earlier):** "the primary colors are black and white." The only other colours are
   amber (the agent is asking), red (errors) and blue (the box's own commands, and links). So code is
   not coloured by syntax.
+- **Widened (owner, 2026-10-11):** "But they don't turn blue like the rest of the actual commands."
+  Blue is a command the box can carry out, whichever of the two carries it out: the box's own, and the
+  commands the harness says it has. The list's sections say whose each one is. A word neither of them
+  knows stays plain, which is what a slip looks like.
 - **Verbatim (user, earlier):** "The null terminal is meant to be compact (while still looking modern
   and aesthetic)." The transcript stops at 212 px, ten lines, at the owner's request, and the box's
   heights are an exact contract with `src/panel.rs` (`MAX_HEIGHT` 314).
