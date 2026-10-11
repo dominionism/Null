@@ -10,8 +10,10 @@
 //! Nothing here touches the user's own Oh-my-pi folder or reaches a real
 //! provider. Each question gets a folder of its own, thrown away afterwards,
 //! and the provider is a stand-in on this Mac that answers by the name of the
-//! model asked for: `ok` replies, `limit` is used up, `auth` is a bad sign-in
-//! and `noaccess` is a model the account may not use (`standin.rs`).
+//! model asked for: `ok` replies, `limit` is used up, `auth` is a bad sign-in,
+//! `noaccess` is a model the account may not use, and `slow` says back what it
+//! was sent a word at a time, so that a reply is still under way while the
+//! next thing is asked (`standin.rs`).
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -104,6 +106,10 @@ struct Agent {
     hello: Value,
     /// Every update of a conversation heard so far, oldest first.
     updates: Vec<Value>,
+    /// The conversation each of those updates came from, in the same order.
+    from: Vec<String>,
+    /// The answers that came while another was waited for, by the number of their request.
+    answers: HashMap<u64, Result<Value, Value>>,
 }
 
 impl Agent {
@@ -132,7 +138,7 @@ impl Agent {
                 }
             }
         });
-        let mut agent = Agent { child, stdin, said, asked: 0, hello: Value::Null, updates: Vec::new() };
+        let mut agent = Agent { child, stdin, said, asked: 0, hello: Value::Null, updates: Vec::new(), from: Vec::new(), answers: HashMap::new() };
         let greeting = json!({ "protocolVersion": 1, "clientCapabilities": {}, "clientInfo": { "name": "null-mini", "title": "Null", "version": env!("CARGO_PKG_VERSION") } });
         agent.hello = agent.request("initialize", greeting).expect("the harness answers a greeting");
         agent
@@ -140,36 +146,93 @@ impl Agent {
 
     /// Send one request and wait for its answer: the result, or the error the harness gave.
     fn request(&mut self, method: &str, params: Value) -> Result<Value, Value> {
+        let sent = self.send(method, params);
+        self.answer(sent, method)
+    }
+
+    /// Send one request and do not wait, so that another can be on its way at
+    /// the same time. Gives the number its answer is asked for with.
+    fn send(&mut self, method: &str, params: Value) -> u64 {
         self.asked += 1;
-        let id = self.asked;
-        writeln!(self.stdin, "{}", json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params })).expect("the harness is listening");
+        writeln!(self.stdin, "{}", json!({ "jsonrpc": "2.0", "id": self.asked, "method": method, "params": params })).expect("the harness is listening");
+        self.asked
+    }
+
+    /// Wait for the answer to a request sent earlier.
+    fn answer(&mut self, sent: u64, method: &str) -> Result<Value, Value> {
         let until = Instant::now() + PATIENCE;
         loop {
-            let message = match self.said.recv_timeout(until.saturating_duration_since(Instant::now())) {
-                Ok(message) => message,
-                Err(mpsc::RecvTimeoutError::Timeout) => panic!("no answer to {method} in {} s", PATIENCE.as_secs()),
-                Err(mpsc::RecvTimeoutError::Disconnected) => panic!("the harness went away before it answered {method}"),
-            };
-            match (message.get("method").and_then(Value::as_str), message.get("id")) {
-                (None, Some(answered)) if *answered == json!(id) => {
-                    return match message.get("error") {
-                        Some(error) => Err(error.clone()),
-                        None => Ok(message["result"].clone()),
-                    };
-                }
-                (Some("session/update"), _) => self.updates.push(message["params"]["update"].clone()),
-                // Something the harness asks of Null. No question here needs one answered.
-                (Some(_), Some(theirs)) => {
-                    let _ = writeln!(self.stdin, "{}", json!({ "jsonrpc": "2.0", "id": theirs, "error": { "code": -32601, "message": "the check answers no requests" } }));
-                }
-                _ => {}
+            if let Some(answer) = self.answers.remove(&sent) {
+                return answer;
             }
+            self.hear(until, &format!("answer to {method}"));
         }
+    }
+
+    /// Go on listening until `come` says that what was waited for has been heard.
+    fn hear_until(&mut self, awaited: &str, come: impl Fn(&Agent) -> bool) {
+        let until = Instant::now() + PATIENCE;
+        while !come(self) {
+            self.hear(until, awaited);
+        }
+    }
+
+    /// Take in the next thing the harness says: an update is kept with the
+    /// conversation it came from, and an answer with the number of its request.
+    fn hear(&mut self, until: Instant, awaited: &str) {
+        let message = match self.said.recv_timeout(until.saturating_duration_since(Instant::now())) {
+            Ok(message) => message,
+            Err(mpsc::RecvTimeoutError::Timeout) => panic!("no {awaited} in {} s", PATIENCE.as_secs()),
+            Err(mpsc::RecvTimeoutError::Disconnected) => panic!("the harness went away with no {awaited}"),
+        };
+        match (message.get("method").and_then(Value::as_str), message.get("id")) {
+            (None, Some(answered)) => {
+                let answer = match message.get("error") {
+                    Some(error) => Err(error.clone()),
+                    None => Ok(message["result"].clone()),
+                };
+                if let Some(sent) = answered.as_u64() {
+                    self.answers.insert(sent, answer);
+                }
+            }
+            (Some("session/update"), _) => {
+                self.from.push(message["params"]["sessionId"].as_str().unwrap_or_default().to_string());
+                self.updates.push(message["params"]["update"].clone());
+            }
+            // Something the harness asks of Null. No question here needs one answered.
+            (Some(_), Some(theirs)) => {
+                let _ = writeln!(self.stdin, "{}", json!({ "jsonrpc": "2.0", "id": theirs, "error": { "code": -32601, "message": "the check answers no requests" } }));
+            }
+            _ => {}
+        }
+    }
+
+    /// The updates of one conversation among those heard from `since` on.
+    fn heard(&self, session: &str, since: usize) -> Vec<Value> {
+        self.updates[since..].iter().zip(&self.from[since..]).filter(|(_, from)| from.as_str() == session).map(|(update, _)| update.clone()).collect()
+    }
+
+    /// The words of one conversation's replies heard from `since` on, in the pieces they came in.
+    fn pieces(&self, session: &str, since: usize) -> Vec<String> {
+        self.heard(session, since).iter().filter_map(words_in).collect()
+    }
+
+    /// Whose reply was heard from `since` on, and whose after it: each
+    /// conversation named again every time the word passes to it.
+    fn turns(&self, since: usize) -> Vec<String> {
+        let mut turns: Vec<String> = self.updates[since..].iter().zip(&self.from[since..]).filter(|(update, _)| words_in(update).is_some()).map(|(_, from)| from.clone()).collect();
+        turns.dedup();
+        turns
     }
 
     /// Open a conversation as Null does. Gives its id and its settings.
     fn open(&mut self, folder: &Folder) -> (String, Value) {
-        let opened = self.request("session/new", json!({ "cwd": folder.work(), "mcpServers": [] })).expect("a conversation opens");
+        self.open_in(&folder.work())
+    }
+
+    /// Open a conversation that works in a folder of the question's choosing.
+    fn open_in(&mut self, work: &Path) -> (String, Value) {
+        let opened = self.request("session/new", json!({ "cwd": work, "mcpServers": [] })).expect("a conversation opens");
         (opened["sessionId"].as_str().expect("a conversation has an id").to_string(), opened["configOptions"].clone())
     }
 
@@ -194,14 +257,24 @@ impl Agent {
     fn hand(&mut self, session: &str, text: &str, files: &[PathBuf]) -> Result<(Value, String), Value> {
         let before = self.updates.len();
         let ended = self.request("session/prompt", json!({ "sessionId": session, "prompt": attach::blocks(text, files) }))?;
-        let mut tools = HashMap::new();
-        let words = self.updates[before..]
-            .iter()
-            .filter_map(|update| translate::event_from_update(update, &mut tools))
-            .filter(|event| event["type"] == "text_delta" && event["thinking"] == false)
-            .filter_map(|event| event["text"].as_str().map(str::to_string))
-            .collect();
-        Ok((ended, words))
+        Ok((ended, self.pieces(session, before).concat()))
+    }
+
+    /// Send a message and do not wait for the reply, so that another
+    /// conversation can be answering at the same time. Gives the number that
+    /// `ended` is asked with.
+    fn begin(&mut self, session: &str, text: &str) -> u64 {
+        self.send("session/prompt", json!({ "sessionId": session, "prompt": attach::blocks(text, &[]) }))
+    }
+
+    /// Wait for a reply begun earlier to be over. Gives how it ended.
+    fn ended(&mut self, begun: u64) -> Result<Value, Value> {
+        self.answer(begun, "session/prompt")
+    }
+
+    /// Stop a conversation's reply, as Ctrl+C in the box does. The harness answers nothing to it.
+    fn stop(&mut self, session: &str) {
+        writeln!(self.stdin, "{}", json!({ "jsonrpc": "2.0", "method": "session/cancel", "params": { "sessionId": session } })).expect("the harness is listening");
     }
 
     /// Every conversation the harness keeps, a page of its list at a time, as Null reads them.
@@ -220,6 +293,12 @@ impl Agent {
             }
         }
     }
+}
+
+/// The words an update adds to a reply, when it adds any. The model's thinking is not the reply.
+fn words_in(update: &Value) -> Option<String> {
+    let event = translate::event_from_update(update, &mut HashMap::new())?;
+    (event["type"] == "text_delta" && event["thinking"] == false).then(|| event["text"].as_str().map(str::to_string))?
 }
 
 impl Drop for Agent {
@@ -241,6 +320,13 @@ fn conversation_on(model: &str, backups: Option<Value>) -> (StandIn, Folder, Age
 }
 
 const MESSAGE: &str = "Reply with exactly one word: pong";
+
+/// The model that takes its time, and two messages for it. It says each back
+/// a word at a time, so a reply is its message again, and long enough that
+/// something else is asked and answered while it is still under way.
+const SLOW: &str = "standin-anthropic/slow";
+const TREES: &str = "alder birch cedar dogwood elm fir gum hazel ivy juniper";
+const BIRDS: &str = "avocet bunting crane dunlin egret finch godwit heron ibis jay";
 
 fn order(models: &[&str]) -> Vec<String> {
     models.iter().map(|model| model.to_string()).collect()
@@ -625,4 +711,148 @@ fn the_list_of_conversations_is_read_to_its_end_a_page_at_a_time() {
 
     let listed: std::collections::HashSet<String> = agent.conversations().iter().filter_map(|kept| kept["sessionId"].as_str().map(str::to_string)).collect();
     assert_eq!(listed, made, "the pages together are the conversations made, each once");
+}
+
+// ── What work in the background rests on ──────────────────────────────────
+
+/// Work in the background is several conversations answering at once in one
+/// harness, each in a folder of its own. So the harness has to take a message
+/// for one while another is still answering, and say both replies as they
+/// come: a word of one between two words of the other, each reply whole, its
+/// own, and ending well.
+#[test]
+#[ignore]
+fn two_conversations_in_two_folders_answer_at_the_same_time() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let elsewhere = folder.root.join("elsewhere");
+    std::fs::create_dir_all(&elsewhere).unwrap();
+    let mut agent = Agent::start(&engine::under_test(), &folder, None);
+    let (here, there) = (agent.open(&folder).0, agent.open_in(&elsewhere).0);
+    for session in [&here, &there] {
+        agent.set(session, "model", json!(SLOW));
+    }
+
+    let before = agent.updates.len();
+    let (first, second) = (agent.begin(&here, TREES), agent.begin(&there, BIRDS));
+    for (which, begun, session, sent) in [("the first", first, &here, TREES), ("the second", second, &there, BIRDS)] {
+        let ended = agent.ended(begun).unwrap_or_else(|error| panic!("{which} message was answered with an error: {error}"));
+        assert_eq!(ended["stopReason"], "end_turn", "{which} reply: {ended}");
+        assert!(!translate::reply_failed(&ended), "{which} reply was taken for a refusal: {ended}");
+        assert_eq!(agent.pieces(session, before).concat(), sent, "{which} reply is its own message said back, whole");
+    }
+    let turns = agent.turns(before);
+    assert!(turns.len() >= 3, "one reply was over before the other began, so they were not said at the same time: the word passed {} times", turns.len().saturating_sub(1));
+
+    let listed = agent.conversations();
+    assert_eq!((history::folder_of(&listed, &here), history::folder_of(&listed, &there)), (Some(folder.work()), Some(elsewhere)), "each in the folder it was opened in: {listed:?}");
+}
+
+/// Stopping one conversation is not stopping the harness. The reply that was
+/// stopped ends as stopped, and the other, still under way at that moment,
+/// goes on to its end and is whole.
+#[test]
+#[ignore]
+fn stopping_one_conversation_leaves_the_other_working() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let mut agent = Agent::start(&engine::under_test(), &folder, None);
+    let (stopped, left) = (agent.open(&folder).0, agent.open(&folder).0);
+    for session in [&stopped, &left] {
+        agent.set(session, "model", json!(SLOW));
+    }
+
+    let before = agent.updates.len();
+    let (first, second) = (agent.begin(&stopped, TREES), agent.begin(&left, BIRDS));
+    agent.hear_until("word from each conversation", |agent| !agent.pieces(&stopped, before).is_empty() && !agent.pieces(&left, before).is_empty());
+    let said_by_then = agent.pieces(&left, before).len();
+    agent.stop(&stopped);
+
+    let ended = agent.ended(first).unwrap_or_else(|error| panic!("the reply that was stopped ended with an error: {error}"));
+    assert_eq!(ended["stopReason"], "cancelled", "the reply that was stopped: {ended}");
+    assert_ne!(agent.pieces(&stopped, before).concat(), TREES, "the reply that was stopped was said to its end all the same");
+    let ended = agent.ended(second).unwrap_or_else(|error| panic!("the other reply ended with an error: {error}"));
+    assert_eq!(ended["stopReason"], "end_turn", "the other reply: {ended}");
+    assert_eq!(agent.pieces(&left, before).concat(), BIRDS, "the other reply is whole");
+    assert!(agent.pieces(&left, before).len() > said_by_then, "the other reply was over before the first was stopped, so this can no longer be told");
+}
+
+/// A second message to a conversation that is still answering is neither
+/// refused nor kept for later: the harness stops the first reply and answers
+/// the second. So the box has to go on refusing one itself.
+#[test]
+#[ignore]
+fn a_second_message_to_a_conversation_still_answering_stops_the_first_reply() {
+    let (_standin, _folder, mut agent, session, _) = conversation_on(SLOW, None);
+    let before = agent.updates.len();
+    let first = agent.begin(&session, TREES);
+    agent.hear_until("word of the first reply", |agent| !agent.pieces(&session, before).is_empty());
+    let second = agent.begin(&session, BIRDS);
+
+    let ended = agent.ended(first).unwrap_or_else(|error| panic!("the first reply ended with an error: {error}"));
+    assert_eq!(ended["stopReason"], "cancelled", "the first reply: {ended}");
+    let ended = agent.ended(second).unwrap_or_else(|error| panic!("the second message was answered with an error, so it is refused now: {error}"));
+    assert_eq!(ended["stopReason"], "end_turn", "the second reply: {ended}");
+    let said = agent.pieces(&session, before).concat();
+    assert!(said.ends_with(BIRDS), "the second message is answered whole: {said}");
+    assert!(!said.contains(TREES), "the first reply was said to its end, so the second message waited for it: {said}");
+}
+
+/// A conversation is opened from `/history` while another is working: the
+/// harness has to load it back and replay what was said in it, and the reply
+/// under way has to go on to its end as if nothing had been asked.
+#[test]
+#[ignore]
+fn a_conversation_loads_back_while_another_is_working() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let binary = engine::under_test();
+    // One from an earlier run, which this harness does not hold.
+    let earlier = {
+        let mut agent = Agent::start(&binary, &folder, None);
+        let (earlier, _) = agent.open(&folder);
+        agent.set(&earlier, "model", json!("standin-anthropic/ok"));
+        agent.say(&earlier, MESSAGE).expect("the message is answered");
+        earlier
+    };
+
+    let mut agent = Agent::start(&binary, &folder, None);
+    let (working, _) = agent.open(&folder);
+    agent.set(&working, "model", json!(SLOW));
+    let before = agent.updates.len();
+    let begun = agent.begin(&working, TREES);
+    agent.hear_until("word of the reply", |agent| !agent.pieces(&working, before).is_empty());
+
+    agent.load(&folder, &earlier).unwrap_or_else(|error| panic!("the earlier conversation did not load back while another was working: {error}"));
+    let said_by_then = agent.pieces(&working, before).len();
+    let replayed = history::replayed(&agent.heard(&earlier, before));
+    assert_eq!(replayed.first(), Some(&json!({ "type": "user_message", "text": MESSAGE })), "what was said in it is replayed: {replayed:?}");
+    assert!(replayed.contains(&json!({ "type": "text_delta", "text": "pong", "thinking": false })), "and what was replied: {replayed:?}");
+
+    let ended = agent.ended(begun).unwrap_or_else(|error| panic!("the reply under way ended with an error: {error}"));
+    assert_eq!(ended["stopReason"], "end_turn", "the reply under way: {ended}");
+    assert_eq!(agent.pieces(&working, before).concat(), TREES, "the reply under way is whole");
+    assert!(agent.pieces(&working, before).len() > said_by_then, "the reply was over before the other had loaded, so this can no longer be told");
+}
+
+/// A conversation that has ended and been looked at is closed in the harness,
+/// so that Null holds only what is working or waiting to be seen. Closed, it
+/// has to stay in the harness's list, load back with what was said in it, and
+/// take the next message.
+#[test]
+#[ignore]
+fn a_closed_conversation_loads_back() {
+    let (_standin, folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", None);
+    assert!(translate::closes_conversations(&agent.hello), "the harness does not say that it closes a conversation: {}", agent.hello);
+    agent.say(&session, MESSAGE).expect("the message is answered");
+    agent.request("session/close", json!({ "sessionId": session })).unwrap_or_else(|error| panic!("the harness did not close the conversation: {error}"));
+    assert!(agent.conversations().iter().any(|kept| kept["sessionId"] == session.as_str()), "a closed conversation is still in the harness's list");
+
+    let before = agent.updates.len();
+    agent.load(&folder, &session).unwrap_or_else(|error| panic!("the closed conversation did not load back: {error}"));
+    let replayed = history::replayed(&agent.heard(&session, before));
+    assert_eq!(replayed.first(), Some(&json!({ "type": "user_message", "text": MESSAGE })), "what was said in it is replayed: {replayed:?}");
+    assert!(replayed.contains(&json!({ "type": "text_delta", "text": "pong", "thinking": false })), "and what was replied: {replayed:?}");
+    let (ended, words) = agent.say(&session, MESSAGE).unwrap_or_else(|error| panic!("the next message was answered with an error: {error}"));
+    assert_eq!(words.trim(), "pong", "the next message continues it: {ended}");
 }
