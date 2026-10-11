@@ -166,9 +166,20 @@ struct Conversation {
     /// The folder it works in, when that is not the box's own. It is chosen
     /// when the conversation starts and does not change.
     folder: Option<PathBuf>,
+    /// The names of the commands the harness last said it can carry out here.
+    commands: Vec<String>,
 }
 
 impl Conversation {
+    /// Whether `text` is one of the harness's own commands: one it carries out
+    /// itself, and not a skill, which is a message to the model under another
+    /// name. The harness answers such a command without a model, so the answer
+    /// counts no tokens and is still no refusal.
+    fn answers_itself(&self, text: &str) -> bool {
+        let name = text.strip_prefix('/').and_then(|rest| rest.split(char::is_whitespace).next()).unwrap_or_default();
+        !name.is_empty() && !name.starts_with("skill:") && self.commands.iter().any(|command| command == name)
+    }
+
     /// How it stands, in the box's own words. A reply under way is working,
     /// or asking while it waits for the person's answer. Otherwise it is as
     /// its last reply ended. None for one that nothing has been asked of yet.
@@ -303,6 +314,12 @@ impl Shared {
     /// for a conversation this run no longer holds.
     fn record(&mut self, which: u64, event: Value) -> Option<u64> {
         let conversation = self.held.get_mut(&which)?;
+        // What the harness carries out itself is kept by name as well: the list
+        // of events is cut at its old end, and this is asked at every message.
+        if event["type"] == "commands" {
+            let named = event["commands"].as_array().into_iter().flatten().filter_map(|command| command["name"].as_str());
+            conversation.commands = named.map(str::to_string).collect();
+        }
         self.seq += 1;
         conversation.events.push_back((self.seq, event));
         while conversation.events.len() > MAX_EVENTS {
@@ -860,6 +877,8 @@ impl Connection<'_> {
                 history::said(self.app, &session, &text);
                 let request: PromptRequest = typed(json!({ "sessionId": session, "prompt": attach::blocks(&text, &files) }))?;
                 let with_files = !files.is_empty();
+                // One of the harness's own commands is answered by the harness, with no model asked.
+                let own = with(self.shared, which, |held| held.answers_itself(&text)).unwrap_or(false);
                 let (app, shared) = (self.app.clone(), self.shared.clone());
                 self.cx
                     .send_request(request)
@@ -874,7 +893,8 @@ impl Connection<'_> {
                                     let (failed, counts) = translate::judge_reply(&response, shared.counts_tokens);
                                     let learned = (counts && !shared.counts_tokens).then(|| shared.noted.clone()).flatten();
                                     shared.counts_tokens = counts;
-                                    (failed, learned)
+                                    // A reply without a count is a refusal only where a model was asked.
+                                    (failed && !own, learned)
                                 };
                                 if let Some(version) = learned {
                                     log!("this harness counts a reply's tokens; from now on a reply without a count is taken for a refusal");
@@ -1825,6 +1845,24 @@ mod tests {
         assert_eq!(kept(&mut shared, second), Some(vec![(2, json!("b"))]));
         assert_eq!(shared.record(99, json!("d")), None, "nothing is kept for a conversation this run does not hold");
         assert_eq!(shared.seq, 3, "and it takes no number");
+    }
+
+    #[test]
+    fn one_of_the_harness_s_own_commands_is_answered_without_a_model() {
+        let mut shared = Shared::new(None, None);
+        let open = shared.open;
+        assert!(!shared.open_one().answers_itself("/context"), "nothing is the harness's own before it has said what it has");
+        shared.record(open, json!({ "type": "commands", "commands": [{ "name": "context", "words": "", "hint": "" }, { "name": "skill:research", "words": "", "hint": "" }] }));
+        let held = shared.open_one();
+        assert!(held.answers_itself("/context"));
+        assert!(held.answers_itself("/context and what follows it"));
+        assert!(!held.answers_itself("/skill:research the box"), "a skill is a message to the model under another name");
+        assert!(!held.answers_itself("/contexts"));
+        assert!(!held.answers_itself("what does /context say"));
+        assert!(!held.answers_itself("/"));
+        // What it has is what it last said it has.
+        shared.record(open, json!({ "type": "commands", "commands": [] }));
+        assert!(!shared.open_one().answers_itself("/context"));
     }
 
     #[test]
