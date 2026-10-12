@@ -114,19 +114,3 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 <p align="center">
   <img src=".github/Readme/license.svg" width="100%" alt="License: MIT, see LICENSE. Built by dominionism. A small box, with your agent behind it." />
 </p>
-
-<a id="links"></a>
-<p align="center">
-  <img src=".github/Readme/links-on-this-page.svg" width="100%" alt="On this page" />
-  <a href="#get-started"><img src=".github/Readme/link-nav-get-started.svg" width="33.3%" alt="Get started: Install Null and open the box" /></a><a href="#use-null"><img src=".github/Readme/link-nav-use-null.svg" width="33.3%" alt="Use Null: The keys that work in the box" /></a><a href="#commands"><img src=".github/Readme/link-nav-commands.svg" width="33.3%" alt="Commands: Each command and what it does" /></a><a href="#privacy-and-permissions"><img src=".github/Readme/link-nav-privacy.svg" width="33.3%" alt="Privacy: What leaves your Mac, and when" /></a><a href="#under-the-hood"><img src=".github/Readme/link-nav-architecture.svg" width="33.3%" alt="Architecture: How the box reaches your agent" /></a><a href="#development"><img src=".github/Readme/link-nav-development.svg" width="33.3%" alt="Development: Build it and run the checks" /></a>
-</p>
-
-<p align="center">
-  <img src=".github/Readme/links-elsewhere.svg" width="100%" alt="Elsewhere" />
-  <a href="https://github.com/can1357/oh-my-pi"><img src=".github/Readme/link-oh-my-pi.svg" width="33.3%" alt="Oh-my-pi: The harness inside Null (opens https://github.com/can1357/oh-my-pi)" /></a><a href="https://rustup.rs/"><img src=".github/Readme/link-rust.svg" width="33.3%" alt="Rust toolchain: To build Null yourself (opens https://rustup.rs/)" /></a><a href="https://v2.tauri.app/start/prerequisites/#macos"><img src=".github/Readme/link-tauri.svg" width="33.3%" alt="Tauri prerequisites: What a build needs on macOS (opens https://v2.tauri.app/start/prerequisites/#macos)" /></a>
-</p>
-
-<p align="center">
-  <img src=".github/Readme/links-in-this-repository.svg" width="100%" alt="In this repository" />
-  <a href="Mini/Page/index.html"><img src=".github/Readme/link-page-html.svg" width="33.3%" alt="Page/index.html: Input, commands and transcript" /></a><a href="Mini/src/harness.rs"><img src=".github/Readme/link-harness-rs.svg" width="33.3%" alt="harness.rs: Talks to the agent over ACP" /></a><a href="Mini/src/translate.rs"><img src=".github/Readme/link-translate-rs.svg" width="33.3%" alt="translate.rs: Translates the agent&#x27;s events" /></a><a href="Mini/src/engine.rs"><img src=".github/Readme/link-engine-rs.svg" width="33.3%" alt="engine.rs: Which Oh-my-pi runs" /></a><a href="Mini/src/markdown.rs"><img src=".github/Readme/link-markdown-rs.svg" width="33.3%" alt="markdown.rs: Replies into structured parts" /></a><a href="Mini/src/panel.rs"><img src=".github/Readme/link-panel-rs.svg" width="33.3%" alt="panel.rs: The window and the pet&#x27;s room" /></a><a href="Mini/src/settings.rs"><img src=".github/Readme/link-settings-rs.svg" width="33.3%" alt="settings.rs: What Null remembers" /></a><a href="Mini/src/check.rs"><img src=".github/Readme/link-check-rs.svg" width="33.3%" alt="check.rs: Live tests of the harness" /></a><a href="LICENSE"><img src=".github/Readme/link-license.svg" width="33.3%" alt="LICENSE: MIT: what you may do with Null" /></a>
-</p>
