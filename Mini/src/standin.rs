@@ -357,18 +357,19 @@ fn wanted(said: &Value) -> Option<(String, Value)> {
     }
     let told = words(last);
     let line = told.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default().trim();
-    let (name, mut input) = if let Some(command) = line.strip_prefix(ASK_THE_SHELL) {
-        ("bash", serde_json::Map::from_iter([("command".to_string(), json!(command))]))
+    // The tool, what it is given, and a word about why, which the box shows as the step.
+    let (name, mut input, why) = if let Some(command) = line.strip_prefix(ASK_THE_SHELL) {
+        ("bash", serde_json::Map::from_iter([("command".to_string(), json!(command))]), "asked for by the stand-in")
     } else if let Some(code) = line.strip_prefix(ASK_FOR_CODE) {
-        ("eval", serde_json::Map::from_iter([("language".to_string(), json!("js")), ("code".to_string(), json!(code))]))
+        ("eval", serde_json::Map::from_iter([("language".to_string(), json!("js")), ("code".to_string(), json!(code))]), "asked for by the stand-in")
     } else {
         let file = crate::attach::split(told.trim_end()).1.into_iter().next()?;
-        ("read", serde_json::Map::from_iter([("path".to_string(), json!(file))]))
+        ("read", serde_json::Map::from_iter([("path".to_string(), json!(file))]), "read the attached file")
     };
     let tool = said.get("tools")?.as_array()?.iter().find(|tool| tool["name"].as_str().is_some_and(|offered| offered.trim_start_matches('_') == name))?;
-    // Whatever else the tool insists on is a word about why.
+    // Whatever else the tool insists on is that word.
     for wanted in tool.pointer("/input_schema/required").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
-        input.entry(wanted).or_insert(json!("asked for by the stand-in"));
+        input.entry(wanted).or_insert(json!(why));
     }
     Some((tool["name"].as_str()?.to_string(), Value::Object(input)))
 }
@@ -425,6 +426,19 @@ mod tests {
     fn request(message: Value) -> Value {
         let tool = |name: &str, required: &[&str]| json!({ "name": name, "input_schema": { "required": required } });
         json!({ "tools": [tool("_read", &["path"]), tool("_bash", &["command", "i"]), tool("_eval", &["language", "code"])], "messages": [message] })
+    }
+
+    #[test]
+    fn handed_a_file_it_asks_to_read_it_and_says_why_in_the_words_the_box_shows() {
+        // A message as the harness passes it on: the words, then where the file is.
+        let told = crate::attach::blocks("what does the note say", &[std::path::PathBuf::from("/tmp/a note.txt")]);
+        let words: Vec<&str> = told.as_array().into_iter().flatten().filter_map(|block| block["text"].as_str().or(block["title"].as_str())).collect();
+        let said = request(json!({ "role": "user", "content": words.join("\n\n") }));
+        assert_eq!(wanted(&said), Some(("_read".to_string(), json!({ "path": "/tmp/a note.txt" }))), "the tool asks for nothing but where the file is");
+        // A tool that also insists on a word about why is given the words the box then shows as the step.
+        let mut insists = said.clone();
+        insists["tools"][0] = json!({ "name": "_read", "input_schema": { "required": ["path", "i"] } });
+        assert_eq!(wanted(&insists), Some(("_read".to_string(), json!({ "path": "/tmp/a note.txt", "i": "read the attached file" }))));
     }
 
     #[test]
