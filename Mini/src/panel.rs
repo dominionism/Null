@@ -20,7 +20,7 @@ use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 
 use crate::log::log;
-use crate::{access, harness, settings, signin};
+use crate::{access, computer, harness, settings, signin};
 
 pub const LABEL: &str = "mini";
 
@@ -339,6 +339,8 @@ fn place(window: &WebviewWindow, saved: Option<(i32, i32)>, lane: f64) {
 }
 
 pub fn show(app: &AppHandle) {
+    // Back from System Settings, perhaps: what macOS allows may have changed.
+    computer::look_again(app);
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         let Ok(panel) = handle.get_webview_panel(LABEL) else {

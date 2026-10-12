@@ -148,6 +148,7 @@ fn main() {
             backups::set_backups,
             computer::computer,
             computer::set_computer,
+            computer::ask_permission,
             engine::harnesses,
             engine::set_harness,
             engine::update_harness,

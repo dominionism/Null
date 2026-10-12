@@ -1,5 +1,7 @@
-//! Full Disk Access: whether macOS lets Null, and so the agent it starts, read
-//! any file without asking.
+//! What macOS lets Null do, and so the agent it starts: Full Disk Access, and
+//! the two permissions computer use needs.
+//!
+//! Full Disk Access is whether the agent may read any file without macOS asking.
 //!
 //! macOS holds Null responsible for whatever the harness touches. Without Full
 //! Disk Access it asks the user about each protected folder in turn, and an agent
@@ -15,6 +17,7 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 use crate::log::log;
@@ -116,9 +119,152 @@ pub fn after_reply(app: &AppHandle) {
     });
 }
 
+// ── What computer use needs ───────────────────────────────────────────────
+//
+// The harness's computer use reads what a window holds and presses in it, which
+// macOS lets a program do only with Accessibility, and takes pictures of the
+// screen, which needs Screen Recording. macOS charges both to Null, which
+// starts the harness. Unlike Full Disk Access, macOS has a question of its own
+// for each, and asking it is also what puts Null in the list. Null asks only
+// when the person switches computer use on, or asks for one in the `/computer`
+// list: never at a start, and never by surprise.
+
+/// One of macOS's permissions that computer use needs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Permission {
+    /// To read what a window holds, and to press and type in it.
+    Accessibility,
+    /// To take a picture of the screen, for what a window's controls do not say.
+    Screen,
+}
+
+/// How one of them stands, for the box to say.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Need {
+    pub permission: Permission,
+    /// The name of its list in System Settings.
+    pub name: &'static str,
+    /// Whether macOS has given it to Null.
+    pub given: bool,
+}
+
+/// macOS's own functions for the two. The first of each pair only answers; the
+/// second shows macOS's dialog.
+#[allow(non_snake_case, non_upper_case_globals)]
+mod macos {
+    use std::ffi::c_void;
+
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        pub fn AXIsProcessTrusted() -> u8;
+        pub fn AXIsProcessTrustedWithOptions(options: *const c_void) -> u8;
+        pub static kAXTrustedCheckOptionPrompt: *const c_void;
+    }
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        pub fn CGPreflightScreenCaptureAccess() -> bool;
+        pub fn CGRequestScreenCaptureAccess() -> bool;
+    }
+}
+
+impl Permission {
+    pub const BOTH: [Permission; 2] = [Permission::Accessibility, Permission::Screen];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Permission::Accessibility => "Accessibility",
+            Permission::Screen => "Screen Recording",
+        }
+    }
+
+    /// Its list in System Settings.
+    fn list(self) -> &'static str {
+        match self {
+            Permission::Accessibility => "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            Permission::Screen => "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+        }
+    }
+
+    /// Whether macOS has given it to Null. Finding out shows nothing.
+    pub fn given(self) -> bool {
+        // SAFETY: both take nothing and only answer.
+        unsafe {
+            match self {
+                Permission::Accessibility => macos::AXIsProcessTrusted() != 0,
+                Permission::Screen => macos::CGPreflightScreenCaptureAccess(),
+            }
+        }
+    }
+}
+
+/// How the two stand now.
+pub fn needs() -> Vec<Need> {
+    Permission::BOTH.iter().map(|&permission| Need { permission, name: permission.name(), given: permission.given() }).collect()
+}
+
+/// The first of them macOS has not given, in the order they are asked for.
+pub fn first_missing(needs: &[Need]) -> Option<Permission> {
+    needs.iter().find(|need| !need.given).map(|need| need.permission)
+}
+
+/// Ask macOS for one. Its own dialog names Null and leads to the switch. The
+/// list in System Settings is opened as well, since macOS shows its dialog for
+/// Screen Recording once only, and afterwards answers no without a word.
+pub fn ask(app: &AppHandle, which: Permission) {
+    if settings::own_folder().is_some() {
+        // A scripted run on a folder of its own sends nobody anywhere.
+        log!("{} is off; a run on a folder of its own asks macOS for nothing", which.name());
+        return;
+    }
+    log!("{} is off; asking macOS for it, and opening its list in System Settings", which.name());
+    // macOS's dialogs belong to the main thread.
+    let _ = app.run_on_main_thread(move || {
+        use objc::runtime::{Object, YES};
+        use objc::{class, msg_send, sel, sel_impl};
+        // SAFETY: the dialog is asked for with the one option it takes, in a dictionary that
+        // lives until the call returns; the other function takes nothing.
+        unsafe {
+            match which {
+                Permission::Accessibility => {
+                    let yes: *mut Object = msg_send![class!(NSNumber), numberWithBool: YES];
+                    let options: *mut Object = msg_send![class!(NSDictionary), dictionaryWithObject: yes forKey: macos::kAXTrustedCheckOptionPrompt as *mut Object];
+                    macos::AXIsProcessTrustedWithOptions(options as *const std::ffi::c_void);
+                }
+                Permission::Screen => {
+                    macos::CGRequestScreenCaptureAccess();
+                }
+            }
+        }
+    });
+    // Off the caller's thread: this opens another app.
+    std::thread::spawn(move || {
+        if let Err(e) = std::process::Command::new("/usr/bin/open").arg(which.list()).status() {
+            log!("could not open System Settings: {e}");
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_first_permission_not_given_is_the_one_asked_for() {
+        let stands = |accessibility: bool, screen: bool| vec![Need { permission: Permission::Accessibility, name: "Accessibility", given: accessibility }, Need { permission: Permission::Screen, name: "Screen Recording", given: screen }];
+        assert_eq!(first_missing(&stands(false, false)), Some(Permission::Accessibility), "reading and pressing comes before pictures");
+        assert_eq!(first_missing(&stands(true, false)), Some(Permission::Screen));
+        assert_eq!(first_missing(&stands(false, true)), Some(Permission::Accessibility));
+        assert_eq!(first_missing(&stands(true, true)), None, "with both given, macOS is asked for nothing");
+    }
+
+    #[test]
+    fn a_permission_is_named_to_the_page_in_one_small_word() {
+        assert_eq!(serde_json::to_value(Permission::Accessibility).unwrap(), "accessibility");
+        assert_eq!(serde_json::to_value(Permission::Screen).unwrap(), "screen");
+        assert_eq!(serde_json::from_value::<Permission>(serde_json::json!("screen")).unwrap(), Permission::Screen);
+    }
 
     #[test]
     fn a_refused_file_means_off_and_an_opened_one_means_on() {

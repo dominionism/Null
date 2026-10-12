@@ -1969,19 +1969,45 @@
       // /computer says whether the agent may see the screen and work the apps on
       // this Mac, and switches it. The harness does the seeing and the pressing;
       // the app only tells it, at its next start, what was chosen here. Two rows,
-      // the one in force marked, as with /harness.
+      // the one in force marked, as with /harness. While it is on, two more: the
+      // permissions macOS wants for it, each with how it stands. Enter on one that
+      // is missing has macOS ask for it and opens its list in System Settings.
       const computerWords = (standing) => {
         if (!standing.on) return 'the agent cannot see the screen or work your apps';
         if (!standing.freely) return 'refused for now: Oh-my-pi is set to ask first, and cannot ask about this in the box';
         return 'the agent may see the screen and work your apps, without asking you first';
       };
 
+      const needWords = (need) => {
+        if (need.given) return 'on';
+        const why = need.permission === 'accessibility' ? 'needed to read a window and to press in it' : 'needed for pictures of the screen';
+        return `off · ${why}. enter opens its switch`;
+      };
+
+      // What is missing of what macOS wants, as the notice line says it.
+      const missingWords = (standing) => {
+        const missing = standing.needs.filter((need) => !need.given).map((need) => need.name);
+        return missing.length ? `turn on Null under ${missing.join(' and under ')} in System Settings` : '';
+      };
+
+      // The notice line says what macOS has still to give, and goes on saying it
+      // until it is given: the person is away in System Settings meanwhile. Each
+      // time the box comes back the app is asked again, and the line follows.
+      let needsSaid = false;
+      const sayNeeds = (standing) => {
+        const words = standing.on ? missingWords(standing) : '';
+        if (words) notice(words, true);
+        else if (needsSaid) unnotice();
+        needsSaid = !!words;
+      };
+
       const drawComputer = () => {
         pick.textContent = '';
         pick.append(el('div', 'provider', 'computer use'));
         picker.shown.forEach((choice, index) => {
-          const lead = `${choice.on === picker.standing.on ? '● ' : '  '}${choice.on ? 'on' : 'off'} `;
-          const about = computerWords({ ...picker.standing, on: choice.on });
+          if (choice.need && !picker.shown[index - 1].need) pick.append(el('div', 'provider', 'what macOS allows Null'));
+          const lead = choice.need ? `  ${choice.need.name} ` : `${choice.on === picker.standing.on ? '● ' : '  '}${choice.on ? 'on' : 'off'} `;
+          const about = choice.need ? needWords(choice.need) : computerWords({ ...picker.standing, on: choice.on });
           const row = el('div', index === picker.index ? 'option selected' : 'option', el('span', '', lead), el('span', 'id', about));
           row.addEventListener('click', () => chooseComputer(choice));
           pick.append(row);
@@ -2010,6 +2036,8 @@
           return;
         }
         const choices = [{ on: false }, { on: true }];
+        // What macOS allows matters only while computer use is on.
+        if (standing.on) standing.needs.forEach((need) => choices.push({ need }));
         picker = { computer: true, standing, models: [], current: null, shown: choices, index: standing.on ? 1 : 0, backups: null, saved: [], spent: new Set(), left: new Map() };
         out.style.display = 'none';
         pick.style.display = 'block';
@@ -2022,11 +2050,24 @@
         if (!choice) return;
         const was = picker.standing;
         closePicker();
+        if (choice.need) {
+          // A permission's row: one that macOS has given needs nothing. For one
+          // that is missing, macOS is asked and its list is opened.
+          if (choice.need.given) return;
+          try {
+            sayNeeds(await invoke('ask_permission', { permission: choice.need.permission }));
+          } catch (error) {
+            line('error', `could not ask macOS: ${error}`);
+          }
+          return;
+        }
         if (choice.on === was.on) return;
         mark('working');
         try {
           const now = await invoke('set_computer', { on: choice.on });
           line('note', now.on ? `computer use is on: ${computerWords(now)}` : 'computer use is off');
+          // The app has asked macOS for the first permission it has not given.
+          sayNeeds(now);
         } catch (error) {
           line('error', `could not change computer use: ${error}`);
         }
@@ -3576,6 +3617,12 @@
 
       listen('mini:shown', (message) => {
         input.focus();
+        // Back from System Settings, perhaps: what macOS had still to give may be given.
+        if (needsSaid) {
+          invoke('computer')
+            .then(sayNeeds)
+            .catch(() => {});
+        }
         // PROTOTYPE (item 15): back from the pet alone, the box opens on the most
         // pressing conversation, which the app lists first.
         const back = alone || !!(message.payload && message.payload.alone);
