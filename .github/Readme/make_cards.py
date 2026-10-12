@@ -258,6 +258,7 @@ def commands(c):
         ("/history [words]", "List the earlier conversations, the box's own and the terminal's, and open one again. Typing narrows the list by title and folder, then adds the conversations in which those words were said. Tab sorts it by folder. On a row, the pencil renames and the x moves the conversation to the Trash. Conversations that are working, asking or not yet looked at come first, under \"now\". The button after the plus opens the same list"),
         ("/rename <title>", "Give the open conversation a title of your own. In /history, Command+R does it for the chosen row, and Command+Delete moves that row to the Trash"),
         ("/pet", "Show the pet beside the box, or put it away"),
+        ("/computer", "See whether the agent may see the screen and work the apps on this Mac, and switch it. While it is on, the list also says how the two permissions macOS wants for it stand, and Enter on a missing one asks macOS for it"),
         ("/folder [path]", "Start a new conversation in a folder of your choosing, where the agent has that project's files and instructions: pick one that conversations already work in, walk to another, or give its path. The box says where each time such a conversation comes to the front"),
         ("/new", "Start a fresh conversation on the last selected model, in the box's own folder. A conversation that is working goes on; at most four work at once"),
         ("/quit", "Quit and clear the saved conversation pointer. With conversations still working it says how many first, and quits when asked again"),
@@ -299,6 +300,8 @@ def privacy(c):
     c.row("Conversations", "OMP keeps your conversations, one file each. To find one by something said in it, Null reads those files on this Mac as you type in /history, keeps nothing of them and logs no word. Deleting moves a conversation's file to the Mac's Trash, where it can be put back, and changes nothing in it")
     c.row("Shortcut", "Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice")
     c.row("Approvals", "Null passes on OMP's approval setting and adds none of its own. OMP's own default lets the agent act without asking you first, and the first opening says so")
+    c.row("Computer use", "Off until you switch it on with /computer. Then the agent may read what any window holds and press and type in any app, and, with Screen Recording, take pictures of the screen. OMP does this, not Null: Null neither looks at the screen nor keeps what the agent saw. It follows OMP's approval setting like any other tool, so with OMP's default the agent uses your Mac without asking you first. Set to ask, this OMP cannot put its question through the box and refuses computer use")
+    c.row("Its permissions", "Two: Accessibility and Screen Recording, which macOS charges to Null because Null starts the agent. Null asks macOS for them only when you switch computer use on or choose one in the /computer list, never at a start. Screen Recording may be left off: the agent then reads and presses, and has no pictures")
     c.row("Full Disk Access", "A separate choice, asked once, after the first reply, with an explanation: macOS attributes the agent's file access to Null. It is broader file access, not a sandbox, and it does not replace OMP's approval rules. The box opens without it")
 
 
@@ -322,9 +325,9 @@ def signing(c):
 
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
-    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, and whether the pet shows")
+    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, and whether computer use is switched on")
     c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. Any title you gave with /rename. And, while there are any, which conversations are working or not yet looked at: an id and one word each, so that work cut off by a restart is found again")
-    c.row("harness.yml", "Settings handed to OMP at every start: no update check, and your backup order when there is one. Rewritten each time")
+    c.row("harness.yml", "Settings handed to OMP at every start: no update check, your backup order when there is one, and computer use on or off once you have used its switch. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
     c.note("Your own OMP settings are not modified. OMP "
            "owns the transcript and the credentials: a restart resumes the saved session, while "
@@ -372,8 +375,9 @@ def source_map(c):
         ("providers.rs, signin.rs", "Usage reports and harness-owned sign-in"),
         ("welcome.rs", "The first opening: with no provider signed in, the box opens once with the sign-in list"),
         ("backups.rs", "The fallback order written for OMP, and the switch reporting it"),
+        ("computer.rs", "The switch for computer use: what is handed to OMP for it, and how it stands"),
         ("markdown.rs", "Reply text into structured parts, including partial streamed input"),
-        ("settings.rs, access.rs, log.rs", "Persistence, the Full Disk Access check, and logging"),
+        ("settings.rs, access.rs, log.rs", "Persistence, what macOS allows Null (Full Disk Access, and the two permissions of computer use), and logging"),
         ("check.rs, standin.rs", "The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use"),
     ]:
         c.row(key, value)
@@ -409,7 +413,7 @@ def dev_switches(c):
         ("UPDATES=<address>", "Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address"),
         ("RELEASE=<address>", "Where /update learns which Null is the newest, in place of GitHub: a made-up address whose last part is a tag, null-v0.2.0"),
         ("FOLDER=<path>", "Run on that folder in place of yours, made if missing: OMP's folder, its MCP definitions and Null's own files are all under it, so a new one is a Mac with nothing signed in"),
-        ("STANDIN=1", "Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and /slow, which says the message back a word at a time; the same for openai and codex; needs FOLDER"),
+        ("STANDIN=1", "Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and /slow, which says the message back a word at a time; the same for openai and codex; needs FOLDER. Told to by a message's last line (ask the shell: <command>), standin-anthropic/ok asks the harness for that tool, as a model would"),
     ]:
         c.row(f"NULL_MINI_{key}", value)
     c.command("NULL_MINI_EXIT_WHEN_READY=1 NULL_MINI_NO_SHORTCUT=1 \\")
@@ -437,6 +441,7 @@ def status(c):
         "Conversations renamed, moved to the Trash, and found by something said in them",
         "A small pet beside the box that shows what the agent is doing",
         "Work in the background: several conversations at once, each seen at a glance, in a folder you choose",
+        "Computer use, switched on with /computer: Oh-my-pi reads windows and works the Mac's apps",
     ])
     c.head("Planned or incomplete", MUTED)
     c.bullets([
@@ -446,8 +451,8 @@ def status(c):
         "Cloned-voice conversation and other platforms",
     ], muted=True)
     c.note("The latest display, the pet, attached files, history with its renaming, deleting and "
-           "searching, work in the background, and some provider flows still need "
-           "hands-on validation, and no real "
+           "searching, work in the background, computer use with its two permissions, and some "
+           "provider flows still need hands-on validation, and no real "
            "provider quota exhaustion has been verified. See the plans for evidence and open "
            "decisions rather than assuming every implemented path is finished.")
 
