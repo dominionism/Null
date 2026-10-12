@@ -1156,7 +1156,9 @@ impl Connection<'_> {
         let Ok(request) = typed::<SetSessionConfigOptionRequest>(json!({ "sessionId": session, "configId": id, "value": value })) else { return };
         match self.cx.send_request(request).block_task().await {
             Ok(response) => {
-                let (_, current) = translate::models_from_config_options(&as_json(&response)["configOptions"]);
+                let options = &as_json(&response)["configOptions"];
+                with(self.shared, which, |held| held.settings_said(options));
+                let (_, current) = translate::models_from_config_options(options);
                 moved(self.app, self.shared, which, current);
             }
             Err(error) => log!("could not ask which model the conversation is on: {}", describe(&error)),
@@ -1295,6 +1297,18 @@ impl Connection<'_> {
     }
 }
 
+impl Conversation {
+    /// The harness has said how the conversation's settings stand. The one Null
+    /// asks with is kept at the value it has now. Null asks by setting it again,
+    /// so asking with an older value would put that back: a thinking level the
+    /// person set with the harness's own `/effort` would last until the next reply.
+    fn settings_said(&mut self, options: &Value) {
+        if let Some(ask) = translate::other_option(options) {
+            self.ask = Some(ask);
+        }
+    }
+}
+
 // ── Calls from the harness ────────────────────────────────────────────────
 
 /// Take note of the model the harness says a conversation is on. When that
@@ -1339,6 +1353,8 @@ fn on_update(app: &AppHandle, shared: &Arc<Mutex<Shared>>, notification: &Sessio
         if !models.is_empty() {
             lock(shared).models = models;
         }
+        // One of the harness's own commands may have changed a setting, as `/effort` does.
+        with(shared, which, |held| held.settings_said(&update["configOptions"]));
         moved(app, shared, which, current);
         return;
     }
@@ -1917,6 +1933,21 @@ mod tests {
         assert_eq!(kept(&mut shared, second), Some(vec![(2, json!("b"))]));
         assert_eq!(shared.record(99, json!("d")), None, "nothing is kept for a conversation this run does not hold");
         assert_eq!(shared.seq, 3, "and it takes no number");
+    }
+
+    #[test]
+    fn a_setting_the_harness_s_own_command_changed_is_asked_with_as_it_is_now() {
+        let settings = |thinking: &str| json!([{ "id": "model", "category": "model", "currentValue": "a/b" }, { "id": "thinking", "currentValue": thinking }]);
+        let mut shared = Shared::new(None, None);
+        let held = shared.open_one();
+        held.settings_said(&settings("high"));
+        assert_eq!(held.ask, Some(("thinking".to_string(), json!("high"))));
+        // `/effort low`, and the harness says so. Asking with "high" again would put it back.
+        held.settings_said(&settings("low"));
+        assert_eq!(held.ask, Some(("thinking".to_string(), json!("low"))));
+        // Told nothing that can be asked with, what there was is kept.
+        held.settings_said(&json!([{ "id": "model", "category": "model", "currentValue": "a/b" }]));
+        assert_eq!(held.ask, Some(("thinking".to_string(), json!("low"))));
     }
 
     #[test]

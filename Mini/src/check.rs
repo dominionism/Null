@@ -1016,3 +1016,38 @@ fn acting_freely_with_computer_use_handed_over_the_harness_says_how_the_desktop_
         assert!(sent.contains(word), "the harness did not say how {word} stands: {sent}");
     }
 }
+
+/// To learn which model a conversation is on, Null sets one of its other
+/// settings to the value that setting already has, and reads what comes back.
+/// The harness has commands of its own that change such a setting, and the box
+/// carries them: `/effort low` sets how hard the model thinks. So the harness
+/// has to say so when one of them changes a setting, or Null would ask with
+/// the old value and put it back. And asked with the value as it is now, the
+/// setting has to stay as the person set it.
+#[test]
+#[ignore]
+fn the_harness_says_so_when_its_own_command_changes_a_setting() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    // A stand-in model that says it can think, so that the harness lets its level be set.
+    let plain = "{ id: ok, name: Stand-in ok, contextWindow: 128000, maxTokens: 8192 }";
+    let models = standin.models_yml();
+    assert!(models.contains(plain), "the stand-in's models are no longer written as this question expects");
+    std::fs::write(folder.settings().join("models.yml"), models.replace(plain, "{ id: ok, name: Stand-in ok, contextWindow: 128000, maxTokens: 8192, reasoning: true }")).unwrap();
+    let mut agent = Agent::start(&engine::under_test(), &folder, None);
+    let (session, _) = agent.open(&folder);
+    let settings = agent.set(&session, "model", json!("standin-anthropic/ok"));
+    let asked_with = |settings: &Value| translate::other_option(settings).filter(|(id, _)| id == "thinking").map(|(_, value)| value);
+    let began = asked_with(&settings).expect("the setting Null asks with is how hard the model thinks");
+    assert_ne!(began, json!("low"), "the level the conversation began on, which the command is to change");
+
+    let before = agent.updates.len();
+    agent.say(&session, "/effort low").expect("the harness answers its own command");
+    let said: Vec<Value> = agent.heard(&session, before).into_iter().filter(|update| update["sessionUpdate"] == "config_option_update").collect();
+    let now = said.last().and_then(|update| asked_with(&update["configOptions"]));
+    assert_eq!(now, Some(json!("low")), "the harness did not say that its command changed the setting: {said:?}");
+
+    // Asked with it as it is now, as Null asks after every reply, it stays.
+    let after = agent.set(&session, "thinking", json!("low"));
+    assert_eq!(asked_with(&after), Some(json!("low")), "the setting did not stay as the command left it");
+}
