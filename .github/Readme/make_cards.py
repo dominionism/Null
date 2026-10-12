@@ -325,7 +325,7 @@ def signing(c):
 
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
-    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, and whether computer use is switched on")
+    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, whether computer use is switched on, and the thinking level you last set with /effort")
     c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. Any title you gave with /rename. And, while there are any, which conversations are working or not yet looked at: an id and one word each, so that work cut off by a restart is found again")
     c.row("harness.yml", "Settings handed to OMP at every start: no update check, your backup order when there is one, and computer use on or off once you have used its switch. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
