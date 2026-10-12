@@ -574,6 +574,47 @@ fn with_computer_use_on_the_list_says_how_the_two_permissions_of_macos_stand() {
 
 #[test]
 #[ignore]
+fn set_to_ask_the_box_shows_the_agent_s_question_and_carries_the_answer() {
+    let mac = Mac::on("ok");
+    // The harness of this run is set to ask before a tool acts, and Null passes that on.
+    mac.keep("agent/config.yml", "tools:\n  approvalMode: always-ask\n");
+    // The stand-in is told to ask the harness's shell for a command, as a model would.
+    let lines = [
+        "ask the shell: touch one &",
+        "<until shows Your agent asks: touch one>",
+        "<show asked>",
+        "<key 3>",
+        "<settle>",
+        "<show refused>",
+        "ask the shell: touch two &",
+        "<until shows Your agent asks: touch two>",
+        "<key 1>",
+        "<settle>",
+        "<show allowed>",
+    ];
+    let seen = mac.run(&lines);
+    let made = |file: &str| std::path::Path::new(&mac.place(&format!("null/Workspace/{file}"))).exists();
+
+    let page = seen.at("asked");
+    assert!(page.text("arrow").contains("asking") && page.is("busy"), "the arrow says that the agent waits for an answer {page}");
+    assert!(page.text("pet").contains("ask"), "and so does the pet {page}");
+    for answer in ["1 Allow once", "2 Always allow", "3 Reject", "4 Always reject"] {
+        assert!(page.has("shows", answer), "the answers the harness offers, numbered: {answer} {page}");
+    }
+
+    // Answered no with its number, the command is not run, and the reply ends.
+    let page = seen.at("refused");
+    assert!(!made("one"), "answered no, the shell acted all the same {page}");
+    assert!(page.has("shows", "pong") && !page.is("busy"), "{page}");
+
+    // Answered yes, it is.
+    let page = seen.at("allowed");
+    assert!(made("two"), "answered yes, the shell did not act {page}");
+    assert!(!page.is("busy"), "{page}");
+}
+
+#[test]
+#[ignore]
 fn computer_use_is_not_changed_while_a_reply_is_under_way() {
     let working = format!("{} &", long(2));
     let lines = [working.as_str(), "<type /computer>", "<key Enter>", "<until notice changing computer use>", "<show computer>", "<type >", "<key ctrl+c>", "<settle>"];

@@ -1473,7 +1473,9 @@
             step(event);
             if (event.status === 'completed' || event.status === 'failed') running.delete(event.call_id);
             else running.add(event.call_id);
-            mark('working');
+            // The step the agent asks about arrives after its question. The arrow
+            // goes on saying that it waits for an answer.
+            mark(pendingAsk ? 'asking' : 'working');
             break;
           case 'approval_request': {
             reply = null;
@@ -3192,6 +3194,8 @@
         if (!pendingAsk) return;
         const { requestId, element } = pendingAsk;
         pendingAsk = null;
+        // Answered: the agent is working again, whatever the answer was.
+        mark(standing());
         element.querySelectorAll('button').forEach((button) => (button.disabled = true));
         try {
           await invoke('respond', { requestId, answer: optionId });
