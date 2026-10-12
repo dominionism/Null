@@ -543,6 +543,37 @@ fn computer_use_is_off_until_it_is_switched_on_and_the_harness_is_then_handed_it
 
 #[test]
 #[ignore]
+fn with_computer_use_on_the_list_says_how_the_two_permissions_of_macos_stand() {
+    let mac = Mac::on("slow");
+    let lines = ["/computer", "<until list computer use>", "<show off>", "<key ArrowDown>", "<key Enter>", "<until shows computer use is on>", "<show switched>", "/computer", "<until list what macOS allows Null>", "<show on>", "<key Escape>"];
+    let seen = mac.run(&lines);
+    let page = seen.at("off");
+    assert!(!page.has("list", "Accessibility") && !page.has("list", "Screen Recording"), "while it is off, what macOS allows is not the question {page}");
+
+    // Each permission has a row that says how it stands, whatever the Mac this runs on has given.
+    let page = seen.at("on");
+    for name in ["Accessibility", "Screen Recording"] {
+        let row = page.text("list").lines().find(|row| row.trim_start().starts_with(name)).unwrap_or_else(|| panic!("no row for {name} {page}")).to_string();
+        let stands = row.trim_start().trim_start_matches(name).trim_start();
+        assert!(stands == "on" || stands.starts_with("off · needed"), "the row for {name} says how it stands: {row}");
+    }
+
+    // What is missing is said on the notice line, and a run on a folder of its own asks macOS for
+    // nothing and opens nothing: no dialog, no System Settings.
+    let missing: Vec<&str> = ["Accessibility", "Screen Recording"].into_iter().filter(|name| page.text("list").lines().any(|row| row.trim_start().starts_with(name) && row.contains("off · needed"))).collect();
+    let page = seen.at("switched");
+    match missing.as_slice() {
+        [] => assert!(!page.has("notice", "turn on Null"), "{page}"),
+        missing => {
+            assert_eq!(page.text("notice"), format!("turn on Null under {} in System Settings", missing.join(" and under ")), "{page}");
+            assert!(seen.logged(&format!("{} is off; a run on a folder of its own asks macOS for nothing", missing[0])));
+        }
+    }
+    assert!(!seen.logged("asking macOS for it"), "a scripted run asked macOS for a permission");
+}
+
+#[test]
+#[ignore]
 fn computer_use_is_not_changed_while_a_reply_is_under_way() {
     let working = format!("{} &", long(2));
     let lines = [working.as_str(), "<type /computer>", "<key Enter>", "<until notice changing computer use>", "<show computer>", "<type >", "<key ctrl+c>", "<settle>"];
