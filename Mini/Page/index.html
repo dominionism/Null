@@ -167,6 +167,15 @@
       body.with-pet {
         min-width: 662px;
       }
+      /* PROTOTYPE (item 15): the box's shadow is not cut off with the box. It
+         reaches 14px to its left, into the last 8px of that window, where on a
+         light desktop it was a grey block beside the pet, cut square. So a window
+         narrower than where the box starts draws no shadow. */
+      @media (max-width: 61px) {
+        .box {
+          box-shadow: none;
+        }
+      }
       .pet .eyes {
         fill: #fff;
       }
