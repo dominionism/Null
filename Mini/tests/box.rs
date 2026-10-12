@@ -494,6 +494,66 @@ fn the_box_says_which_harness_it_runs_and_switches_to_the_user_s_own() {
 
 #[test]
 #[ignore]
+fn computer_use_is_off_until_it_is_switched_on_and_the_harness_is_then_handed_it() {
+    let mac = Mac::on("slow");
+    let lines = [
+        "/",
+        "<until list /computer>",
+        "<show commands>",
+        "<key Escape>",
+        "/computer",
+        "<until list computer use>",
+        "<show before>",
+        "<key ArrowDown>",
+        "<key Enter>",
+        "<until shows computer use is on>",
+        "<show on>",
+        "hello with it on",
+        "<settle>",
+        "/computer",
+        "<until list computer use>",
+        "<show during>",
+        "<key ArrowUp>",
+        "<key Enter>",
+        "<until shows computer use is off>",
+        "<show off>",
+    ];
+    let seen = mac.run(&lines);
+    assert_eq!(seen.at("commands").rows("/computer"), 1, "the box's own command, listed once and the harness's of that name not beside it {}", seen.at("commands"));
+
+    let page = seen.at("before");
+    assert!(page.has("list", "● off the agent cannot see the screen or work your apps"), "off is what is in force {page}");
+    assert!(page.has("list", "on the agent may see the screen and work your apps, without asking you first"), "{page}");
+
+    let page = seen.at("on");
+    assert!(page.has("shows", "computer use is on: the agent may see the screen and work your apps, without asking you first"), "{page}");
+    assert!(seen.logged("computer use: on"));
+
+    let page = seen.at("during");
+    assert!(page.has("list", "● on"), "on is in force now {page}");
+    assert!(seen.at("off").has("shows", "computer use is off"), "{}", seen.at("off"));
+    assert!(seen.logged("computer use: off"));
+
+    // The harness is told when it next starts, in the file Null hands it: the message sent with
+    // it on started one. Switched off since, the choice is kept for the start after this.
+    assert!(mac.kept("null/harness.yml").contains(r#""computer":{"enabled":true}"#), "what the harness was handed: {}", mac.kept("null/harness.yml"));
+    let kept: serde_json::Value = serde_json::from_str(&mac.kept("null/settings.json")).expect("Null's settings");
+    assert_eq!(kept["computer"], false, "what Null keeps: {kept}");
+}
+
+#[test]
+#[ignore]
+fn computer_use_is_not_changed_while_a_reply_is_under_way() {
+    let working = format!("{} &", long(2));
+    let lines = [working.as_str(), "<type /computer>", "<key Enter>", "<until notice changing computer use>", "<show computer>", "<type >", "<key ctrl+c>", "<settle>"];
+    let seen = Mac::on("slow").run(&lines);
+    let page = seen.at("computer");
+    assert_eq!(page.text("notice"), "stop the reply with ctrl+c before changing computer use", "{page}");
+    assert!(page.text("list").is_empty() && page.is("busy"), "no list is opened, and the reply goes on {page}");
+}
+
+#[test]
+#[ignore]
 fn update_says_when_nothing_is_newer_and_when_a_newer_null_is_out() {
     let mac = Mac::on("slow");
     mac.keep("null-v9.9.9", "");

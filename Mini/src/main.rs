@@ -36,6 +36,7 @@ mod attach;
 mod backups;
 #[cfg(test)]
 mod check;
+mod computer;
 mod engine;
 mod harness;
 mod history;
@@ -145,6 +146,8 @@ fn main() {
             providers::providers,
             backups::backups,
             backups::set_backups,
+            computer::computer,
+            computer::set_computer,
             engine::harnesses,
             engine::set_harness,
             engine::update_harness,

@@ -41,7 +41,7 @@ use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::history;
-use crate::{access, attach, backups, panel, providers, settings};
+use crate::{access, attach, backups, computer, panel, providers, settings};
 
 /// What the box says when the harness has to be started again while conversations are working.
 const RESTART_WAITS: &str = "that takes effect once nothing is working: the harness starts again then";
@@ -708,13 +708,26 @@ async fn serve(
 /// The settings Null hands the harness at every start. Always that it is not to
 /// look for a newer version of itself: Null runs the version it chose, and moves
 /// on only with a new Null. And `more`, whatever else there is to say to it,
-/// in the harness's own form: the backup order, when there is one.
+/// in the harness's own form: the backup order, when there is one, and
+/// computer use, when the person switched it.
 pub fn own_settings(more: Option<Value>) -> Value {
     let mut settings = json!({ "startup": { "checkUpdate": false } });
     if let (Some(all), Some(Value::Object(more))) = (settings.as_object_mut(), more) {
         all.extend(more);
     }
     settings
+}
+
+/// Several things to say to the harness, each in its own form, as one. None
+/// when there is nothing to say.
+pub fn together(parts: impl IntoIterator<Item = Option<Value>>) -> Option<Value> {
+    let mut all = serde_json::Map::new();
+    for part in parts.into_iter().flatten() {
+        if let Value::Object(part) = part {
+            all.extend(part);
+        }
+    }
+    (!all.is_empty()).then_some(Value::Object(all))
 }
 
 /// What to add when starting the harness so that it reads those settings. They
@@ -727,7 +740,8 @@ fn settings_args(app: &AppHandle, binary: &Path) -> Vec<String> {
     let _ = std::fs::create_dir_all(&dir);
     // The file had another name while the backup order was all it held.
     let _ = std::fs::remove_file(dir.join(settings::file_name("backups", "yml")));
-    match std::fs::write(&path, own_settings(backups::harness_settings(app, binary)).to_string()) {
+    let more = together([backups::harness_settings(app, binary), computer::harness_settings(app, binary)]);
+    match std::fs::write(&path, own_settings(more).to_string()) {
         Ok(()) => vec!["--config".into(), path.display().to_string()],
         Err(e) => {
             log!("could not write the harness's settings to {}: {e}", path.display());
@@ -1876,6 +1890,15 @@ mod tests {
     fn the_backup_order_goes_in_the_same_settings() {
         let backups = json!({ "retry": { "fallbackChains": { "default": ["a/one"] } } });
         assert_eq!(own_settings(Some(backups)), json!({ "startup": { "checkUpdate": false }, "retry": { "fallbackChains": { "default": ["a/one"] } } }));
+    }
+
+    #[test]
+    fn what_null_has_to_say_to_the_harness_is_handed_over_as_one() {
+        let backups = json!({ "retry": { "fallbackChains": { "default": ["a/one"] } } });
+        let computer = json!({ "computer": { "enabled": true } });
+        assert_eq!(together([None, None]), None, "nothing to say");
+        assert_eq!(together([Some(backups.clone()), None]), Some(backups.clone()));
+        assert_eq!(together([Some(backups), Some(computer)]), Some(json!({ "retry": { "fallbackChains": { "default": ["a/one"] } }, "computer": { "enabled": true } })));
     }
 
     /// A conversation the harness has opened, as this run holds it.
