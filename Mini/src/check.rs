@@ -110,6 +110,11 @@ struct Agent {
     from: Vec<String>,
     /// The answers that came while another was waited for, by the number of their request.
     answers: HashMap<u64, Result<Value, Value>>,
+    /// Every question the harness put to Null before a tool acted, oldest first.
+    questions: Vec<Value>,
+    /// How such a question is answered: with the answer of this kind among those
+    /// offered, as the protocol names the kinds. Nothing here refuses to answer at all.
+    answering: Option<&'static str>,
 }
 
 impl Agent {
@@ -117,9 +122,16 @@ impl Agent {
     /// and greet it. `more` is what Null adds to those for this run, in the
     /// harness's own form: a backup order, or computer use switched on.
     fn start(binary: &Path, folder: &Folder, more: Option<Value>) -> Agent {
+        Agent::start_set_to(binary, folder, more, "yolo")
+    }
+
+    /// The same, with the harness set to do this about asking before a tool
+    /// acts, as Null passes on what the person set: "yolo" acts freely,
+    /// "always-ask" asks every time.
+    fn start_set_to(binary: &Path, folder: &Folder, more: Option<Value>, asking: &str) -> Agent {
         let mut child = folder
             .command(binary)
-            .args(["--approval-mode", "yolo", "--config"])
+            .args(["--approval-mode", asking, "--config"])
             .arg(folder.handed(more))
             .arg("acp")
             .stdin(Stdio::piped())
@@ -139,7 +151,7 @@ impl Agent {
                 }
             }
         });
-        let mut agent = Agent { child, stdin, said, asked: 0, hello: Value::Null, updates: Vec::new(), from: Vec::new(), answers: HashMap::new() };
+        let mut agent = Agent { child, stdin, said, asked: 0, hello: Value::Null, updates: Vec::new(), from: Vec::new(), answers: HashMap::new(), questions: Vec::new(), answering: None };
         let greeting = json!({ "protocolVersion": 1, "clientCapabilities": {}, "clientInfo": { "name": "null-mini", "title": "Null", "version": env!("CARGO_PKG_VERSION") } });
         agent.hello = agent.request("initialize", greeting).expect("the harness answers a greeting");
         agent
@@ -200,7 +212,18 @@ impl Agent {
                 self.from.push(message["params"]["sessionId"].as_str().unwrap_or_default().to_string());
                 self.updates.push(message["params"]["update"].clone());
             }
-            // Something the harness asks of Null. No question here needs one answered.
+            // The harness asks before a tool acts. It is answered when the question at hand says how.
+            (Some("session/request_permission"), Some(theirs)) if self.answering.is_some() => {
+                let asked = message["params"].clone();
+                let chosen = asked["options"].as_array().into_iter().flatten().find(|option| option["kind"].as_str() == self.answering).map(|option| option["optionId"].clone());
+                let answer = match chosen {
+                    Some(id) => json!({ "jsonrpc": "2.0", "id": theirs, "result": { "outcome": { "outcome": "selected", "optionId": id } } }),
+                    None => json!({ "jsonrpc": "2.0", "id": theirs, "result": { "outcome": { "outcome": "cancelled" } } }),
+                };
+                self.questions.push(asked);
+                let _ = writeln!(self.stdin, "{answer}");
+            }
+            // Anything else the harness asks of Null. No question here needs one answered.
             (Some(_), Some(theirs)) => {
                 let _ = writeln!(self.stdin, "{}", json!({ "jsonrpc": "2.0", "id": theirs, "error": { "code": -32601, "message": "the check answers no requests" } }));
             }
@@ -904,4 +927,92 @@ fn with_computer_use_handed_over_the_model_is_told_of_the_desktop() {
     assert!(!without.contains(named), "the model is told of computer use though nothing switched it on");
     let with = told(Some(json!({ "computer": { "enabled": true } })));
     assert!(with.contains(named), "with computer use handed over, the model is not told of the desktop");
+}
+
+/// What the model was last sent in the stand-in's hearing: for a tool it asked
+/// for, what the harness gave back.
+fn last_sent(standin: &StandIn) -> String {
+    standin.heard().last().and_then(|request| request["messages"].as_array().and_then(|messages| messages.last()).map(standin::words)).unwrap_or_default()
+}
+
+/// A person can set the harness to ask before a tool acts, and Null passes that
+/// on. The box then shows the harness's question with the answers it offers,
+/// and sends back the one chosen. So the question has to come through the
+/// protocol, a "no" has to stop the tool, a "yes" has to let it run, and one of
+/// the answers offered has to hold for the rest of the conversation, so that a
+/// person is not asked about every step.
+#[test]
+#[ignore]
+fn set_to_ask_the_harness_asks_before_the_shell_acts_and_keeps_to_the_answer() {
+    let asked_and = |kind: &'static str| {
+        let standin = StandIn::start();
+        let folder = Folder::new(&standin);
+        let mut agent = Agent::start_set_to(&engine::under_test(), &folder, None, "always-ask");
+        agent.answering = Some(kind);
+        let (session, _) = agent.open(&folder);
+        agent.set(&session, "model", json!("standin-anthropic/ok"));
+        let made = folder.work().join("made by the shell");
+        agent.say(&session, &format!("{MESSAGE}\n{}touch 'made by the shell'", standin::ASK_THE_SHELL)).unwrap_or_else(|error| panic!("a message was answered with an error: {error}"));
+        (agent.questions.clone(), made.exists(), last_sent(&standin))
+    };
+
+    let (questions, made, sent) = asked_and("reject_once");
+    assert_eq!(questions.len(), 1, "the harness put {} questions to Null before the shell acted", questions.len());
+    let kinds: Vec<&str> = questions[0]["options"].as_array().into_iter().flatten().filter_map(|option| option["kind"].as_str()).collect();
+    assert!(kinds.contains(&"allow_once") && kinds.contains(&"reject_once"), "the answers offered: {kinds:?}");
+    assert!(kinds.contains(&"allow_always"), "no answer offered holds for the rest of the conversation: {kinds:?}");
+    assert!(questions[0]["toolCall"]["title"].as_str().is_some_and(|title| title.contains("touch")), "the question does not say what is about to be done: {}", questions[0]["toolCall"]);
+    assert!(!made, "answered no, the shell acted all the same");
+    assert!(sent.contains("rejected"), "the model was not told that the person said no: {sent}");
+
+    let (questions, made, _) = asked_and("allow_once");
+    assert_eq!(questions.len(), 1, "the harness put {} questions to Null before the shell acted", questions.len());
+    assert!(made, "answered yes, the shell did not act");
+}
+
+/// Computer use is worked through the tool that runs code. Set to ask, this
+/// harness does not put a question about that tool through the protocol: it
+/// refuses the call outright. So computer use works in the box only when the
+/// harness acts freely, and the box says so. Should a newer harness ask, this
+/// question fails, which is the day computer use can ask first in the box.
+/// Whatever it does, a call nobody said yes to must not run.
+#[test]
+#[ignore]
+fn set_to_ask_the_harness_refuses_a_code_run_and_never_runs_it_unasked() {
+    for (more, why) in [(None, "set to ask before every tool"), (Some(json!({ "tools": { "approval": { "computer": "prompt" } } })), "set to ask before computer use alone")] {
+        let standin = StandIn::start();
+        let folder = Folder::new(&standin);
+        let handed = json!({ "computer": { "enabled": true } });
+        let (handed, asking) = match more {
+            Some(Value::Object(policy)) => (Value::Object(handed.as_object().cloned().unwrap_or_default().into_iter().chain(policy).collect()), "yolo"),
+            _ => (handed, "always-ask"),
+        };
+        let mut agent = Agent::start_set_to(&engine::under_test(), &folder, Some(handed), asking);
+        // Were a question to come after all, it is answered no: nothing here may work this Mac.
+        agent.answering = Some("reject_once");
+        let (session, _) = agent.open(&folder);
+        agent.set(&session, "model", json!("standin-anthropic/ok"));
+        agent.say(&session, &format!("{MESSAGE}\n{}return await computer.capabilities()", standin::ASK_FOR_CODE)).unwrap_or_else(|error| panic!("a message was answered with an error: {error}"));
+        let sent = last_sent(&standin);
+        assert!(!sent.contains("axPermission"), "{why}, the harness ran computer use with nobody asked: {sent}");
+        assert!(agent.questions.is_empty(), "{why}, the harness now asks about a code run through the protocol, so computer use can ask first in the box: {:?}", agent.questions);
+        assert!(sent.contains("denied") || sent.contains("requires approval"), "{why}, the model was not told that the call was refused: {sent}");
+    }
+}
+
+/// And acting freely, which is how computer use works in the box: a call that
+/// only asks how the desktop stands is answered, with no question to Null. It
+/// asks which of macOS's permissions this Mac has given. No window is read, no
+/// picture is taken and nothing is pressed.
+#[test]
+#[ignore]
+fn acting_freely_with_computer_use_handed_over_the_harness_says_how_the_desktop_stands() {
+    let (standin, _folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", Some(json!({ "computer": { "enabled": true } })));
+    agent.answering = Some("reject_once");
+    agent.say(&session, &format!("{MESSAGE}\n{}return await computer.capabilities()", standin::ASK_FOR_CODE)).unwrap_or_else(|error| panic!("a message was answered with an error: {error}"));
+    let sent = last_sent(&standin);
+    assert!(agent.questions.is_empty(), "acting freely, the harness asked all the same: {:?}", agent.questions);
+    for word in ["axPermission", "capturePermission", "inputPermission"] {
+        assert!(sent.contains(word), "the harness did not say how {word} stands: {sent}");
+    }
 }
