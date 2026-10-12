@@ -72,9 +72,9 @@ impl Folder {
     }
 
     /// The settings Null hands the harness at start, in a file as Null writes it.
-    fn handed(&self, backups: Option<Value>) -> PathBuf {
+    fn handed(&self, more: Option<Value>) -> PathBuf {
         let file = self.root.join("harness.yml");
-        std::fs::write(&file, harness::own_settings(backups).to_string()).unwrap();
+        std::fs::write(&file, harness::own_settings(more).to_string()).unwrap();
         file
     }
 
@@ -114,12 +114,13 @@ struct Agent {
 
 impl Agent {
     /// Start `binary` on `folder` with the settings Null hands over at start,
-    /// and greet it. `backups` is the backup order in the harness's own form.
-    fn start(binary: &Path, folder: &Folder, backups: Option<Value>) -> Agent {
+    /// and greet it. `more` is what Null adds to those for this run, in the
+    /// harness's own form: a backup order, or computer use switched on.
+    fn start(binary: &Path, folder: &Folder, more: Option<Value>) -> Agent {
         let mut child = folder
             .command(binary)
             .args(["--approval-mode", "yolo", "--config"])
-            .arg(folder.handed(backups))
+            .arg(folder.handed(more))
             .arg("acp")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -310,10 +311,10 @@ impl Drop for Agent {
 
 /// A conversation on the program under test, on one of the stand-in's models.
 /// Gives the settings as they were once the model was set.
-fn conversation_on(model: &str, backups: Option<Value>) -> (StandIn, Folder, Agent, String, Value) {
+fn conversation_on(model: &str, more: Option<Value>) -> (StandIn, Folder, Agent, String, Value) {
     let standin = StandIn::start();
     let folder = Folder::new(&standin);
-    let mut agent = Agent::start(&engine::under_test(), &folder, backups);
+    let mut agent = Agent::start(&engine::under_test(), &folder, more);
     let (session, _) = agent.open(&folder);
     let settings = agent.set(&session, "model", json!(model));
     (standin, folder, agent, session, settings)
@@ -880,4 +881,27 @@ fn a_conversation_started_in_a_folder_works_there() {
     let listed = agent.conversations();
     assert_eq!(history::folder_of(&listed, &session), Some(project.clone()), "the harness lists it under that folder: {listed:?}");
     assert_eq!(history::folders(&listed, &folder.work()), [project], "and that is a folder `/folder` offers");
+}
+
+/// Computer use is the harness's own, and it is off until the harness's
+/// settings say otherwise. Null switches it on in the settings it hands over at
+/// start, so a harness started that way has to tell the model that there is a
+/// desktop to work, by the name the model works it with, and one started
+/// without has to say nothing of it. Only what the model is sent is read:
+/// nothing here looks at this Mac's screen or presses anything on it.
+#[test]
+#[ignore]
+fn with_computer_use_handed_over_the_model_is_told_of_the_desktop() {
+    let told = |more: Option<Value>| {
+        let (standin, _folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", more);
+        agent.say(&session, MESSAGE).unwrap_or_else(|error| panic!("a message was answered with an error: {error}"));
+        standin.heard().first().map(Value::to_string).unwrap_or_default()
+    };
+    // The model works the desktop through a thing named `computer`, and is told of it by that name.
+    let named = "`computer`";
+    let without = told(None);
+    assert!(without.contains(MESSAGE), "the message did not reach the model, so nothing can be told: {without}");
+    assert!(!without.contains(named), "the model is told of computer use though nothing switched it on");
+    let with = told(Some(json!({ "computer": { "enabled": true } })));
+    assert!(with.contains(named), "with computer use handed over, the model is not told of the desktop");
 }
