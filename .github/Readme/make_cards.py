@@ -248,7 +248,8 @@ def surface(c):
         "command. Several conversations can work at once, each in a folder you choose. Voice is "
         "planned, not built.",
     ])
-    c.note("The banner above is an illustration, not a recording of an agent session.")
+    c.note("The pet above is the one beside the box, moving as it does there: at rest, at work while a "
+           "reply is under way, and hopping when the reply ends.")
 
 
 # ── Get started ───────────────────────────────────────────────────────────
@@ -531,7 +532,7 @@ def status(c):
 def layout(c):
     c.raw("Mini/                  Null: the Rust host in src/, the page in Page/, tests/, Scripts/\n"
           ".github/workflows/     Null's tests, its releases, and the weekly Oh-my-pi check\n"
-          ".github/Readme/        The cards of this README, and the script that draws them")
+          ".github/Readme/        The banner and the cards of this README, and the scripts that draw them")
     c.note("Context/ and Memories/ hold the owner's own plans, decisions, research and handoffs, and "
            "are not tracked in Git.")
 

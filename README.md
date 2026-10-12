@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/Readme/hero.svg" width="100%" alt="Null — your agent, a shortcut away. A monochrome illustration of Null's pet above the floating input and the Control+Space shortcut; the pet bobs, blinks and lifts its antenna, as it does at rest in the app." />
+  <img src=".github/Readme/hero.svg" width="208" alt="Null's pet: a small round creature drawn in black squares, with two eyes, two feet, an antenna and a tail. It moves as it does beside the box in the app: it rests, walks in place while a reply is under way, and hops when the reply ends." />
 </p>
 
 <p align="center">
@@ -107,7 +107,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="repository-layout"></a>
 <p align="center">
-  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout: Mini/ holds Null, with the Rust host, the page, the tests and the scripts; .github/workflows holds Null's tests, its releases and the weekly Oh-my-pi check; .github/Readme holds this README's cards. Context/ and Memories/ are the owner's own and are not tracked in Git." />
+  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout: Mini/ holds Null, with the Rust host, the page, the tests and the scripts; .github/workflows holds Null's tests, its releases and the weekly Oh-my-pi check; .github/Readme holds this README's banner and cards. Context/ and Memories/ are the owner's own and are not tracked in Git." />
 </p>
 
 <a id="license"></a>
