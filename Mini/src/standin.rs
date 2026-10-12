@@ -11,6 +11,12 @@
 //! talking does what a model does: it asks the harness to read the file, and
 //! replies once it has been given what is in it.
 //!
+//! The same `ok` can be told to ask for a tool, by the last line of a message:
+//! `ask the shell: <a command>` has it ask the harness's shell for that
+//! command, and `ask for code: <code>` has it ask the tool that runs code.
+//! It replies once the harness has answered, whether the tool ran or was
+//! refused. So a check can see what the harness does before a tool acts.
+//!
 //! A fifth answer, `slow`, replies as `ok` does but takes its time: it says
 //! back the last line of the message it was sent, a wait and then a word,
 //! written as it comes. So a reply can still be under way while something else
@@ -257,9 +263,9 @@ fn reply(kind: &str, which: &str, model: &str, said: &Value) -> (u16, Vec<(&'sta
     let anthropic = |kind_of_error: &str, message: &str| json!({ "type": "error", "error": { "type": kind_of_error, "message": message }, "request_id": "req_standin" }).to_string();
     let openai = |message: String, kind_of_error: &str, code: &str| json!({ "error": { "message": message, "type": kind_of_error, "param": null, "code": code } }).to_string();
     match (kind, which) {
-        // Handed a file it has not read yet, a model asks to read it.
-        ("anthropic", "ok") if reading(said).is_some() => {
-            let (tool, input) = reading(said).unwrap_or_default();
+        // Handed a file it has not read yet, or told to ask for a tool, a model asks.
+        ("anthropic", "ok") if wanted(said).is_some() => {
+            let (tool, input) = wanted(said).unwrap_or_default();
             (
                 200,
                 Vec::new(),
@@ -333,23 +339,37 @@ pub fn words(message: &Value) -> String {
     words
 }
 
-/// The tool a model handed a file would call to read it, and with what: the
-/// harness's own tool for reading, given the path the message names. None when
-/// no file was handed over, when the tool has already answered, or when the
-/// harness offers no such tool.
-fn reading(said: &Value) -> Option<(String, Value)> {
+/// What the last line of a message has to begin with for `ok` to ask the
+/// harness's shell for the rest of it, and for it to ask the tool that runs
+/// code. The code is JavaScript.
+pub const ASK_THE_SHELL: &str = "ask the shell: ";
+pub const ASK_FOR_CODE: &str = "ask for code: ";
+
+/// The tool a model would call for the message it was just sent, and with
+/// what. Handed a file, the harness's own tool for reading, given the path the
+/// message names. Told to ask for a tool, that tool, given the rest of the
+/// line. None when the message is neither, when the tool has already answered,
+/// or when the harness offers no such tool.
+fn wanted(said: &Value) -> Option<(String, Value)> {
     let last = said.get("messages")?.as_array()?.last()?;
     if last["content"].as_array().is_some_and(|parts| parts.iter().any(|part| part["type"] == "tool_result")) {
         return None;
     }
     let told = words(last);
-    let file = crate::attach::split(told.trim_end()).1.into_iter().next()?;
-    let tool = said.get("tools")?.as_array()?.iter().find(|tool| tool["name"].as_str().is_some_and(|name| name.trim_start_matches('_') == "read"))?;
-    // Whatever else the tool insists on is a word about why.
-    let mut input = serde_json::Map::new();
-    input.insert("path".into(), json!(file));
+    let line = told.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default().trim();
+    // The tool, what it is given, and a word about why, which the box shows as the step.
+    let (name, mut input, why) = if let Some(command) = line.strip_prefix(ASK_THE_SHELL) {
+        ("bash", serde_json::Map::from_iter([("command".to_string(), json!(command))]), "asked for by the stand-in")
+    } else if let Some(code) = line.strip_prefix(ASK_FOR_CODE) {
+        ("eval", serde_json::Map::from_iter([("language".to_string(), json!("js")), ("code".to_string(), json!(code))]), "asked for by the stand-in")
+    } else {
+        let file = crate::attach::split(told.trim_end()).1.into_iter().next()?;
+        ("read", serde_json::Map::from_iter([("path".to_string(), json!(file))]), "read the attached file")
+    };
+    let tool = said.get("tools")?.as_array()?.iter().find(|tool| tool["name"].as_str().is_some_and(|offered| offered.trim_start_matches('_') == name))?;
+    // Whatever else the tool insists on is that word.
     for wanted in tool.pointer("/input_schema/required").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
-        input.entry(wanted).or_insert(json!("read the attached file"));
+        input.entry(wanted).or_insert(json!(why));
     }
     Some((tool["name"].as_str()?.to_string(), Value::Object(input)))
 }
@@ -400,6 +420,45 @@ mod tests {
         stream.read_to_string(&mut answer).expect("the reply is read to its end");
         let frames = answer.lines().filter_map(|line| serde_json::from_str::<Value>(line.strip_prefix("data: ")?).ok());
         frames.filter_map(|frame| frame.pointer("/delta/text").or(frame.pointer("/choices/0/delta/content")).and_then(Value::as_str).map(str::to_string)).collect()
+    }
+
+    /// A request as a harness sends one: the tools it offers, and one message.
+    fn request(message: Value) -> Value {
+        let tool = |name: &str, required: &[&str]| json!({ "name": name, "input_schema": { "required": required } });
+        json!({ "tools": [tool("_read", &["path"]), tool("_bash", &["command", "i"]), tool("_eval", &["language", "code"])], "messages": [message] })
+    }
+
+    #[test]
+    fn handed_a_file_it_asks_to_read_it_and_says_why_in_the_words_the_box_shows() {
+        // A message as the harness passes it on: the words, then where the file is.
+        let told = crate::attach::blocks("what does the note say", &[std::path::PathBuf::from("/tmp/a note.txt")]);
+        let words: Vec<&str> = told.as_array().into_iter().flatten().filter_map(|block| block["text"].as_str().or(block["title"].as_str())).collect();
+        let said = request(json!({ "role": "user", "content": words.join("\n\n") }));
+        assert_eq!(wanted(&said), Some(("_read".to_string(), json!({ "path": "/tmp/a note.txt" }))), "the tool asks for nothing but where the file is");
+        // A tool that also insists on a word about why is given the words the box then shows as the step.
+        let mut insists = said.clone();
+        insists["tools"][0] = json!({ "name": "_read", "input_schema": { "required": ["path", "i"] } });
+        assert_eq!(wanted(&insists), Some(("_read".to_string(), json!({ "path": "/tmp/a note.txt", "i": "read the attached file" }))));
+    }
+
+    #[test]
+    fn told_to_it_asks_the_shell_for_the_rest_of_the_line() {
+        let said = request(json!({ "role": "user", "content": format!("a note of the harness's own\nReply with one word\n{ASK_THE_SHELL}touch 'a file'") }));
+        assert_eq!(wanted(&said), Some(("_bash".to_string(), json!({ "command": "touch 'a file'", "i": "asked for by the stand-in" }))));
+    }
+
+    #[test]
+    fn told_to_it_asks_for_code_to_be_run() {
+        let said = request(json!({ "role": "user", "content": format!("{ASK_FOR_CODE}return 6 * 7") }));
+        assert_eq!(wanted(&said), Some(("_eval".to_string(), json!({ "language": "js", "code": "return 6 * 7" }))));
+    }
+
+    #[test]
+    fn it_asks_for_no_tool_twice_and_for_none_unless_told() {
+        let answered = request(json!({ "role": "user", "content": [{ "type": "tool_result", "tool_use_id": "toolu_standin", "content": format!("{ASK_THE_SHELL}ls") }] }));
+        assert_eq!(wanted(&answered), None, "the tool has answered, so the reply is next");
+        assert_eq!(wanted(&request(json!({ "role": "user", "content": "Reply with one word" }))), None);
+        assert_eq!(wanted(&request(json!({ "role": "user", "content": format!("{ASK_THE_SHELL}ls\nand a last line that is not one") }))), None, "only the last line tells it to");
     }
 
     #[test]
