@@ -16,7 +16,7 @@ import re
 import xml.etree.ElementTree as ET
 from html import escape
 
-from terminal import BAR, FG, GREEN, MUTED, PAD, TEXT, W, delay, idle_prompt, prompt, window
+from terminal import BAR, BAR_BG, BLUE, BORDER, FG, GREEN, MUTED, PAD, TEXT, W, delay, idle_prompt, prompt, window
 
 OUT = os.path.dirname(os.path.abspath(__file__))
 
@@ -151,80 +151,103 @@ class Card:
 CARDS = {}
 
 
-# ── Link chips ────────────────────────────────────────────────────────────
+# ── Link cards ────────────────────────────────────────────────────────────
 # A link inside a card cannot be clicked: an SVG loaded as an image is inert, and GitHub strips an
-# inline <svg> out of markdown. So each link is its own small window-styled image wrapped in <a>:
-# clickable, and with no text there is no underline for GitHub to draw. The chips stand together at
-# the foot of the README, under the Links card, so that everything that can be pressed is in one place.
-CHIP_H, CHIP_PAD, CHIP_FS = 30, 14, 12.5
-CHIP_CW = CHIP_FS * 0.6
-CHIP_FONT = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
+# inline <svg> out of markdown. So each link is its own small card, an image wrapped in <a>:
+# clickable, and with no text there is no underline for GitHub to draw. A link card says where it
+# goes and, in a few words, what is there. They stand together at the foot of the README, three
+# across under a heading for each group, so that everything that can be pressed is in one place.
+LINK_W, LINK_H = 286, 58         # three across are as wide as a card, at a card's scale
+LINK_GAP, LINK_PAD = 5, 14       # room kept clear on each side, and the text's inset
+LINK_COLS = 31                   # the longest a link's few words may be, to stay on one line
+LINK_FONT = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
+LABEL = "#7D8590"                # a heading's grey, which reads on a dark page and on a light one
 
-CHIPS = {
-    "oh-my-pi": ("Oh-my-pi", "https://github.com/can1357/oh-my-pi", True),
-    "rust": ("Rust toolchain", "https://rustup.rs/", True),
-    "tauri": ("Tauri macOS prerequisites", "https://v2.tauri.app/start/prerequisites/#macos", True),
-    "page-html": ("Page/index.html", "Mini/Page/index.html", False),
-    "harness-rs": ("harness.rs", "Mini/src/harness.rs", False),
-    "translate-rs": ("translate.rs", "Mini/src/translate.rs", False),
-    "engine-rs": ("engine.rs", "Mini/src/engine.rs", False),
-    "check-rs": ("check.rs", "Mini/src/check.rs", False),
-    "markdown-rs": ("markdown.rs", "Mini/src/markdown.rs", False),
-    "panel-rs": ("panel.rs", "Mini/src/panel.rs", False),
-    "settings-rs": ("settings.rs", "Mini/src/settings.rs", False),
-    "license": ("MIT", "LICENSE", False),
-    "nav-get-started": ("Get started", "#get-started", False),
-    "nav-use-null": ("Use Null", "#use-null", False),
-    "nav-privacy": ("Privacy", "#privacy-and-permissions", False),
-    "nav-architecture": ("Architecture", "#under-the-hood", False),
-    "nav-development": ("Development", "#development", False),
+# What the arrow on a link card says: up the page, out of GitHub, or to a file here.
+UP, OUT_OF_HERE, FILE = "↑", "↗", "→"
+
+LINKS = {
+    "nav-get-started": ("Get started", "Install Null and open the box", "#get-started", UP),
+    "nav-use-null": ("Use Null", "The keys that work in the box", "#use-null", UP),
+    "nav-commands": ("Commands", "Each command and what it does", "#commands", UP),
+    "nav-privacy": ("Privacy", "What leaves your Mac, and when", "#privacy-and-permissions", UP),
+    "nav-architecture": ("Architecture", "How the box reaches your agent", "#under-the-hood", UP),
+    "nav-development": ("Development", "Build it and run the checks", "#development", UP),
+    "oh-my-pi": ("Oh-my-pi", "The harness inside Null", "https://github.com/can1357/oh-my-pi", OUT_OF_HERE),
+    "rust": ("Rust toolchain", "To build Null yourself", "https://rustup.rs/", OUT_OF_HERE),
+    "tauri": ("Tauri prerequisites", "What a build needs on macOS", "https://v2.tauri.app/start/prerequisites/#macos", OUT_OF_HERE),
+    "page-html": ("Page/index.html", "Input, commands and transcript", "Mini/Page/index.html", FILE),
+    "harness-rs": ("harness.rs", "Talks to the agent over ACP", "Mini/src/harness.rs", FILE),
+    "translate-rs": ("translate.rs", "Translates the agent's events", "Mini/src/translate.rs", FILE),
+    "engine-rs": ("engine.rs", "Which Oh-my-pi runs", "Mini/src/engine.rs", FILE),
+    "markdown-rs": ("markdown.rs", "Replies into structured parts", "Mini/src/markdown.rs", FILE),
+    "panel-rs": ("panel.rs", "The window and the pet's room", "Mini/src/panel.rs", FILE),
+    "settings-rs": ("settings.rs", "What Null remembers", "Mini/src/settings.rs", FILE),
+    "check-rs": ("check.rs", "Live tests of the harness", "Mini/src/check.rs", FILE),
+    "license": ("LICENSE", "MIT: what you may do with Null", "LICENSE", FILE),
 }
 
-# The rows of chips under the Links card, in the order of that card's own rows: the page's sections,
-# what is elsewhere, the files of the source map, and the license.
-# The Context/ chips are gone: the owner's plans, decisions and research are his
+# The groups, each under its heading. A group is a multiple of three, so that every row is full.
+# The Context/ links are gone: the owner's plans, decisions and research are his
 # own and are not published, so nothing links to them.
-LINK_ROWS = [
-    ["nav-get-started", "nav-use-null", "nav-privacy", "nav-architecture", "nav-development"],
-    ["oh-my-pi", "rust", "tauri"],
-    ["page-html", "harness-rs", "engine-rs", "translate-rs", "markdown-rs", "panel-rs", "settings-rs", "check-rs"],
-    ["license"],
+LINK_GROUPS = [
+    ("on-this-page", "On this page",
+     ["nav-get-started", "nav-use-null", "nav-commands", "nav-privacy", "nav-architecture", "nav-development"]),
+    ("elsewhere", "Elsewhere", ["oh-my-pi", "rust", "tauri"]),
+    ("in-this-repository", "In this repository",
+     ["page-html", "harness-rs", "translate-rs", "engine-rs", "markdown-rs", "panel-rs", "settings-rs", "check-rs", "license"]),
 ]
 
 
-def chip(slug):
-    """One clickable chip, and the markdown that links it."""
-    label, url, external = CHIPS[slug]
-    arrow = 16 if external else 0
-    w = round(CHIP_PAD * 2 + len(label) * CHIP_CW + arrow)
-    mark = (
-        f'  <text x="{w - CHIP_PAD}" y="{CHIP_H / 2 + 4}" font-size="11" fill="{MUTED}" text-anchor="end" xml:space="preserve">↗</text>\n'
-        if external
-        else ""
-    )
+def link_card(slug):
+    """One clickable link card, and the markdown that links it."""
+    name, about, url, arrow = LINKS[slug]
+    assert len(about) <= LINK_COLS, f"too long for a link card: {about!r}"
+    left, right = LINK_GAP + LINK_PAD, LINK_W - LINK_GAP - LINK_PAD
     svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{CHIP_H}" viewBox="0 0 {w} {CHIP_H}" '
-        f'role="img" aria-label="{escape(label)}">\n'
-        f"  <title>{escape(label)}</title>\n"
-        f"  <style>text {{ font-family: {CHIP_FONT}; }}</style>\n"
-        f'  <rect x="0.5" y="0.5" width="{w - 1}" height="{CHIP_H - 1}" rx="8" fill="#161B22" stroke="#21262D"/>\n'
-        f'  <text x="{CHIP_PAD}" y="{CHIP_H / 2 + 4}" font-size="{CHIP_FS}" fill="#58A6FF" xml:space="preserve">{escape(label)}</text>\n'
-        f"{mark}"
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{LINK_W}" height="{LINK_H}" viewBox="0 0 {LINK_W} {LINK_H}" '
+        f'role="img" aria-label="{escape(name)}: {escape(about)}">\n'
+        f"  <title>{escape(name)}: {escape(about)}</title>\n"
+        f"  <style>text {{ font-family: {LINK_FONT}; }}</style>\n"
+        f'  <rect x="{LINK_GAP + 0.5}" y="1.5" width="{LINK_W - 2 * LINK_GAP - 1}" height="{LINK_H - 3}" rx="8" fill="{BAR_BG}" stroke="{BORDER}"/>\n'
+        f'  <text x="{left}" y="24" font-size="12.5" font-weight="600" fill="{BLUE}" xml:space="preserve">{escape(name)}</text>\n'
+        f'  <text x="{right}" y="24" font-size="12" fill="{MUTED}" text-anchor="end">{arrow}</text>\n'
+        f'  <text x="{left}" y="43" font-size="12" fill="{MUTED}" xml:space="preserve">{escape(about)}</text>\n'
         f"</svg>\n"
     )
     ET.fromstring(svg)
     with open(os.path.join(OUT, f"link-{slug}.svg"), "w") as handle:
         handle.write(svg)
-    alt = f"{label} (opens {url})" if external else label
-    return f'  <a href="{url}"><img src=".github/Readme/link-{slug}.svg" height="{CHIP_H}" alt="{alt}" /></a>'
+    alt = f"{name}: {about}" + (f" (opens {url})" if arrow == OUT_OF_HERE else "")
+    return f'<a href="{url}"><img src=".github/Readme/link-{slug}.svg" width="33.3%" alt="{escape(alt)}" /></a>'
 
 
-def link_rows():
-    """The markdown blocks for the chips, to paste under the Links card."""
+def link_heading(slug, heading):
+    """A group's heading, as wide as a card: on a row of its own, in line with the link cards' edge."""
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="24" viewBox="0 0 {W} 24" '
+        f'role="img" aria-label="{escape(heading)}">\n'
+        f"  <title>{escape(heading)}</title>\n"
+        f"  <style>text {{ font-family: {LINK_FONT}; }}</style>\n"
+        f'  <text x="{LINK_GAP + 1}" y="17" font-size="11" font-weight="600" letter-spacing="1.6" fill="{LABEL}">{escape(heading.upper())}</text>\n'
+        f"</svg>\n"
+    )
+    ET.fromstring(svg)
+    with open(os.path.join(OUT, f"links-{slug}.svg"), "w") as handle:
+        handle.write(svg)
+    return f'<img src=".github/Readme/links-{slug}.svg" width="100%" alt="{escape(heading)}" />'
+
+
+def link_groups():
+    """The markdown blocks for the link cards, to paste at the foot of the README.
+
+    The link cards of a group are written with nothing between them: three at a third of the width
+    fill a row, and a space between two would push the third onto the next.
+    """
     blocks = []
-    for slugs in LINK_ROWS:
-        body = "\n  &nbsp;\n".join(chip(slug) for slug in slugs)
-        blocks.append(f'<p align="center">\n{body}\n</p>')
+    for slug, heading, slugs in LINK_GROUPS:
+        assert len(slugs) % 3 == 0, f"a row of {heading!r} would not be full"
+        blocks.append(f'<p align="center">\n  {link_heading(slug, heading)}\n  {"".join(link_card(s) for s in slugs)}\n</p>')
     return blocks
 
 
@@ -542,16 +565,6 @@ def license_card(c):
     c.note("Built by dominionism. A small box, with your agent behind it.")
 
 
-# ── Links ─────────────────────────────────────────────────────────────────
-def links(c):
-    c.sub("The cards above are pictures, so nothing in them can be pressed. Everything on this page "
-          "that can be is in the rows below.")
-    c.row("This page", "Get started, Use Null, Privacy, Architecture and Development go to those sections")
-    c.row("Elsewhere", "Oh-my-pi, the Rust toolchain, and what Tauri needs on macOS")
-    c.row("Source", "The files of the source map")
-    c.row("License", "MIT")
-
-
 add("surface", "Small surface. Real agent.", surface)
 add("step-harness", "1. The harness comes with Null", step_harness)
 add("step-build", "2. Install", step_build)
@@ -570,7 +583,6 @@ add("dev-switches", "Development switches and smoke checks", dev_switches, key_c
 add("status", "Status and direction", status)
 add("layout", "Repository layout", layout)
 add("license", "License", license_card)
-add("links", "Links", links)
 
 for name, (title, svg) in CARDS.items():
     ET.fromstring(svg)   # a card that is not well-formed XML never reaches the README
@@ -580,4 +592,4 @@ for name, (title, svg) in CARDS.items():
     print(f"wrote {name}.svg  ({W}x{h[1] if h else '?'}, {len(svg) // 1024} KB)")
 
 print()
-print("\n\n".join(link_rows()))
+print("\n\n".join(link_groups()))
