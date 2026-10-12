@@ -1,6 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="103" height="30" viewBox="0 0 103 30" role="img" aria-label="harness.rs">
-  <title>harness.rs</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="286" height="58" viewBox="0 0 286 58" role="img" aria-label="harness.rs: Talks to the agent over ACP">
+  <title>harness.rs: Talks to the agent over ACP</title>
   <style>text { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; }</style>
-  <rect x="0.5" y="0.5" width="102" height="29" rx="8" fill="#161B22" stroke="#21262D"/>
-  <text x="14" y="19.0" font-size="12.5" fill="#58A6FF" xml:space="preserve">harness.rs</text>
+  <rect x="5.5" y="1.5" width="275" height="55" rx="8" fill="#161B22" stroke="#21262D"/>
+  <text x="19" y="24" font-size="12.5" font-weight="600" fill="#58A6FF" xml:space="preserve">harness.rs</text>
+  <text x="267" y="24" font-size="12" fill="#8B949E" text-anchor="end">→</text>
+  <text x="19" y="43" font-size="12" fill="#8B949E" xml:space="preserve">Talks to the agent over ACP</text>
 </svg>
