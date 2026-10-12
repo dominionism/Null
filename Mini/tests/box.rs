@@ -597,6 +597,7 @@ fn set_to_ask_the_box_shows_the_agent_s_question_and_carries_the_answer() {
 
     let page = seen.at("asked");
     assert!(page.text("arrow").contains("asking") && page.is("busy"), "the arrow says that the agent waits for an answer {page}");
+    assert!(page.text("pet").contains("ask"), "and so does the pet {page}");
     for answer in ["1 Allow once", "2 Always allow", "3 Reject", "4 Always reject"] {
         assert!(page.has("shows", answer), "the answers the harness offers, numbered: {answer} {page}");
     }
