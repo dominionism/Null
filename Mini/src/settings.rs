@@ -41,6 +41,10 @@ pub struct Settings {
     /// Nothing here means the person never used the switch, and the harness's own
     /// settings hold.
     pub computer: Option<bool>,
+    /// How hard the model thinks, as the person last set it with the harness's own
+    /// `/effort`. A new conversation starts on it. Nothing here means the harness's
+    /// own setting holds.
+    pub thinking: Option<String>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -166,6 +170,7 @@ mod tests {
             engine: Some("18.9.0".into()),
             pet: Some(false),
             computer: Some(true),
+            thinking: Some("low".into()),
         };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);

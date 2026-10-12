@@ -474,6 +474,28 @@ fn one_of_the_harness_s_own_commands_is_answered_and_a_skill_goes_by_its_short_n
     assert!(page.parts().ends_with("you,reply"), "{page}");
 }
 
+/// The harness starts every conversation thinking at its own level. The level
+/// a person sets with the harness's own `/effort` is where their next
+/// conversations start, in this run and once Null has been started again.
+#[test]
+#[ignore]
+fn a_thinking_level_set_once_is_where_new_conversations_start() {
+    // The stand-in's models say they can think here, so that there is a level to set.
+    let mac = Mac::on("ok").with("NULL_MINI_STANDIN", "thinking".into());
+    // The harness answers its command itself. The next conversation is not started before it has.
+    let seen = mac.run(&["/effort low", "<until shows Thinking set to low>", "<settle>", "/new", "these words open a conversation", "<settle>", "<until shows pong>", "<show new>"]);
+    assert!(seen.logged("thinking level low, set in the box"), "what the person set is not remembered:\n{}", seen.log);
+    assert!(seen.logged("the conversation starts on thinking level low"), "the next conversation did not start there:\n{}", seen.log);
+    let page = seen.at("new");
+    assert!(page.parts().ends_with("you,reply"), "an answer, and not a failed one {page}");
+    let settings: Value = serde_json::from_str(&mac.kept("null/settings.json")).unwrap();
+    assert_eq!(settings["thinking"], "low", "{settings}");
+
+    let seen = mac.run(&["/new", "and these open another", "<settle>", "<until shows pong>"]);
+    assert!(seen.logged("the conversation starts on thinking level low"), "started again, Null did not start a conversation there:\n{}", seen.log);
+    assert!(!seen.logged("thinking level low, set in the box"), "nobody set a level in this run:\n{}", seen.log);
+}
+
 #[test]
 #[ignore]
 fn the_box_says_which_harness_it_runs_and_switches_to_the_user_s_own() {

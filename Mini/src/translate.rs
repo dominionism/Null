@@ -221,6 +221,18 @@ pub fn other_option(options: &Value) -> Option<(String, Value)> {
     others().find(|option| option.get("id") == Some(&json!("thinking"))).and_then(known).or_else(|| others().find_map(known))
 }
 
+/// How hard the model of a session thinks, out of its config options: the
+/// levels it can be set to, and the one it is on. Nothing of either when the
+/// session has no such setting.
+pub fn thinking_from_config_options(options: &Value) -> (Vec<String>, Option<String>) {
+    let Some(option) = options.as_array().and_then(|options| options.iter().find(|option| option.get("id") == Some(&json!("thinking")))) else {
+        return (Vec::new(), None);
+    };
+    let levels = option.get("options").and_then(Value::as_array).into_iter().flatten().filter_map(|entry| entry.get("value")?.as_str().map(str::to_string)).collect();
+    let current = option.get("currentValue").and_then(Value::as_str).map(str::to_string);
+    (levels, current)
+}
+
 /// Pull the model list and the current model out of a session's config options.
 pub fn models_from_config_options(options: &Value) -> (Vec<ModelChoice>, Option<String>) {
     let Some(option) = options.as_array().and_then(|options| {
@@ -455,6 +467,18 @@ mod tests {
         assert_eq!(other_option(&options), Some(("mode2".to_string(), json!("default"))));
         assert_eq!(other_option(&json!([{ "id": "model", "currentValue": "a/b" }])), None);
         assert_eq!(other_option(&Value::Null), None);
+    }
+
+    #[test]
+    fn how_hard_the_model_thinks_is_read_with_the_levels_it_can_be_set_to() {
+        let options = json!([
+            { "id": "model", "category": "model", "currentValue": "a/b" },
+            { "id": "thinking", "category": "thought_level", "currentValue": "high", "options": [{ "value": "off", "name": "Off" }, { "value": "low", "name": "low" }, { "value": "high", "name": "high" }] }
+        ]);
+        assert_eq!(thinking_from_config_options(&options), (vec!["off".to_string(), "low".to_string(), "high".to_string()], Some("high".to_string())));
+        // A model that does not think has no such setting.
+        assert_eq!(thinking_from_config_options(&json!([{ "id": "model", "currentValue": "a/b" }])), (Vec::new(), None));
+        assert_eq!(thinking_from_config_options(&Value::Null), (Vec::new(), None));
     }
 
     #[test]

@@ -1027,16 +1027,7 @@ fn acting_freely_with_computer_use_handed_over_the_harness_says_how_the_desktop_
 #[test]
 #[ignore]
 fn the_harness_says_so_when_its_own_command_changes_a_setting() {
-    let standin = StandIn::start();
-    let folder = Folder::new(&standin);
-    // A stand-in model that says it can think, so that the harness lets its level be set.
-    let plain = "{ id: ok, name: Stand-in ok, contextWindow: 128000, maxTokens: 8192 }";
-    let models = standin.models_yml();
-    assert!(models.contains(plain), "the stand-in's models are no longer written as this question expects");
-    std::fs::write(folder.settings().join("models.yml"), models.replace(plain, "{ id: ok, name: Stand-in ok, contextWindow: 128000, maxTokens: 8192, reasoning: true }")).unwrap();
-    let mut agent = Agent::start(&engine::under_test(), &folder, None);
-    let (session, _) = agent.open(&folder);
-    let settings = agent.set(&session, "model", json!("standin-anthropic/ok"));
+    let (_standin, _folder, mut agent, session, settings) = conversation_that_thinks();
     let asked_with = |settings: &Value| translate::other_option(settings).filter(|(id, _)| id == "thinking").map(|(_, value)| value);
     let began = asked_with(&settings).expect("the setting Null asks with is how hard the model thinks");
     assert_ne!(began, json!("low"), "the level the conversation began on, which the command is to change");
@@ -1050,4 +1041,55 @@ fn the_harness_says_so_when_its_own_command_changes_a_setting() {
     // Asked with it as it is now, as Null asks after every reply, it stays.
     let after = agent.set(&session, "thinking", json!("low"));
     assert_eq!(asked_with(&after), Some(json!("low")), "the setting did not stay as the command left it");
+}
+
+/// A conversation on a stand-in model that says it can think, so that the
+/// harness lets its level be set. Gives its settings as they are on that model.
+fn conversation_that_thinks() -> (StandIn, Folder, Agent, String, Value) {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    std::fs::write(folder.settings().join("models.yml"), standin.models_that(true)).unwrap();
+    let mut agent = Agent::start(&engine::under_test(), &folder, None);
+    let (session, _) = agent.open(&folder);
+    let settings = agent.set(&session, "model", json!("standin-anthropic/ok"));
+    (standin, folder, agent, session, settings)
+}
+
+/// The harness starts every conversation thinking at its own level. Null
+/// remembers the level the person last set with `/effort`, and sets a new
+/// conversation to it as it opens. So the harness has to name the levels a
+/// conversation can be set to, a level set that way has to hold through a
+/// reply and through a move to another model, the command's own change has to
+/// come with the model unchanged, which is how Null tells it from a backup
+/// taking over, and a level the harness does not know has to be refused.
+#[test]
+#[ignore]
+fn a_thinking_level_set_as_a_conversation_opens_holds() {
+    let (_standin, _folder, mut agent, session, settings) = conversation_that_thinks();
+    let (levels, began) = translate::thinking_from_config_options(&settings);
+    assert!(levels.iter().any(|level| level == "low"), "the levels the conversation can be set to: {levels:?}");
+    assert_ne!(began.as_deref(), Some("low"), "the level the conversation began on, which Null is to change");
+
+    let level = |settings: &Value| translate::thinking_from_config_options(settings).1;
+    assert_eq!(level(&agent.set(&session, "thinking", json!("low"))).as_deref(), Some("low"));
+    let before = agent.updates.len();
+    agent.say(&session, MESSAGE).expect("the message is answered");
+    let said: Vec<Value> = agent.heard(&session, before).into_iter().filter(|update| update["sessionUpdate"] == "config_option_update").collect();
+    assert!(said.iter().all(|update| level(&update["configOptions"]).as_deref() == Some("low")), "a reply changed the level: {said:?}");
+    assert_eq!(level(&agent.set(&session, "thinking", json!("low"))).as_deref(), Some("low"), "the level did not hold through a reply");
+
+    // On another model, and back: the level goes with the conversation.
+    assert_eq!(level(&agent.set(&session, "model", json!("standin-openai/ok"))).as_deref(), Some("low"), "the level did not hold through a move to another model");
+    assert_eq!(level(&agent.set(&session, "model", json!("standin-anthropic/ok"))).as_deref(), Some("low"));
+
+    // The person's own change says which model it was made on: the same one.
+    let before = agent.updates.len();
+    agent.say(&session, "/effort high").expect("the harness answers its own command");
+    let said: Vec<Value> = agent.heard(&session, before).into_iter().filter(|update| update["sessionUpdate"] == "config_option_update").collect();
+    let last = said.last().unwrap_or_else(|| panic!("the harness did not say that its command changed the level"));
+    assert_eq!(level(&last["configOptions"]).as_deref(), Some("high"));
+    assert_eq!(translate::models_from_config_options(&last["configOptions"]).1.as_deref(), Some("standin-anthropic/ok"), "the command's change did not name the model it was made on");
+
+    let odd = agent.request("session/set_config_option", json!({ "sessionId": session, "configId": "thinking", "value": "no such level" }));
+    assert!(odd.is_err(), "a level the harness does not know was taken: {odd:?}");
 }
