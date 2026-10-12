@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="commands"></a>
 <p align="center">
-  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /attach, /history, /rename, /pet, /folder, /new and /quit, with what each does; /history also finds a conversation by something said in it, renames one, moves one to the Trash, and lists first the ones that are working, asking or not yet looked at; /folder starts a conversation in a folder you choose; /quit warns once while conversations are working; the list also holds the commands the harness itself offers, the skills it finds among them, and typing one of those by the name the list shows has the harness carry it out, arguments and all; a name neither the box nor the harness knows opens that list." />
+  <img src=".github/Readme/commands.svg" width="100%" alt="A few commands and no settings window: /model, /login, /usage, /backup, /harness, /update, /attach, /history, /rename, /pet, /computer, /folder, /new and /quit, with what each does; /computer switches whether the agent may see the screen and work the Mac's apps, and says how the two permissions macOS wants for it stand; /history also finds a conversation by something said in it, renames one, moves one to the Trash, and lists first the ones that are working, asking or not yet looked at; /folder starts a conversation in a folder you choose; /quit warns once while conversations are working; the list also holds the commands the harness itself offers, the skills it finds among them, and typing one of those by the name the list shows has the harness carry it out, arguments and all; a name neither the box nor the harness knows opens that list." />
 </p>
 
 <a id="when-a-provider-stops-answering"></a>
@@ -67,7 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="privacy-and-permissions"></a>
 <p align="center">
-  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, an attached file travels as its path and Null reads none of its content, Null reads OMP's conversation files to search them and keeps nothing, and deleting moves a conversation to the Trash, the shortcut needs no Accessibility permission, Null passes on OMP's approval setting, whose default lets the agent act without asking, and Full Disk Access is a separate choice asked after the first reply." />
+  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, an attached file travels as its path and Null reads none of its content, Null reads OMP's conversation files to search them and keeps nothing, and deleting moves a conversation to the Trash, the shortcut needs no Accessibility permission, Null passes on OMP's approval setting, whose default lets the agent act without asking, computer use is off until switched on with /computer, is done by OMP and follows that same setting, and its two permissions, Accessibility and Screen Recording, are asked of macOS only when you switch it on, and Full Disk Access is a separate choice asked after the first reply." />
 </p>
 
 <a id="signing-and-permission-persistence"></a>
@@ -77,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="what-null-keeps"></a>
 <p align="center">
-  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, history.json with a title for each conversation made in the box, any title you gave, and which conversations are working or not yet looked at, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
+  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, with whether computer use is switched on among its few things, history.json with a title for each conversation made in the box, any title you gave, and which conversations are working or not yet looked at, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
 </p>
 
 <a id="under-the-hood"></a>
@@ -87,7 +87,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="source-map"></a>
 <p align="center">
-  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, search.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
+  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, search.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, computer.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
 </p>
 
 <a id="development"></a>
@@ -97,7 +97,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="development-switches-and-smoke-checks"></a>
 <p align="center">
-  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the ten NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider that can also answer slowly, and the warning that profile isolation does not isolate MCP." />
+  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the ten NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider that can also answer slowly or ask for a tool, and the warning that profile isolation does not isolate MCP." />
 </p>
 
 <a id="status-and-direction"></a>
