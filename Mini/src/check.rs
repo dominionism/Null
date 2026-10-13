@@ -129,8 +129,14 @@ impl Agent {
     /// acts, as Null passes on what the person set: "yolo" acts freely,
     /// "always-ask" asks every time.
     fn start_set_to(binary: &Path, folder: &Folder, more: Option<Value>, asking: &str) -> Agent {
+        Agent::start_with(binary, folder, more, asking, &[])
+    }
+
+    /// The same, with flags of Null's own on the start line before `acp`.
+    fn start_with(binary: &Path, folder: &Folder, more: Option<Value>, asking: &str, flags: &[&str]) -> Agent {
         let mut child = folder
             .command(binary)
+            .args(flags)
             .args(["--approval-mode", asking, "--config"])
             .arg(folder.handed(more))
             .arg("acp")
@@ -927,6 +933,122 @@ fn with_computer_use_handed_over_the_model_is_told_of_the_desktop() {
     assert!(!without.contains(named), "the model is told of computer use though nothing switched it on");
     let with = told(Some(json!({ "computer": { "enabled": true } })));
     assert!(with.contains(named), "with computer use handed over, the model is not told of the desktop");
+}
+
+/// With the browser link on, Null tells the model how to use it in a few lines
+/// of its own, handed over on the start line as `--append-system-prompt`,
+/// while the harness's own link setting stays off. So the harness has to pass
+/// those lines to the model in a conversation opened over the protocol, and
+/// pass nothing when none were handed over.
+#[test]
+#[ignore]
+fn a_rule_handed_over_at_start_reaches_the_model() {
+    const RULE: &str = "Box check rule: open a tab of your own, never the one in view.";
+    let told = |flags: &[&str]| {
+        let standin = StandIn::start();
+        let folder = Folder::new(&standin);
+        let mut agent = Agent::start_with(&engine::under_test(), &folder, None, "yolo", flags);
+        let (session, _) = agent.open_in(&folder.work());
+        agent.set(&session, "model", json!("standin-anthropic/ok"));
+        agent.say(&session, MESSAGE).unwrap_or_else(|error| panic!("a message was answered with an error: {error}"));
+        standin.heard().first().map(Value::to_string).unwrap_or_default()
+    };
+    let without = told(&[]);
+    assert!(without.contains(MESSAGE), "the message did not reach the model, so nothing can be told: {without}");
+    assert!(!without.contains(RULE), "the model is told the rule though none was handed over");
+    let with = told(&["--append-system-prompt", RULE]);
+    assert!(with.contains(RULE), "a rule handed over at start does not reach the model: {with}");
+}
+
+/// Null makes its own copy of the browser link's extension from the engine it
+/// carries, in one folder that Chrome loads and keeps loading. The harness's
+/// relay refuses an extension of a protocol other than its own ("out of
+/// date"). So the extension this engine writes has to speak the protocol this
+/// engine's relay expects. The check writes it, starts the relay on a port of
+/// its own, says hello as the extension does, with the number the extension
+/// states, and reads what the relay makes of it. No Chrome is needed.
+#[test]
+#[ignore]
+fn the_extension_the_engine_writes_speaks_the_relay_s_protocol() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let binary = engine::under_test();
+    let written = folder.root.join("extension");
+    let installed = folder.command(&binary).args(["browser-relay", "install", "--dir"]).arg(&written).output().expect("the harness runs");
+    assert!(installed.status.success(), "the harness did not write its extension: {}", String::from_utf8_lossy(&installed.stderr));
+    let script = std::fs::read_to_string(written.join("background.js")).expect("the extension has its script");
+    let stated: String = script.split("discardedTabsProtocol:").nth(1).expect("the extension states its protocol").trim_start().chars().take_while(char::is_ascii_digit).collect();
+    assert!(!stated.is_empty(), "the extension states no number for its protocol");
+
+    let port = std::net::TcpListener::bind("127.0.0.1:0").and_then(|free| free.local_addr()).expect("a free port").port();
+    // With nothing to read the relay stops at once, so it is given an input
+    // that stays open, and it is stopped however this ends.
+    let relay = Stopped(folder.command(&binary).args(["browser-relay", "-p", &port.to_string()]).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().expect("the relay starts"));
+    let until = Instant::now() + PATIENCE;
+    while std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+        assert!(Instant::now() < until, "the relay never listened on port {port}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let hello = json!({ "t": "hello", "instanceId": "harness-check", "userAgent": "Chrome/155.0", "browserVersion": "Chrome/155.0", "discardedTabsProtocol": stated.parse::<u64>().unwrap(), "tabs": [], "attachedTabIds": [] });
+    let _extension = as_the_extension(port, &hello);
+    let mut said = Value::Null;
+    while said.get("ompExtensionDiscardedTabsProtocol").is_none() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(100));
+        said = relay_says(port);
+    }
+    drop(relay);
+    assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err(), "the relay went on listening once it was stopped");
+    assert_eq!(said["ompExtensionDiscardedTabsProtocol"], json!(stated), "the relay did not hear the extension's protocol: {said}");
+    assert_eq!(said["ompRelayDiscardedTabsProtocol"], said["ompExtensionDiscardedTabsProtocol"], "the extension this engine writes is out of date for its own relay: {said}");
+}
+
+/// A program the check started, stopped when it is let go, whether the check
+/// passed or not.
+struct Stopped(Child);
+
+impl Drop for Stopped {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// Connect to a relay as its extension does, with no origin, and say one
+/// thing. The connection is given back: the relay forgets an extension that
+/// has gone.
+fn as_the_extension(port: u16, said: &Value) -> std::net::TcpStream {
+    use std::io::Read;
+    let mut socket = std::net::TcpStream::connect(("127.0.0.1", port)).expect("the relay takes the connection");
+    // The key is the protocol's own example: sixteen bytes, as a key has to be.
+    write!(socket, "GET /ext HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").unwrap();
+    let mut answer = [0u8; 512];
+    let read = socket.read(&mut answer).expect("the relay answers");
+    assert!(answer[..read].starts_with(b"HTTP/1.1 101"), "the relay would not take the extension: {}", String::from_utf8_lossy(&answer[..read]));
+    // One text message, masked as a client's has to be.
+    let text = said.to_string().into_bytes();
+    let mask = [7u8, 11, 13, 17];
+    let mut frame = vec![0x81];
+    match text.len() {
+        length if length < 126 => frame.push(0x80 | length as u8),
+        length => {
+            frame.push(0x80 | 126);
+            frame.extend_from_slice(&(length as u16).to_be_bytes());
+        }
+    }
+    frame.extend_from_slice(&mask);
+    frame.extend(text.iter().enumerate().map(|(at, byte)| byte ^ mask[at % 4]));
+    socket.write_all(&frame).unwrap();
+    socket
+}
+
+/// What a relay says of itself at `/json/version`, or nothing.
+fn relay_says(port: u16) -> Value {
+    use std::io::Read;
+    let Ok(mut socket) = std::net::TcpStream::connect(("127.0.0.1", port)) else { return Value::Null };
+    let _ = write!(socket, "GET /json/version HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    let mut answer = String::new();
+    let _ = socket.read_to_string(&mut answer);
+    answer.find('{').and_then(|start| serde_json::from_str(&answer[start..answer.rfind('}')? + 1]).ok()).unwrap_or(Value::Null)
 }
 
 /// What the model was last sent in the stand-in's hearing: for a tool it asked
