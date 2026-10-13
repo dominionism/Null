@@ -644,7 +644,18 @@ fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) {
 /// Start the harness thread. Nothing is launched until the first order arrives.
 pub fn init(app: &AppHandle) {
     let saved = settings::get(app);
-    let mut shared = Shared::new(saved.session, saved.model);
+    // The one that was open is loaded back with the first message, unless a
+    // person has it open in a terminal now: two harnesses writing one
+    // conversation spoil it. The box starts on a new one instead.
+    let session = saved.session.filter(|id| {
+        let elsewhere = history::open_in_a_terminal(id);
+        if elsewhere {
+            log!("the conversation that was open is open in a terminal now; the box starts a new one");
+            settings::update(app, |settings| settings.session = None);
+        }
+        !elsewhere
+    });
+    let mut shared = Shared::new(session, saved.model);
     shared.recall(history::stood(app));
     let shared = Arc::new(Mutex::new(shared));
     // What was working when Null went away is written down as cut off from now on.
