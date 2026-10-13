@@ -418,9 +418,10 @@ fn ours(program: u32) -> bool {
     false
 }
 
-/// What the box says of a conversation it leaves alone because a person has it
-/// open in a terminal: two harnesses writing one conversation spoil it.
-pub const IN_A_TERMINAL: &str = "that conversation is open in a terminal. close it there first";
+/// Why the box leaves a conversation alone that a person has open in a
+/// terminal: two harnesses writing one conversation spoil it. Said after
+/// "Could not open that conversation:".
+pub const IN_A_TERMINAL: &str = "it's already open in a terminal. Close it there first.";
 
 /// Whether a program in a terminal, and not Null's own, holds a file.
 fn held_in_a_terminal(file: &Path) -> bool {
@@ -494,7 +495,7 @@ pub async fn delete_conversation(app: AppHandle, id: String) -> Result<Option<u6
     };
     harness::close(&app, id.clone()).await;
     if held_in_a_terminal(&file) {
-        return refuse(IN_A_TERMINAL);
+        return refuse("That conversation is already open in a terminal. Close it there first.");
     }
     let holders = held_by(&file);
     if !holders.is_empty() {
