@@ -41,7 +41,7 @@ use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::history;
-use crate::{access, attach, backups, computer, panel, providers, settings};
+use crate::{access, attach, backups, computer, panel, providers, settings, verify};
 
 /// What the box says when the harness has to be started again while conversations are working.
 const RESTART_WAITS: &str = "that takes effect once nothing is working: the harness starts again then";
@@ -82,6 +82,11 @@ enum Command {
     /// Ask the harness which model a conversation is on now. It can move to a
     /// backup by itself in the middle of a reply, and does not always say so.
     CheckModel { which: u64 },
+    /// A reply has ended: have the second model verify the answer, when the
+    /// person asked for that and this is a reply to verify (`verify.rs`).
+    Verify { which: u64 },
+    /// The second model has answered: put the conversation back on its own model.
+    Verified { which: u64 },
     /// Have the harness say what it can carry out. It says so when a session
     /// starts, so this is also what opens one: a box that has asked nothing yet
     /// has not been told, and the list it offers would be the box's own only.
@@ -163,6 +168,14 @@ struct Conversation {
     /// How hard its model can be set to think, as the harness names the levels.
     /// None of them when the harness gives the conversation no such setting.
     levels: Vec<String>,
+    /// How many steps the reply under way has taken, or the last one took.
+    steps: u32,
+    /// The reply under way is the second model verifying the answer before it
+    /// (`verify.rs`), sent by Null and not by the person.
+    verifying: bool,
+    /// The model the conversation was moved from for that, to be put back on
+    /// once the second model has answered. None when it was not moved.
+    back: Option<String>,
     /// Its reply ended while the box showed another conversation, and it has
     /// not been shown since. It is kept until it has been.
     unseen: bool,
@@ -406,6 +419,7 @@ impl Shared {
         }
         open.busy = true;
         open.unseen = false;
+        open.steps = 0;
         Ok((which, cursor))
     }
 
@@ -559,6 +573,46 @@ fn restart_if_due(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
     }
 }
 
+/// The harness has answered a message with how its reply ended: say so in the
+/// box and free the conversation. `own` is a reply the harness gave itself,
+/// with no model asked.
+fn reply_ended(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, response: &Value, own: bool) {
+    let reason = response["stopReason"].as_str().map(translate::stop_reason).unwrap_or("completed");
+    // The harness reports a provider's refusal as a reply like any other.
+    let (failed, learned) = {
+        let mut shared = lock(shared);
+        let (failed, counts) = translate::judge_reply(response, shared.counts_tokens);
+        let learned = (counts && !shared.counts_tokens).then(|| shared.noted.clone()).flatten();
+        shared.counts_tokens = counts;
+        // A reply without a count is a refusal only where a model was asked.
+        (failed && !own, learned)
+    };
+    if let Some(version) = learned {
+        log!("this harness counts a reply's tokens; from now on a reply without a count is taken for a refusal");
+        settings::update(app, |settings| settings.counts_tokens = Some(version));
+    }
+    log!("reply ended: {reason}{}", if failed { ", with nothing from the model" } else { "" });
+    if failed {
+        providers::forget(app);
+        publish(app, shared, which, json!({ "type": "reply_failed" }));
+    }
+    publish(app, shared, which, json!({ "type": "status_change", "status": "ready", "reason": null }));
+    publish(app, shared, which, json!({ "type": "message_done", "stop_reason": reason }));
+    let ended = match reason {
+        _ if failed => Ended::Failed,
+        "refused" => Ended::Failed,
+        "cancelled" => Ended::Stopped,
+        _ => Ended::Done,
+    };
+    finish(shared, which, ended);
+    tell_work(app, shared);
+    restart_if_due(app, shared);
+    // The user has now seen Null answer: the moment to ask for Full Disk Access.
+    if !failed && reason == "completed" {
+        access::after_reply(app);
+    }
+}
+
 /// The reply is over, and this is how it ended: free the conversation and
 /// answer any approval still open as cancelled. One that the box is not
 /// showing waits to be seen.
@@ -643,7 +697,7 @@ fn refuse(app: &AppHandle, shared: &Arc<Mutex<Shared>>, command: Command, reason
         Command::Close { reply, .. } => {
             let _ = reply.send(());
         }
-        Command::Interrupt { .. } | Command::Restart | Command::CheckModel { .. } => {}
+        Command::Interrupt { .. } | Command::Restart | Command::CheckModel { .. } | Command::Verify { .. } | Command::Verified { .. } => {}
     }
 }
 
@@ -654,7 +708,7 @@ async fn serve(
     first: Command,
     orders: &mut mpsc::UnboundedReceiver<Command>,
 ) -> Result<(), String> {
-    if matches!(first, Command::Restart | Command::CheckModel { .. }) {
+    if matches!(first, Command::Restart | Command::CheckModel { .. } | Command::Verify { .. } | Command::Verified { .. }) {
         return Ok(()); // nothing is running; the next order starts a fresh process anyway
     }
     // No harness is running, so none holds the conversation. It is not started to be asked.
@@ -912,6 +966,7 @@ impl Connection<'_> {
                         return Ok(());
                     }
                 };
+                self.put_back(which, &session).await;
                 history::said(self.app, &session, &text);
                 let request: PromptRequest = typed(json!({ "sessionId": session, "prompt": attach::blocks(&text, &files) }))?;
                 let with_files = !files.is_empty();
@@ -923,42 +978,9 @@ impl Connection<'_> {
                     .on_receiving_result(async move |result| {
                         match result {
                             Ok(response) => {
-                                let response = as_json(&response);
-                                let reason = response["stopReason"].as_str().map(translate::stop_reason).unwrap_or("completed");
-                                // The harness reports a provider's refusal as a reply like any other.
-                                let (failed, learned) = {
-                                    let mut shared = lock(&shared);
-                                    let (failed, counts) = translate::judge_reply(&response, shared.counts_tokens);
-                                    let learned = (counts && !shared.counts_tokens).then(|| shared.noted.clone()).flatten();
-                                    shared.counts_tokens = counts;
-                                    // A reply without a count is a refusal only where a model was asked.
-                                    (failed && !own, learned)
-                                };
-                                if let Some(version) = learned {
-                                    log!("this harness counts a reply's tokens; from now on a reply without a count is taken for a refusal");
-                                    settings::update(&app, |settings| settings.counts_tokens = Some(version));
-                                }
-                                log!("reply ended: {reason}{}", if failed { ", with nothing from the model" } else { "" });
-                                if failed {
-                                    providers::forget(&app);
-                                    publish(&app, &shared, which, json!({ "type": "reply_failed" }));
-                                }
-                                publish(&app, &shared, which, json!({ "type": "status_change", "status": "ready", "reason": null }));
-                                publish(&app, &shared, which, json!({ "type": "message_done", "stop_reason": reason }));
-                                let ended = match reason {
-                                    _ if failed => Ended::Failed,
-                                    "refused" => Ended::Failed,
-                                    "cancelled" => Ended::Stopped,
-                                    _ => Ended::Done,
-                                };
-                                finish(&shared, which, ended);
-                                tell_work(&app, &shared);
-                                restart_if_due(&app, &shared);
-                                // The user has now seen Null answer: the moment to ask for Full Disk Access.
-                                if !failed && reason == "completed" {
-                                    access::after_reply(&app);
-                                }
+                                reply_ended(&app, &shared, which, &as_json(&response), own);
                                 let _ = order(&app.state::<Harness>(), Command::CheckModel { which });
+                                let _ = order(&app.state::<Harness>(), Command::Verify { which });
                             }
                             Err(error) => fail_reply(&app, &shared, which, attach::refused(error_event(&error), with_files)),
                         }
@@ -994,6 +1016,13 @@ impl Connection<'_> {
                 let _ = reply.send(result);
             }
             Command::CheckModel { which } => self.check_model(which).await,
+            Command::Verify { which } => self.verify(which).await?,
+            Command::Verified { which } => {
+                let session = with(self.shared, which, |held| held.session.clone().filter(|_| held.loaded)).flatten();
+                if let Some(session) = session {
+                    self.put_back(which, &session).await;
+                }
+            }
             Command::Commands { reply } => {
                 let which = lock(self.shared).open;
                 // Opening the conversation is the whole of it: the harness says
@@ -1288,6 +1317,16 @@ impl Connection<'_> {
                 return Err(format!("{HARNESS_NAME} has no model named {id}"));
             }
         }
+        self.move_to(which, session, id).await?;
+        settings::update(self.app, |settings| settings.model = Some(id.to_string()));
+        publish(self.app, self.shared, which, json!({ "type": "model_changed", "model": id }));
+        Ok(())
+    }
+
+    /// Have the harness put a conversation on another model. It is Null's doing
+    /// and is not taken for a backup taking over. Nothing is remembered of it
+    /// and the box is not told: that is for whoever asked for the move.
+    async fn move_to(&mut self, which: u64, session: &str, id: &str) -> Result<(), String> {
         let request: SetSessionConfigOptionRequest = typed(json!({ "sessionId": session, "configId": "model", "value": id }))?;
         let was_settling = with(self.shared, which, |held| std::mem::replace(&mut held.settling, true)).unwrap_or(false);
         let response = self.cx.send_request(request).block_task().await;
@@ -1296,10 +1335,71 @@ impl Connection<'_> {
             with(self.shared, which, |held| held.model = Some(id.to_string()));
         }
         with(self.shared, which, |held| held.settling = was_settling);
-        response.map_err(|e| describe(&e))?;
-        settings::update(self.app, |settings| settings.model = Some(id.to_string()));
-        publish(self.app, self.shared, which, json!({ "type": "model_changed", "model": id }));
+        response.map(|_| ()).map_err(|e| describe(&e))
+    }
+
+    /// Have a second model verify the answer a reply has just ended with, when
+    /// the person named one (`/verify`) and this is a reply to verify. The
+    /// conversation is moved to that model and asked in Null's own words; it
+    /// is the same conversation, so the second model has before it everything
+    /// the first saw and did. The answer is on the page already.
+    async fn verify(&mut self, which: u64) -> Result<(), String> {
+        let Some(verifier) = settings::get(self.app).verifier else { return Ok(()) };
+        let offered = lock(self.shared).models.iter().any(|model| model.id == verifier);
+        let Some((reply, session, on)) = with(self.shared, which, |held| {
+            let reply = verify::Reply { ended_well: !held.busy && held.ended == Some(Ended::Done), steps: held.steps, verification: held.verifying, own_folder: held.folder.is_none(), offered };
+            (reply, held.session.clone().filter(|_| held.loaded), held.model.clone())
+        }) else {
+            return Ok(());
+        };
+        let (true, Some(session)) = (verify::due(&reply), session) else { return Ok(()) };
+        with(self.shared, which, |held| {
+            held.busy = true;
+            held.verifying = true;
+            held.steps = 0;
+        });
+        tell_work(self.app, self.shared);
+        log!("the answer is verified by {verifier}");
+        tell(self.app, self.shared, which, vec![json!({ "type": "verifying", "model": verifier }), json!({ "type": "status_change", "status": "running", "reason": null })]);
+        if on.as_deref() != Some(verifier.as_str()) {
+            if let Err(reason) = self.move_to(which, &session, &verifier).await {
+                log!("could not move the conversation to {verifier}: {reason}");
+                with(self.shared, which, |held| held.verifying = false);
+                fail_reply(self.app, self.shared, which, json!({ "type": "error", "message": format!("the answer was not verified: {reason}"), "code": null, "details": null }));
+                return Ok(());
+            }
+            with(self.shared, which, |held| held.back = on);
+        }
+        let request: PromptRequest = typed(json!({ "sessionId": session, "prompt": attach::blocks(verify::ASK, &[]) }))?;
+        let (app, shared) = (self.app.clone(), self.shared.clone());
+        self.cx
+            .send_request(request)
+            .on_receiving_result(async move |result| {
+                match result {
+                    Ok(response) => reply_ended(&app, &shared, which, &as_json(&response), false),
+                    Err(error) => fail_reply(&app, &shared, which, error_event(&error)),
+                }
+                with(&shared, which, |held| held.verifying = false);
+                let _ = order(&app.state::<Harness>(), Command::Verified { which });
+                Ok(())
+            })
+            .map_err(|e| describe(&e))?;
         Ok(())
+    }
+
+    /// Put a conversation back on the model it was on before the second model
+    /// was asked. A message the person sends meanwhile waits for this, so that
+    /// it is answered by the model they chose.
+    async fn put_back(&mut self, which: u64, session: &str) {
+        let Some(back) = with(self.shared, which, |held| held.back.take()).flatten() else { return };
+        match self.move_to(which, session, &back).await {
+            Ok(()) => log!("the conversation is back on {back}"),
+            Err(reason) => {
+                log!("could not put the conversation back on {back}: {reason}");
+                let on = with(self.shared, which, |held| held.model.clone()).flatten().unwrap_or_default();
+                publish(self.app, self.shared, which, json!({ "type": "error", "message": format!("the conversation stays on {on}: it could not be put back on {back}"), "code": null, "details": reason }));
+            }
+        }
     }
 
     /// Take in a conversation's settings as the harness gives them: the models
@@ -1418,7 +1518,18 @@ fn on_update(app: &AppHandle, shared: &Arc<Mutex<Shared>>, notification: &Sessio
         return;
     }
     // The box already shows a conversation that is being loaded back after the harness went away.
-    let event = with(shared, which, |held| if held.replay == Replay::Drop { None } else { translate::event_from_update(update, &mut held.tools) }).flatten();
+    let event = with(shared, which, |held| {
+        // A step the agent takes in a reply under way. A replay of old ones is not counted.
+        if held.busy && held.replay == Replay::Live && update["sessionUpdate"] == "tool_call" {
+            held.steps += 1;
+        }
+        if held.replay == Replay::Drop {
+            None
+        } else {
+            translate::event_from_update(update, &mut held.tools)
+        }
+    })
+    .flatten();
     if let Some(event) = event {
         publish(app, shared, which, event);
     }

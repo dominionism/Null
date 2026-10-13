@@ -474,6 +474,58 @@ fn one_of_the_harness_s_own_commands_is_answered_and_a_skill_goes_by_its_short_n
     assert!(page.parts().ends_with("you,reply"), "{page}");
 }
 
+/// A second model looks at an answer again when the person has named one
+/// (`/verify`). The answer is on the page first. Then the box says who verifies
+/// it, that model's reply follows, and the conversation is back on its own
+/// model afterwards, with the person's choice of model as it was. An answer
+/// that took no step is left alone: it saw nothing to be checked against.
+#[test]
+#[ignore]
+fn an_answer_that_took_a_step_is_verified_by_the_model_named_for_it() {
+    let mac = Mac::on("ok");
+    let lines = [
+        "/verify",
+        "<until list nobody>",
+        "<show list>",
+        "<key Escape>",
+        "<until no list>",
+        "/verify openai ok",
+        "<until list standin-openai/ok>",
+        "<key Enter>",
+        "<until shows each answer is verified by standin-openai/ok>",
+        "these words take no step",
+        "<settle>",
+        "<until shows pong>",
+        "<show plain>",
+        "ask the shell: true &",
+        "<until shows verifying the answer with standin-openai/ok>",
+        "<settle>",
+        "<show verified>",
+        "and these come after it",
+        "<settle>",
+        "<show after>",
+    ];
+    let seen = mac.run(&lines);
+    let page = seen.at("list");
+    assert!(page.has("list", "nobody") && page.has("list", "STANDIN-OPENAI"), "nobody first, then the models {page}");
+    assert!(page.has("chosen", "nobody"), "nobody verifies until somebody is named {page}");
+
+    let page = seen.at("plain");
+    assert!(!page.has("shows", "verifying the answer"), "an answer that took no step was verified {page}");
+
+    let page = seen.at("verified");
+    assert!(page.parts().ends_with("note,reply"), "the box says who verifies, and that model's reply follows {page}");
+    assert!(!page.is("busy"), "{page}");
+    assert!(seen.logged("the answer is verified by standin-openai/ok"), "{}", seen.log);
+    assert!(seen.logged("the conversation is back on standin-anthropic/ok"), "{}", seen.log);
+
+    // The message after it is answered by the model the person chose, and not verified: it took no step.
+    assert!(seen.at("after").parts().ends_with("you,reply"), "{}", seen.at("after"));
+    let settings: Value = serde_json::from_str(&mac.kept("null/settings.json")).unwrap();
+    assert_eq!(settings["model"], "standin-anthropic/ok", "the person's own model is still the one chosen {settings}");
+    assert_eq!(settings["verifier"], "standin-openai/ok", "{settings}");
+}
+
 /// The harness starts every conversation thinking at its own level. The level
 /// a person sets with the harness's own `/effort` is where their next
 /// conversations start, in this run and once Null has been started again.

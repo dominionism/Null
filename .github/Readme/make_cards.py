@@ -252,6 +252,7 @@ def commands(c):
         ("/login", "Follow the harness's own sign-in steps inside the box, browser sign-in or key entry"),
         ("/usage", "See the harness's usage reports and reset times; providers without a report are marked"),
         ("/backup [filter]", "Set an ordered fallback list: Enter adds or removes a model, Esc saves it"),
+        ("/verify [filter]", "Name a second model that checks each answer once it is given, or nobody. The answer is shown first. Then the box says who verifies it, and that model says that the answer stands or what to correct. Each one costs a reply from that model"),
         ("/harness", "See which Oh-my-pi the box runs, the built-in one or your own, and switch between them"),
         ("/update", "Move the built-in Oh-my-pi to the newest version the repository's harness check has passed, and say when a newer Null is out and what gets it"),
         ("/attach [path]", "Hand the agent a file with the next message: choose it from a list of your folders inside the box, or give its path. The plus at the end of the row does the same"),
@@ -301,6 +302,7 @@ def privacy(c):
     c.row("Shortcut", "Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice")
     c.row("Approvals", "Null passes on OMP's approval setting and adds none of its own. OMP's own default lets the agent act without asking you first, and the first opening says so")
     c.row("Computer use", "Off until you switch it on with /computer. Then the agent may read what any window holds and press and type in any app, and, with Screen Recording, take pictures of the screen. OMP does this, not Null: Null neither looks at the screen nor keeps what the agent saw. It follows OMP's approval setting like any other tool, so with OMP's default the agent uses your Mac without asking you first. Set to ask, this OMP cannot put its question through the box and refuses computer use")
+    c.row("Verifying", "Off until you name a model with /verify. Then, when a reply that took steps has ended, Null moves that conversation to the model you named, sends it one message of Null's own that asks it to check the answer against what was seen, and puts the conversation back. It is the only message Null sends that you did not type, and the box says so each time. Conversations started with /folder are left alone")
     c.row("Its permissions", "Two: Accessibility and Screen Recording, which macOS charges to Null because Null starts the agent. Null asks macOS for them only when you switch computer use on or choose one in the /computer list, never at a start. Screen Recording may be left off: the agent then reads and presses, and has no pictures")
     c.row("Full Disk Access", "A separate choice, asked once, after the first reply, with an explanation: macOS attributes the agent's file access to Null. It is broader file access, not a sandbox, and it does not replace OMP's approval rules. The box opens without it")
 
@@ -325,7 +327,7 @@ def signing(c):
 
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
-    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, whether computer use is switched on, and the thinking level you last set with /effort")
+    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, whether computer use is switched on, the thinking level you last set with /effort, and the model you named to verify answers")
     c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. Any title you gave with /rename. And, while there are any, which conversations are working or not yet looked at: an id and one word each, so that work cut off by a restart is found again")
     c.row("harness.yml", "Settings handed to OMP at every start: no update check, your backup order when there is one, and computer use on or off once you have used its switch. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
@@ -376,6 +378,7 @@ def source_map(c):
         ("welcome.rs", "The first opening: with no provider signed in, the box opens once with the sign-in list"),
         ("backups.rs", "The fallback order written for OMP, and the switch reporting it"),
         ("computer.rs", "The switch for computer use: what is handed to OMP for it, and how it stands"),
+        ("verify.rs", "The second model that checks an answer: when it is asked, and the words it is asked with"),
         ("markdown.rs", "Reply text into structured parts, including partial streamed input"),
         ("settings.rs, access.rs, log.rs", "Persistence, what macOS allows Null (Full Disk Access, and the two permissions of computer use), and logging"),
         ("check.rs, standin.rs", "The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use"),
@@ -442,6 +445,7 @@ def status(c):
         "A small pet beside the box that shows what the agent is doing",
         "Work in the background: several conversations at once, each seen at a glance, in a folder you choose",
         "Computer use, switched on with /computer: Oh-my-pi reads windows and works the Mac's apps",
+        "A second model that checks each answer, named with /verify",
     ])
     c.head("Planned or incomplete", MUTED)
     c.bullets([

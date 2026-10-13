@@ -1093,3 +1093,33 @@ fn a_thinking_level_set_as_a_conversation_opens_holds() {
     let odd = agent.request("session/set_config_option", json!({ "sessionId": session, "configId": "thinking", "value": "no such level" }));
     assert!(odd.is_err(), "a level the harness does not know was taken: {odd:?}");
 }
+
+/// The person can name a second model that looks at an answer again
+/// (`/verify`). Null then moves the conversation to that model once a reply
+/// has ended, asks it in Null's own words, and puts the conversation back. So
+/// a conversation has to take another model between two replies and keep what
+/// was said in it, the second model has to be sent what went before, its
+/// reply has to end as any reply does, and the conversation has to answer on
+/// its own model again afterwards.
+#[test]
+#[ignore]
+fn a_conversation_is_moved_to_a_second_model_for_one_reply_and_back() {
+    let (standin, _folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", None);
+    agent.say(&session, &format!("{MESSAGE}\n{}true", standin::ASK_THE_SHELL)).expect("the message is answered");
+    assert_eq!(standin.asked(), ["anthropic/ok", "anthropic/ok"], "a step, and then the answer");
+
+    let (_, on) = translate::models_from_config_options(&agent.set(&session, "model", json!("standin-openai/ok")));
+    assert_eq!(on.as_deref(), Some("standin-openai/ok"));
+    let (ended, words) = agent.say(&session, crate::verify::ASK).expect("the second model answers");
+    assert_eq!(standin.asked().last().map(String::as_str), Some("openai/ok"), "the second model was not the one asked");
+    assert_eq!((ended["stopReason"].as_str(), words.as_str()), (Some("end_turn"), "pong"), "its reply did not end as a reply does");
+    assert!(!translate::reply_failed(&ended), "its reply counted no tokens: {ended}");
+    let sent = standin.heard().last().map(|request| request["messages"].to_string()).unwrap_or_default();
+    assert!(sent.contains(MESSAGE), "the second model was not sent what went before: {sent}");
+    assert!(sent.contains("the one word: stands"), "nor what Null asks of it: {sent}");
+
+    let (_, on) = translate::models_from_config_options(&agent.set(&session, "model", json!("standin-anthropic/ok")));
+    assert_eq!(on.as_deref(), Some("standin-anthropic/ok"));
+    agent.say(&session, MESSAGE).expect("the next message is answered");
+    assert_eq!(standin.asked().last().map(String::as_str), Some("anthropic/ok"), "put back, the conversation did not answer on its own model");
+}

@@ -45,6 +45,9 @@ pub struct Settings {
     /// `/effort`. A new conversation starts on it. Nothing here means the harness's
     /// own setting holds.
     pub thinking: Option<String>,
+    /// The model that looks at a finished answer again before it is relied on
+    /// (`/verify`). Nothing here means no answer is verified.
+    pub verifier: Option<String>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -171,6 +174,7 @@ mod tests {
             pet: Some(false),
             computer: Some(true),
             thinking: Some("low".into()),
+            verifier: Some("e/f".into()),
         };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);
