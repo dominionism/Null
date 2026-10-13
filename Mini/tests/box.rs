@@ -1085,6 +1085,29 @@ fn work_cut_off_by_a_restart_is_found_again() {
     assert_eq!(seen.at("opened").parts(), "you", "what was asked is there, and the reply that was cut off is not");
 }
 
+/// Null notes a conversation as working as soon as the harness opens it,
+/// before the message reaches the harness. Gone away in between, it found at
+/// the next start work that the harness never wrote down: it could not be
+/// opened, the pet said it had failed, and it was written down again at every
+/// start. Such work is let go.
+#[test]
+#[ignore]
+fn work_the_harness_never_wrote_down_is_let_go_at_the_next_start() {
+    let mac = Mac::on("slow");
+    let (none, opened) = ("01a1ffff-0000-7000-8000-000000000001", "01a1ffff-0000-7000-8000-000000000002");
+    mac.keep("null/history.json", &format!(r#"{{"titles":{{}},"renamed":{{}},"standing":{{"{none}":"working","{opened}":"working"}}}}"#));
+    // One the harness has no file of, and one it opened and was told nothing in.
+    let workspace = mac.place("null/Workspace");
+    mac.keep(
+        &format!("agent/sessions/-box-/2026-10-13T09-00-00-000Z_{opened}.jsonl"),
+        &format!("{{\"type\":\"title\",\"title\":\"\"}}\n{{\"type\":\"session\",\"version\":3,\"id\":\"{opened}\",\"timestamp\":\"2026-10-13T09:00:00.000Z\",\"cwd\":\"{workspace}\"}}\n"),
+    );
+    let seen = mac.run(&["<show start>"]);
+    assert!(seen.logged("2 conversation(s) noted as working had nothing in them at the harness; let go"), "{}", seen.log);
+    assert_ne!(seen.at("start").text("pet"), "pet fail", "the pet does not say that work failed {}", seen.at("start"));
+    assert!(!mac.kept("null/history.json").contains("standing"), "nothing is written down again: {}", mac.kept("null/history.json"));
+}
+
 // ── Stopping, quitting, starting again ────────────────────────────────────
 
 #[test]
