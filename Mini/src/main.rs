@@ -51,6 +51,7 @@ mod shortcut;
 mod signin;
 mod standin;
 mod translate;
+mod verify;
 mod welcome;
 
 use log::log;
@@ -150,6 +151,8 @@ fn main() {
             computer::computer,
             computer::set_computer,
             computer::ask_permission,
+            verify::verifier,
+            verify::set_verifier,
             engine::harnesses,
             engine::set_harness,
             engine::update_harness,

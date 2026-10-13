@@ -14,7 +14,8 @@
      does it for any other, and the x beside it moves a conversation to the
      Trash), /pet shows the
      pet or puts it away, /computer says whether the agent may see the screen
-     and work the apps on this Mac, and switches it, /new starts a new
+     and work the apps on this Mac, and switches it, /verify names a second
+     model that checks each answer once it is given, /new starts a new
      conversation, /quit quits the app
      and closes the conversation. A lone / and Enter lists these commands, and
      so does a command the box does not have. Ctrl+C stops a reply or, with
@@ -1324,6 +1325,7 @@
       const ABOUT = [
         ['/model', 'choose the model'],
         ['/backup', 'the models to carry on with'],
+        ['/verify', 'have a second model check each answer'],
         ['/usage', 'what each provider has left'],
         ['/login', 'sign in to a provider'],
         ['/harness', 'which Oh-my-pi the box runs'],
@@ -1518,6 +1520,13 @@
           case 'model_changed':
             reply = null;
             line('note', `now on ${event.model}`);
+            break;
+          case 'verifying':
+            // The answer above is given. A second model now looks at it again,
+            // on the person's standing word (/verify). Nobody typed this.
+            reply = null;
+            foldSteps();
+            line('note', `verifying the answer with ${event.model}`);
             break;
           case 'model_switched':
             // The harness moved to a backup by itself. A switch is never silent.
@@ -1743,10 +1752,10 @@
       };
 
       const closePicker = () => {
-        const { backups, saved, harness, places } = picker;
+        const { backups, saved, harness, places, verify } = picker;
         picker = null;
         if (backups && backups.join() !== saved.join()) saveBackups(backups);
-        if (harness || places) unnotice();
+        if (harness || places || verify) unnotice();
         pick.style.display = 'none';
         pick.textContent = '';
         if (out.textContent) {
@@ -1839,10 +1848,12 @@
       };
 
       // `backups` is true for /backup: the list then sets the backup order.
-      const openPicker = async (filter = '', backups = false) => {
+      // `verify` is true for /verify: the list then names the model that checks
+      // each answer, with a first row for nobody.
+      const openPicker = async (filter = '', backups = false, verify = false) => {
         if (picker) return;
         if (busy) {
-          notice(`stop the reply with ctrl+c before ${backups ? 'changing the backups' : 'switching models'}`);
+          notice(`stop the reply with ctrl+c before ${backups ? 'changing the backups' : verify ? 'choosing who verifies' : 'switching models'}`);
           return;
         }
         mark('working');
@@ -1851,6 +1862,9 @@
         try {
           listed = await invoke('models');
           if (backups) order = await invoke('backups');
+          if (verify) {
+            listed = { models: [{ id: '', label: 'nobody', provider: 'answers are verified by' }].concat(listed.models), current: (await invoke('verifier')) || '' };
+          }
         } catch (error) {
           line('error', `could not list models: ${error}`);
           mark('');
@@ -1862,13 +1876,14 @@
           return;
         }
         const at = listed.models.findIndex((model) => model.id === listed.current);
-        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order, spent: new Set(), left: new Map() };
+        picker = { models: listed.models, current: listed.current, shown: [], index: filter || order ? 0 : Math.max(at, 0), backups: order, saved: order, verify, spent: new Set(), left: new Map() };
         out.style.display = 'none';
         pick.style.display = 'block';
         input.value = filter;
         tint();
         mark('');
         if (order) notice('enter adds or removes a backup. esc is done');
+        if (verify) notice('enter names the model that checks each answer. esc leaves it', true);
         drawPicker();
         // Which providers have nothing left, once the harness has said. The list does not wait for it.
         const opened = picker;
@@ -1894,6 +1909,18 @@
           return;
         }
         const current = picker && picker.current;
+        if (picker && picker.verify) {
+          // Who checks each answer from now on, or nobody. The conversation stays as it is.
+          closePicker();
+          if (model.id === current) return;
+          try {
+            const now = await invoke('set_verifier', { id: model.id || null });
+            line('note', now ? `each answer is verified by ${now} from now on` : 'answers are not verified from now on');
+          } catch (error) {
+            line('error', `could not change who verifies: ${error}`);
+          }
+          return;
+        }
         closePicker();
         if (model.id === current) return;
         mark('working');
@@ -3075,6 +3102,10 @@
       const send = async (text) => {
         if (text === '/model' || text.startsWith('/model ')) {
           openPicker(text.slice(6).trim());
+          return;
+        }
+        if (text === '/verify' || text.startsWith('/verify ')) {
+          openPicker(text.slice(7).trim(), false, true);
           return;
         }
         if (text === '/backup' || text.startsWith('/backup ')) {
