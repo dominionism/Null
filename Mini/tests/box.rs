@@ -880,6 +880,22 @@ fn a_conversation_begun_with_a_skill_is_in_history() {
     assert!(page.has("list", "box-check-long cedar maple"), "the conversation begun with a skill is listed {page}");
 }
 
+/// A new conversation started while another one works is a conversation of
+/// its own, with its own title, and the one left working keeps its title.
+#[test]
+#[ignore]
+fn a_conversation_begun_while_another_works_has_its_own_title() {
+    let working = format!("first alpha message {} &", long(2));
+    let lines = [working.as_str(), "<wait 800>", "/new", "second beta message", "<settle>", "/history", "<until list second beta message>", "<show listed>", "<key Escape>"];
+    let seen = Mac::on("slow").run(&lines);
+    let page = seen.at("listed");
+    let list = page.text("list");
+    assert_eq!((list.matches("first alpha message").count(), list.matches("second beta message").count()), (1, 1), "each title once {page}");
+    let first = list.lines().find(|row| row.contains("first alpha message")).unwrap_or_default();
+    let second = list.lines().find(|row| row.contains("second beta message")).unwrap_or_default();
+    assert!(second.trim_start().starts_with('●') && !first.contains('●'), "the open one is the new one {page}");
+}
+
 // ── Work in the background ────────────────────────────────────────────────
 
 #[test]
