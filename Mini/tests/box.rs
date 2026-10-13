@@ -1082,3 +1082,15 @@ fn the_pet_alone_stays_in_view_while_the_list_behind_it_changes() {
     assert_eq!(page.number("wide"), 56.0, "still the pet alone: the first conversation works on {page}");
     assert_eq!(page.number("aside"), 0.0, "the page has not moved sideways under the pet {page}");
 }
+
+/// With nothing working the pet says how the last reply ended, and goes; the
+/// box comes back whole, not at the pet's size.
+#[test]
+#[ignore]
+fn with_nothing_working_the_pet_says_how_it_ended_and_goes() {
+    let lines = ["one two three four five six &", "<wait 600>", "<away>", "<wait 7000>", "<pet>", "<show back>"];
+    let seen = Mac::on("slow").run(&lines);
+    assert!(seen.logged("the pet stands alone") && seen.logged("the pet has gone: nothing is working"), "{}", seen.log);
+    let page = seen.at("back");
+    assert!(page.number("wide") > 600.0, "the box came back whole {page}");
+}

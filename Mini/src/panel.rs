@@ -61,6 +61,11 @@ static BOX_HEIGHT: Mutex<f64> = Mutex::new(HEIGHT);
 /// Where the window's corner was when it became the pet alone. Somewhere else
 /// by the time the box comes back, and the user has moved the pet.
 static STOOD: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+/// How long the pet alone stays once the last reply has ended: long enough to
+/// say how it ended, a hop for one that is done, and then it goes.
+const GOODBYE: Duration = Duration::from_secs(3);
+/// A goodbye is under way: the pet goes when it is over, unless work began again.
+static LEAVING: AtomicBool = AtomicBool::new(false);
 
 /// PROTOTYPE. Whether the box is put away, with the pet alone or with nothing.
 /// A reply that ends then has not been seen, in the open conversation either.
@@ -206,9 +211,9 @@ fn remember(app: &AppHandle) {
 }
 
 /// PROTOTYPE. Whether the pet has something to say with the box away: it is
-/// not put away with `/pet`, and a conversation is working, asking or unseen.
+/// not put away with `/pet`, and a conversation is working or asking.
 fn to_say(app: &AppHandle) -> bool {
-    lane(app) > 0.0 && harness::anything_to_say(app)
+    lane(app) > 0.0 && harness::anything_at_work(app)
 }
 
 /// PROTOTYPE. The window becomes the pet alone, where the pet stands. On the
@@ -267,25 +272,59 @@ fn out_and_in(panel: &tauri_nspanel::raw_nspanel::RawNSPanel) {
     }
 }
 
-/// PROTOTYPE. The pet stands alone while the box is away and there is
-/// something to say, and goes when nothing is left. Asked at every change in
-/// how the conversations stand, and once the page has loaded: work that was
-/// cut off is something to say from the start.
+/// PROTOTYPE. The pet stands alone while the box is away and work goes on.
+/// When the last reply has ended it stays a moment to say how, and goes.
+/// Asked at every change in how the conversations stand, and once the page
+/// has loaded.
 pub fn settle(app: &AppHandle) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         let Ok(panel) = handle.get_webview_panel(LABEL) else { return };
-        let (alone, to_say) = (ALONE.load(Ordering::SeqCst), to_say(&handle));
-        if alone && !to_say {
-            remember(&handle);
-            ALONE.store(false, Ordering::SeqCst);
-            panel.order_out(None);
-            let _ = handle.emit_to(LABEL, "mini:alone", false);
-            log!("the pet has gone: nothing is left to say");
-        } else if !alone && !panel.is_visible() && to_say {
+        let (alone, at_work) = (ALONE.load(Ordering::SeqCst), to_say(&handle));
+        if alone && !at_work && !LEAVING.swap(true, Ordering::SeqCst) {
+            let later = handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(GOODBYE);
+                let again = later.clone();
+                let _ = later.run_on_main_thread(move || {
+                    LEAVING.store(false, Ordering::SeqCst);
+                    // The box came back meanwhile, or work began again.
+                    if ALONE.load(Ordering::SeqCst) && !to_say(&again) {
+                        leave(&again);
+                    }
+                });
+            });
+        } else if !alone && !panel.is_visible() && at_work {
             stand_alone(&handle);
         }
     });
+}
+
+/// PROTOTYPE. The pet alone goes. The window is the box's again before it is
+/// put away, so that the box comes back whole and where it can be seen, as
+/// from a press on the pet. On the main thread.
+fn leave(app: &AppHandle) {
+    let Ok(panel) = app.get_webview_panel(LABEL) else { return };
+    grow_back(app);
+    remember(app);
+    ALONE.store(false, Ordering::SeqCst);
+    panel.order_out(None);
+    let _ = app.emit_to(LABEL, "mini:alone", false);
+    log!("the pet has gone: nothing is working");
+}
+
+/// PROTOTYPE. The window grows back from the pet alone to the box, at the same
+/// corner, or where the box is whole on the screen when the pet was moved to
+/// an edge. On the main thread.
+fn grow_back(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(LABEL) else { return };
+    let height = *BOX_HEIGHT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let onto = brought_onto_screen(&window, lane(app));
+    size(&window, WIDTH + lane(app), height);
+    if let Some(corner) = onto {
+        let _ = window.set_position(PhysicalPosition::new(corner.0, corner.1));
+        log!("the pet had been moved to where the box does not fit; the box is brought onto the screen");
+    }
 }
 
 /// PROTOTYPE. A press on the pet alone makes its window the one that takes
@@ -354,16 +393,7 @@ pub fn show(app: &AppHandle) {
         }
         PUT_AWAY.store(false, Ordering::SeqCst);
         if alone {
-            // The window grows back from the pet to the box, at the same corner.
-            if let Some(window) = handle.get_webview_window(LABEL) {
-                let height = *BOX_HEIGHT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                let onto = brought_onto_screen(&window, lane(&handle));
-                size(&window, WIDTH + lane(&handle), height);
-                if let Some(corner) = onto {
-                    let _ = window.set_position(PhysicalPosition::new(corner.0, corner.1));
-                    log!("the pet had been moved to where the box does not fit; the box is brought onto the screen");
-                }
-            }
+            grow_back(&handle);
         }
         let before = frontmost_app();
         panel.show();
@@ -396,7 +426,7 @@ pub fn hide(app: &AppHandle, why: &'static str) {
         }
         PUT_AWAY.store(true, Ordering::SeqCst);
         remember(&handle);
-        // PROTOTYPE: with something to say, the pet stays where it stands.
+        // PROTOTYPE: while work goes on, the pet stays where it stands.
         if to_say(&handle) {
             log!("the box is put away ({why}); the pet stays");
             stand_alone(&handle);
