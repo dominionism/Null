@@ -956,8 +956,8 @@ fn a_conversation_open_in_a_terminal_is_not_opened_from_history() {
     let before = std::fs::metadata(&file).unwrap().len();
     let seen = mac.run(&["/history", "<until list first maple message>", "first maple message", "<until shows open in a terminal>", "<show refused>"]);
     let page = seen.at("refused");
-    assert!(page.has("shows", "could not open that conversation: that conversation is open in a terminal. close it there first"), "{page}");
-    assert!(seen.logged("a conversation was not opened: that conversation is open in a terminal"), "{}", seen.log);
+    assert!(page.text("shows").contains("Could not open that conversation: it's already open in a terminal. Close it there first."), "written as a sentence {page}");
+    assert!(seen.logged("a conversation was not opened: it's already open in a terminal"), "{}", seen.log);
     assert_eq!(std::fs::metadata(&file).unwrap().len(), before, "the box wrote nothing to it");
 }
 
