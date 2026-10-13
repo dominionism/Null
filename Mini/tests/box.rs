@@ -861,6 +861,25 @@ fn a_conversation_is_moved_to_the_trash_and_leaves_the_list() {
     assert!(seen.logged("a conversation was moved to the Trash"));
 }
 
+/// The harness lists a conversation from the first 4 KB of its file and counts
+/// the messages it finds there (Oh-my-pi 18.8.7). A conversation begun with a
+/// skill has the skill's words first, and with a skill as long as most are,
+/// that 4 KB holds no message: it is counted at none, and Null took that for a
+/// conversation in which nothing was said. It went from `/history` while it
+/// was still working, and could not be opened again.
+#[test]
+#[ignore]
+fn a_conversation_begun_with_a_skill_is_in_history() {
+    let mac = Mac::on("ok");
+    // A skill of the run's own, longer than the harness reads of a conversation to list it.
+    let words = vec![WORDS; 40].join("\n");
+    mac.keep("agent/skills/box-check-long/SKILL.md", &format!("---\nname: box-check-long\ndescription: A long skill. Made by the box check.\n---\n\nSay pong.\n\n{words}\n"));
+    let lines = ["<type />", "<until list /box-check-long>", "<key Escape>", "<until no list>", "/box-check-long cedar maple", "<settle>", "/new", "beta maple message", "<settle>", "/history", "<until list beta maple message>", "<show listed>", "<key Escape>"];
+    let seen = mac.run(&lines);
+    let page = seen.at("listed");
+    assert!(page.has("list", "box-check-long cedar maple"), "the conversation begun with a skill is listed {page}");
+}
+
 // ── Work in the background ────────────────────────────────────────────────
 
 #[test]
