@@ -329,6 +329,7 @@ def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
     c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, whether computer use is switched on, the thinking level you last set with /effort, and the model you named to verify answers")
     c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. Any title you gave with /rename. And, while there are any, which conversations are working or not yet looked at: an id and one word each, so that work cut off by a restart is found again")
+    c.row("routing.json", "What each of the last 500 replies cost, in numbers: how many steps it took, how many of them failed, how long it ran, when it ended and how, the model and its thinking level, whether the conversation was in the box's own folder, and whether the reply was a second model verifying. No word that was typed, shown or read, and no conversation's id or title. Nothing is done with the numbers yet, and they do not leave this Mac")
     c.row("harness.yml", "Settings handed to OMP at every start: no update check, your backup order when there is one, and computer use on or off once you have used its switch. Rewritten each time")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
     c.note("Your own OMP settings are not modified. OMP "
@@ -379,6 +380,7 @@ def source_map(c):
         ("backups.rs", "The fallback order written for OMP, and the switch reporting it"),
         ("computer.rs", "The switch for computer use: what is handed to OMP for it, and how it stands"),
         ("verify.rs", "The second model that checks an answer: when it is asked, and the words it is asked with"),
+        ("routing.rs", "What each reply cost, kept in numbers: its steps, the ones that failed, how long it ran, the model, and how it ended"),
         ("markdown.rs", "Reply text into structured parts, including partial streamed input"),
         ("settings.rs, access.rs, log.rs", "Persistence, what macOS allows Null (Full Disk Access, and the two permissions of computer use), and logging"),
         ("check.rs, standin.rs", "The harness check: live tests of what Null relies on, against the stand-in provider that scripted runs also use"),

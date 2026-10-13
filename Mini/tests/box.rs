@@ -596,6 +596,32 @@ fn while_a_backup_is_answering_an_answer_is_verified_without_moving_the_conversa
     assert_eq!(settings["model"], "standin-codex/limit", "the person's own model is still the one chosen {settings}");
 }
 
+/// Of each reply Null keeps what it cost, in numbers: its steps, the steps
+/// among them that failed, how long it ran, the model and how it ended
+/// (`routing.rs`). No word of what was typed or said is kept, and what the
+/// harness answers itself, with no model asked, is not a reply to count.
+#[test]
+#[ignore]
+fn each_reply_is_counted_in_numbers_and_no_word_of_it_is_kept() {
+    let mac = Mac::on("ok");
+    let lines = ["heliotrope", "<settle>", "ask the shell: false", "<settle>", "/context", "<until shows Context window>", "<settle>", "<show counted>"];
+    let seen = mac.run(&lines);
+    assert!(seen.at("counted").has("shows", "pong"), "{}", seen.at("counted"));
+    assert!(seen.logged("reply counted: 1 step(s), 1 failed"), "{}", seen.log);
+    let kept = mac.kept("null/routing.json");
+    let counted: Value = serde_json::from_str(&kept).unwrap_or_else(|e| panic!("the count is not a file of replies ({e}): {kept}"));
+    let replies = counted["replies"].as_array().cloned().unwrap_or_default();
+    assert_eq!(replies.len(), 2, "the two replies of a model, and nothing for the harness's own answer: {kept}");
+    let numbers = |reply: &Value| (reply["steps"].as_u64(), reply["failed"].as_u64(), reply["ended"].as_str().map(str::to_string), reply["model"].as_str().map(str::to_string));
+    let on = Some("standin-anthropic/ok".to_string());
+    assert_eq!(numbers(&replies[0]), (Some(0), Some(0), Some("done".into()), on.clone()), "an answer that took no step: {kept}");
+    assert_eq!(numbers(&replies[1]), (Some(1), Some(1), Some("done".into()), on), "one step, which failed: {kept}");
+    assert!(replies.iter().all(|reply| reply["seconds"].as_f64().is_some_and(|seconds| seconds >= 0.0) && reply["own_folder"] == true && reply["verification"] == false), "{kept}");
+    for word in ["heliotrope", "shell", "pong", "context"] {
+        assert!(!kept.to_lowercase().contains(word), "`{word}` was typed or said, and is in the count: {kept}");
+    }
+}
+
 /// The harness starts every conversation thinking at its own level. The level
 /// a person sets with the harness's own `/effort` is where their next
 /// conversations start, in this run and once Null has been started again.

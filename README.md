@@ -77,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="what-null-keeps"></a>
 <p align="center">
-  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, with whether computer use is switched on among its few things, history.json with a title for each conversation made in the box, any title you gave, and which conversations are working or not yet looked at, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
+  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, with whether computer use is switched on among its few things, history.json with a title for each conversation made in the box, any title you gave, and which conversations are working or not yet looked at, routing.json with what each of the last 500 replies cost in numbers and the model's name, and no word of what was typed or said, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
 </p>
 
 <a id="under-the-hood"></a>
@@ -87,7 +87,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="source-map"></a>
 <p align="center">
-  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, search.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, computer.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
+  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, search.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, computer.rs, verify.rs, routing.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
 </p>
 
 <a id="development"></a>

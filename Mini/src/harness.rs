@@ -20,7 +20,7 @@
 //! harness process is started on the first order and started again, with the
 //! conversation loaded back, if it has gone away.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -41,7 +41,7 @@ use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::history;
-use crate::{access, attach, backups, computer, panel, providers, settings, verify};
+use crate::{access, attach, backups, computer, panel, providers, routing, settings, verify};
 
 /// What the box says when the harness has to be started again while conversations are working.
 const RESTART_WAITS: &str = "that takes effect once nothing is working: the harness starts again then";
@@ -81,7 +81,9 @@ enum Command {
     SetModel { which: u64, id: String, reply: oneshot::Sender<Result<(), String>> },
     /// Ask the harness which model a conversation is on now. It can move to a
     /// backup by itself in the middle of a reply, and does not always say so.
-    CheckModel { which: u64 },
+    /// `counted` is what the reply that has just ended cost: it is kept once
+    /// that is known, so that it is counted on the model that answered it.
+    CheckModel { which: u64, counted: Option<routing::Reply> },
     /// A reply has ended: have the second model verify the answer, when the
     /// person asked for that and this is a reply to verify (`verify.rs`).
     Verify { which: u64 },
@@ -174,6 +176,10 @@ struct Conversation {
     levels: Vec<String>,
     /// How many steps the reply under way has taken, or the last one took.
     steps: u32,
+    /// The steps of the reply under way that failed, by the harness's id for each.
+    failed: HashSet<String>,
+    /// When the reply under way began. None while none is.
+    began: Option<std::time::Instant>,
     /// The reply under way is the second model verifying the answer before it
     /// (`verify.rs`), sent by Null and not by the person.
     verifying: bool,
@@ -214,6 +220,47 @@ impl Conversation {
             Ended::Failed => "failed",
             Ended::Stopped => "stopped",
             Ended::CutOff => "cut off",
+        })
+    }
+
+    /// A reply begins: it is working, and is counted from here (`routing.rs`).
+    fn begin(&mut self) {
+        self.busy = true;
+        (self.steps, self.began) = (0, Some(std::time::Instant::now()));
+        self.failed.clear();
+    }
+
+    /// Count what the harness says of the reply under way: a step the agent
+    /// takes, and a step that failed. Each is counted once, however often the
+    /// harness says so. A replay of old ones is not counted. This comes before
+    /// the update is taken in, while `tools` still holds what was said last.
+    fn count(&mut self, update: &Value) {
+        if !self.busy || self.replay != Replay::Live {
+            return;
+        }
+        let (Some(kind @ ("tool_call" | "tool_call_update")), Some(id)) = (update["sessionUpdate"].as_str(), update["toolCallId"].as_str()) else { return };
+        if kind == "tool_call" && !self.tools.contains_key(id) {
+            self.steps += 1;
+        }
+        if update["status"] == "failed" {
+            self.failed.insert(id.to_string());
+        }
+    }
+
+    /// What the reply that has just ended cost, in numbers (`routing.rs`).
+    /// None when no reply had begun.
+    fn counted(&mut self) -> Option<routing::Reply> {
+        let seconds = self.began.take()?.elapsed().as_secs_f64();
+        Some(routing::Reply {
+            at: routing::now(),
+            model: self.model.clone(),
+            thinking: self.level(),
+            steps: self.steps,
+            failed: self.failed.len() as u32,
+            seconds: (seconds * 10.0).round() / 10.0,
+            ended: self.standing()?.to_string(),
+            own_folder: self.folder.is_none(),
+            verification: self.verifying,
         })
     }
 
@@ -444,9 +491,8 @@ impl Shared {
         if working >= MAX_WORKING {
             return Err(TOO_MANY.into());
         }
-        open.busy = true;
+        open.begin();
         open.unseen = false;
-        open.steps = 0;
         Ok((which, cursor))
     }
 
@@ -589,9 +635,21 @@ fn end_reply(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, event: Va
     }
     publish(app, shared, which, json!({ "type": "status_change", "status": "blocked", "reason": event["message"] }));
     publish(app, shared, which, event);
-    finish(shared, which, ended);
+    if let Some(reply) = finish(shared, which, ended) {
+        routing::count(app, reply);
+    }
     tell_work(app, shared);
     restart_if_due(app, shared);
+}
+
+/// Keep the count of a reply that has ended (`routing.rs`), on the model its
+/// conversation is on now, when the conversation is still held.
+fn count_on(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, counted: Option<routing::Reply>) {
+    let Some(mut reply) = counted else { return };
+    if let Some(on) = with(shared, which, |held| held.model.clone()).flatten() {
+        reply.model = Some(on);
+    }
+    routing::count(app, reply);
 }
 
 /// A reply has ended: if the harness was waiting for nothing to be working, it is started again now.
@@ -604,8 +662,9 @@ fn restart_if_due(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
 
 /// The harness has answered a message with how its reply ended: say so in the
 /// box and free the conversation. `own` is a reply the harness gave itself,
-/// with no model asked.
-fn reply_ended(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, response: &Value, own: bool) {
+/// with no model asked. Gives what the reply cost, for the caller to keep
+/// (`routing.rs`): nothing for one the harness gave itself.
+fn reply_ended(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, response: &Value, own: bool) -> Option<routing::Reply> {
     let reason = response["stopReason"].as_str().map(translate::stop_reason).unwrap_or("completed");
     // The harness reports a provider's refusal as a reply like any other.
     let (failed, learned) = {
@@ -633,20 +692,21 @@ fn reply_ended(app: &AppHandle, shared: &Arc<Mutex<Shared>>, which: u64, respons
         "cancelled" => Ended::Stopped,
         _ => Ended::Done,
     };
-    finish(shared, which, ended);
+    let counted = finish(shared, which, ended).filter(|_| !own);
     tell_work(app, shared);
     restart_if_due(app, shared);
     // The user has now seen Null answer: the moment to ask for Full Disk Access.
     if !failed && reason == "completed" {
         access::after_reply(app);
     }
+    counted
 }
 
 /// The reply is over, and this is how it ended: free the conversation and
 /// answer any approval still open as cancelled. One that the box is not
-/// showing waits to be seen.
-fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) {
-    let pending: Vec<_> = {
+/// showing waits to be seen. Gives what the reply cost, when one had begun.
+fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) -> Option<routing::Reply> {
+    let (pending, counted): (Vec<_>, _) = {
         let mut shared = lock(shared);
         let open = shared.open;
         shared.of(which).map(|held| {
@@ -655,7 +715,7 @@ fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) {
             // PROTOTYPE (item 15, the pet alone): with the box put away, a reply
             // that ends in the open conversation has not been seen either.
             held.unseen = which != open || panel::put_away();
-            held.pending.drain().map(|(_, responder)| responder).collect()
+            (held.pending.drain().map(|(_, responder)| responder).collect(), held.counted())
         })
     }
     .unwrap_or_default();
@@ -664,6 +724,7 @@ fn finish(shared: &Arc<Mutex<Shared>>, which: u64, ended: Ended) {
             let _ = responder.respond(response);
         }
     }
+    counted
 }
 
 // ── Start-up ──────────────────────────────────────────────────────────────
@@ -756,11 +817,15 @@ async fn serve(
     first: Command,
     orders: &mut mpsc::UnboundedReceiver<Command>,
 ) -> Result<(), String> {
-    if matches!(first, Command::Restart | Command::CheckModel { .. } | Command::Verify { .. } | Command::Verified { .. }) {
-        return Ok(()); // nothing is running; the next order starts a fresh process anyway
-    }
-    // No harness is running, so none holds the conversation. It is not started to be asked.
     let first = match first {
+        // Nothing is running; the next order starts a fresh process anyway.
+        Command::Restart | Command::Verify { .. } | Command::Verified { .. } => return Ok(()),
+        // The same, and the reply it came after is counted on the model as it was known.
+        Command::CheckModel { which, counted } => {
+            count_on(app, shared, which, counted);
+            return Ok(());
+        }
+        // No harness is running, so none holds the conversation. It is not started to be asked.
         Command::Close { reply, .. } => {
             let _ = reply.send(());
             return Ok(());
@@ -1026,8 +1091,8 @@ impl Connection<'_> {
                     .on_receiving_result(async move |result| {
                         match result {
                             Ok(response) => {
-                                reply_ended(&app, &shared, which, &as_json(&response), own);
-                                let _ = order(&app.state::<Harness>(), Command::CheckModel { which });
+                                let counted = reply_ended(&app, &shared, which, &as_json(&response), own);
+                                let _ = order(&app.state::<Harness>(), Command::CheckModel { which, counted });
                                 let _ = order(&app.state::<Harness>(), Command::Verify { which });
                             }
                             Err(error) => fail_reply(&app, &shared, which, attach::refused(error_event(&error), with_files)),
@@ -1063,7 +1128,10 @@ impl Connection<'_> {
                 let result = self.set_model(which, &id).await;
                 let _ = reply.send(result);
             }
-            Command::CheckModel { which } => self.check_model(which).await,
+            Command::CheckModel { which, counted } => {
+                self.check_model(which).await;
+                count_on(self.app, self.shared, which, counted);
+            }
             Command::Verify { which } => self.verify(which).await?,
             Command::Verified { which } => {
                 let session = with(self.shared, which, |held| held.session.clone().filter(|_| held.loaded)).flatten();
@@ -1433,9 +1501,8 @@ impl Connection<'_> {
         // person's model is left to the harness, as it is when nothing verifies.
         let verifier = on.clone().filter(|_| on_a_backup).unwrap_or(verifier);
         with(self.shared, which, |held| {
-            held.busy = true;
+            held.begin();
             held.verifying = true;
-            held.steps = 0;
         });
         tell_work(self.app, self.shared);
         log!("the answer is verified by {verifier}");
@@ -1455,7 +1522,8 @@ impl Connection<'_> {
             .send_request(request)
             .on_receiving_result(async move |result| {
                 match result {
-                    Ok(response) => reply_ended(&app, &shared, which, &as_json(&response), false),
+                    // The second model's reply is counted as its own, on the model it was asked of.
+                    Ok(response) => count_on(&app, &shared, which, reply_ended(&app, &shared, which, &as_json(&response), false)),
                     Err(error) => fail_reply(&app, &shared, which, error_event(&error)),
                 }
                 with(&shared, which, |held| held.verifying = false);
@@ -1617,10 +1685,7 @@ fn on_update(app: &AppHandle, shared: &Arc<Mutex<Shared>>, notification: &Sessio
     }
     // The box already shows a conversation that is being loaded back after the harness went away.
     let event = with(shared, which, |held| {
-        // A step the agent takes in a reply under way. A replay of old ones is not counted.
-        if held.busy && held.replay == Replay::Live && update["sessionUpdate"] == "tool_call" {
-            held.steps += 1;
-        }
+        held.count(update);
         if held.replay == Replay::Drop {
             None
         } else {
@@ -2311,6 +2376,73 @@ mod tests {
         // What it has is what it last said it has.
         shared.record(open, json!({ "type": "commands", "commands": [] }));
         assert!(!shared.open_one().answers_itself("/context"));
+    }
+
+    #[test]
+    fn a_reply_s_steps_are_counted_once_each_and_so_are_the_ones_that_failed() {
+        // As `on_update` takes an update in: it is counted, and then kept.
+        fn hear(held: &mut Conversation, update: Value) {
+            held.count(&update);
+            translate::event_from_update(&update, &mut held.tools);
+        }
+        let begun = |id: &str| json!({ "sessionUpdate": "tool_call", "toolCallId": id, "title": "$ false", "kind": "execute", "status": "pending" });
+        let said = |id: &str, status: &str| json!({ "sessionUpdate": "tool_call_update", "toolCallId": id, "status": status });
+        let mut held = Conversation::default();
+        // Nothing is counted of a conversation that is not answering.
+        hear(&mut held, begun("before"));
+        hear(&mut held, said("before", "failed"));
+        assert_eq!((held.steps, held.failed.len()), (0, 0));
+
+        held.begin();
+        // A step that fails, as Oh-my-pi 18.8.7 says it: pending, in progress, failed.
+        hear(&mut held, begun("c1"));
+        hear(&mut held, said("c1", "in_progress"));
+        hear(&mut held, said("c1", "failed"));
+        // Said again, it is the same step and the same failure.
+        hear(&mut held, begun("c1"));
+        hear(&mut held, said("c1", "failed"));
+        // One that goes well, and words between them, which are no step.
+        hear(&mut held, json!({ "sessionUpdate": "agent_message_chunk", "content": { "type": "text", "text": "failed" } }));
+        hear(&mut held, begun("c2"));
+        hear(&mut held, said("c2", "completed"));
+        // One the harness said nothing of before it failed.
+        hear(&mut held, said("c3", "failed"));
+        assert_eq!((held.steps, held.failed.len()), (2, 2));
+
+        // Old steps replayed while a conversation is loaded back are not this reply's.
+        held.replay = Replay::Show;
+        hear(&mut held, begun("old"));
+        hear(&mut held, said("old", "failed"));
+        assert_eq!((held.steps, held.failed.len()), (2, 2));
+        // The next reply is counted from nothing.
+        held.replay = Replay::Live;
+        held.begin();
+        assert_eq!((held.steps, held.failed.len()), (0, 0));
+    }
+
+    #[test]
+    fn a_reply_that_has_ended_gives_what_it_cost_and_one_that_never_began_gives_nothing() {
+        let shared = Arc::new(Mutex::new(Shared::new(None, None)));
+        let which = lock(&shared).begin_reply().expect("it may work").0;
+        with(&shared, which, |held| {
+            held.model = Some("a/b".into());
+            held.ask = Some(("thinking".into(), json!("high")));
+            held.count(&json!({ "sessionUpdate": "tool_call", "toolCallId": "c1", "status": "pending" }));
+            held.count(&json!({ "sessionUpdate": "tool_call_update", "toolCallId": "c1", "status": "failed" }));
+        });
+        let counted = finish(&shared, which, Ended::Stopped).expect("a reply that began is counted");
+        assert!(counted.at > 0 && counted.seconds >= 0.0);
+        assert_eq!(counted, routing::Reply { model: Some("a/b".into()), thinking: Some("high".into()), steps: 1, failed: 1, ended: "stopped".into(), own_folder: true, verification: false, at: counted.at, seconds: counted.seconds });
+        // It is given once, and a conversation nothing was asked of has nothing to count.
+        assert_eq!(finish(&shared, which, Ended::Done), None);
+        // One that works in a folder of the person's choosing says so, and so does a verification.
+        let (elsewhere, _) = lock(&shared).start_in(Some(PathBuf::from("/tmp/elsewhere")));
+        with(&shared, elsewhere, |held| {
+            held.begin();
+            held.verifying = true;
+        });
+        let counted = finish(&shared, elsewhere, Ended::Done).expect("it began");
+        assert_eq!((counted.own_folder, counted.verification, counted.ended.as_str(), counted.steps), (false, true, "done", 0));
     }
 
     #[test]
