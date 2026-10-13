@@ -1700,6 +1700,16 @@
         alone = !!message.payload;
       });
 
+      // The page never moves inside its window: only the transcript and the
+      // list scroll. Bringing a row of the list into view moves every scrollable
+      // thing around it, the page too, and in the pet alone's narrow window
+      // that slid the box in where the pet stands, a strip of it with its
+      // words and no pet. Whatever moves the page, it is put straight back.
+      document.addEventListener('scroll', () => {
+        const page = document.scrollingElement;
+        if (page.scrollLeft || page.scrollTop) page.scrollTo(0, 0);
+      });
+
       // ── Choosing a model ───────────────────────────────────────────────
 
       // The same list serves /model and /backup. For /backup the models chosen

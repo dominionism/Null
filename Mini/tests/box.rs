@@ -1067,3 +1067,18 @@ fn with_the_box_put_away_the_pet_stays_while_work_goes_on() {
     assert_eq!(seen.at("alone").text("pet"), "pet work");
     assert!(seen.logged("the box is put away (esc); the pet stays") && seen.logged("the pet stands alone") && seen.logged("shown, back from the pet alone"), "{}", seen.log);
 }
+
+/// The pet alone is a window as small as the pet, cut out of the page. Bringing
+/// a row of an open list into view moved the whole page sideways inside it,
+/// and the window showed a strip of the box with its words where the pet had
+/// been. The list behind the pet changes whenever a conversation does.
+#[test]
+#[ignore]
+fn the_pet_alone_stays_in_view_while_the_list_behind_it_changes() {
+    let working = format!("{} &", long(2));
+    let lines = [working.as_str(), "<wait 800>", "/new", "one two three four five six &", "<wait 600>", "/history", "<until list now>", "<away>", "<wait 5000>", "<show alone>", "<pet>", "<key Escape>"];
+    let seen = Mac::on("slow").run(&lines);
+    let page = seen.at("alone");
+    assert_eq!(page.number("wide"), 56.0, "still the pet alone: the first conversation works on {page}");
+    assert_eq!(page.number("aside"), 0.0, "the page has not moved sideways under the pet {page}");
+}

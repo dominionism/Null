@@ -1985,6 +1985,9 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
             shows: out.innerText,
             lines: [...out.children].map((one) => one.className).join(','),
             tags: [...out.querySelectorAll('*')].reduce((count, one) => ({ ...count, [one.tagName]: (count[one.tagName] || 0) + 1 }), {}),
+            // How far the page has moved sideways inside its window, and how wide that is.
+            aside: document.scrollingElement.scrollLeft,
+            wide: window.innerWidth,
           }),
         });
       }
