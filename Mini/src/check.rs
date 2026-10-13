@@ -1123,3 +1123,27 @@ fn a_conversation_is_moved_to_a_second_model_for_one_reply_and_back() {
     agent.say(&session, MESSAGE).expect("the next message is answered");
     assert_eq!(standin.asked().last().map(String::as_str), Some("anthropic/ok"), "put back, the conversation did not answer on its own model");
 }
+
+/// Why Null sets no model on a conversation while a backup is answering
+/// (`harness.rs`, `on_a_backup`). Left alone, such a conversation goes
+/// straight to the backup, as the question about the backup taking over has
+/// it. Set back on the model that refused, as putting it back after `/verify`
+/// would, the harness takes that model and tries it again before the backup
+/// answers: the wait of a refusal, paid before every reply.
+#[test]
+#[ignore]
+fn set_back_on_a_model_that_refused_the_harness_tries_it_again_before_the_backup() {
+    let backups = backups::overlay(&order(&["standin-anthropic/ok"]), &Value::Null);
+    let (standin, _folder, mut agent, session, _) = conversation_on("standin-codex/limit", backups);
+    agent.say(&session, MESSAGE).expect("the backup answers");
+    assert_eq!(standin.asked().last().map(String::as_str), Some("anthropic/ok"), "the backup did not take over: {:?}", standin.asked());
+
+    let (_, on) = translate::models_from_config_options(&agent.set(&session, "model", json!("standin-codex/limit")));
+    assert_eq!(on.as_deref(), Some("standin-codex/limit"), "the harness did not take the model back");
+    let before = standin.asked().len();
+    let (ended, words) = agent.say(&session, MESSAGE).expect("the next message is answered");
+    let asked = standin.asked()[before..].to_vec();
+    assert_eq!(words.trim(), "pong", "the backup's reply");
+    assert!(!translate::reply_failed(&ended), "the backup's reply was taken for a refusal: {ended}");
+    assert!(asked.first().map(String::as_str) == Some("codex/limit") && asked.last().map(String::as_str) == Some("anthropic/ok"), "set back on the model that refused, the message went to {asked:?}");
+}
