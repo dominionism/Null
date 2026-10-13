@@ -35,6 +35,7 @@ compile_error!("Null is macOS-only for now");
 mod access;
 mod attach;
 mod backups;
+mod browser;
 #[cfg(test)]
 mod check;
 mod computer;

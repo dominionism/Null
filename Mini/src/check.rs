@@ -27,7 +27,7 @@ use serde_json::{json, Value};
 
 use crate::history;
 use crate::standin::{self, StandIn};
-use crate::{attach, backups, engine, harness, search, translate};
+use crate::{attach, backups, browser, engine, harness, search, translate};
 
 /// How long one answer from the harness is waited for. It tries a provider that
 /// refuses several times before it gives up, which takes a quarter of a minute.
@@ -1020,6 +1020,35 @@ impl Drop for Stopped {
     fn drop(&mut self) {
         let _ = self.0.kill();
         let _ = self.0.wait();
+    }
+}
+
+/// Null offers the link under its own name: it makes its own copy of the
+/// extension the engine in use writes, and changes what Chrome shows of it.
+/// Each change looks for words that stand once in the engine's extension, so
+/// an engine whose extension has moved them would give a link half under the
+/// harness's name; Null then makes none. The extension this engine writes has
+/// to be one Null knows how to name, and a copy made again, as for a newer
+/// engine, has to stand in the same folder Chrome loads.
+#[test]
+#[ignore]
+fn the_extension_null_makes_from_the_engine_is_under_null_s_name() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let binary = engine::under_test();
+    let link = browser::folder(&folder.root);
+    let read = |file: &str| std::fs::read_to_string(link.join(file)).unwrap_or_default();
+    for time in ["first", "again"] {
+        browser::make(&binary, &link).unwrap_or_else(|why| panic!("Null could not make its copy, the {time} time: {why}"));
+        let manifest: Value = serde_json::from_str(&read("manifest.json")).expect("the copy has a manifest");
+        assert_eq!((&manifest["name"], &manifest["action"]["default_title"]), (&json!("Null"), &json!("Null")), "{manifest}");
+        for (_, icon) in manifest["icons"].as_object().expect("the copy names its icons") {
+            assert!(link.join(icon.as_str().unwrap()).is_file(), "the icon {icon} is in the copy");
+        }
+        assert!(read("background.js").contains("const title = \"Null\";"), "the agent's tabs are gathered under Null's name");
+        assert!(read("options.html").contains("<h1>Null</h1>"), "its settings page is headed with Null's name");
+        assert!(link.join("LICENSE").is_file() && link.join("THIRD-PARTY-NOTICES.txt").is_file(), "the harness's licence and notices stay with it");
+        assert!(!link.with_extension("new").exists(), "nothing is left beside the folder");
     }
 }
 
