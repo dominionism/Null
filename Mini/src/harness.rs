@@ -1949,6 +1949,7 @@ pub fn smoke(app: &AppHandle, text: String) {
 /// `<click #history>` presses the first thing the selector finds; `<settle>`
 /// waits until the page has stopped working; `<until list words>` waits for
 /// words to stand in the list, and likewise in `shows` (the transcript), the
+/// `reply` last begun (what the agent says, and not what was asked), the
 /// `notice` or the `field`, or with `no` before it for that to be empty, which
 /// is what keeps a run from resting on how fast the Mac is; and `<show name>`
 /// logs what the page has at that moment, under that name, and the run goes on.
@@ -1978,11 +1979,12 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
     }
     // Waiting as a person does, with their eyes: for words in a part of the
     // page, or for that part to be empty. Half a minute, and then it is said.
-    const until = /^<until (no )?(list|shows|notice|field)(?: (.*))?>$/.exec(line);
+    const until = /^<until (no )?(list|shows|reply|notice|field)(?: (.*))?>$/.exec(line);
     if (until) {
       const [, none, where, words = ''] = until;
       const there = () => {
-        const text = where === 'list' ? seen(pick) : where === 'shows' ? out.innerText : where === 'notice' ? seen(noticeLine) : input.value;
+        const replies = out.querySelectorAll('.reply');
+        const text = where === 'list' ? seen(pick) : where === 'shows' ? out.innerText : where === 'reply' ? (replies.length ? replies[replies.length - 1].innerText : '') : where === 'notice' ? seen(noticeLine) : input.value;
         if (none) return !text.trim();
         return words ? text.toLowerCase().includes(words.toLowerCase()) : !!text.trim();
       };

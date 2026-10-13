@@ -1073,8 +1073,11 @@ fn neither_the_model_nor_the_backups_are_changed_while_a_reply_is_under_way() {
 fn work_cut_off_by_a_restart_is_found_again() {
     let mac = Mac::on("slow");
     let working = format!("{} &", long(3));
-    // Null goes away while a conversation is working, as at a restart.
-    mac.run(&[working.as_str(), "/new", "<until notice still working. /history shows it>"]);
+    // Null goes away while a conversation is working, as at a restart. Not
+    // before the reply has begun, which says the harness has the message: on
+    // GitHub's Mac this failed now and then with the work noted by Null and
+    // not listed by the harness, as if it went away before that.
+    mac.run(&[working.as_str(), "<until reply alder birch>", "/new", "<until notice still working. /history shows it>"]);
     let seen = mac.run(&["/history", "<until list cut off>", "<show history>", "<key Enter>", "<settle>", "<until shows alder birch>", "<show opened>"]);
     let page = seen.at("history");
     assert!(page.text("list").trim_start().to_lowercase().starts_with("now") && page.has("chosen", "cut off"), "{page}");
