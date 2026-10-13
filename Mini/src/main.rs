@@ -25,6 +25,7 @@
 //! - `NULL_MINI_STANDIN`: offer a stand-in provider's models in that folder, so a
 //!   message is answered, or refused, with no real sign-in. Needs
 //!   `NULL_MINI_FOLDER`. The models are `standin-anthropic/ok` and the like.
+//!   Set to `thinking`, they say they can think, so that `/effort` has a level to set.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 

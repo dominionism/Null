@@ -26,6 +26,8 @@
 //! questions against it. And a scripted run of the app itself offers its models
 //! to the harness with `NULL_MINI_STANDIN`, on a folder of the run's own
 //! (`NULL_MINI_FOLDER`), so that nothing of the user's is read or written.
+//! Set to `thinking`, the models say they can think, and the harness then
+//! lets how hard one thinks be set.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -78,12 +80,19 @@ impl StandIn {
 
     /// The file that offers the stand-in's models to a harness, as `standin-<kind>/<answer>`.
     pub fn models_yml(&self) -> String {
+        self.models_that(false)
+    }
+
+    /// The same file. With `think`, every model says it can think, so that the
+    /// harness lets how hard one thinks be set, as its own `/effort` does.
+    pub fn models_that(&self, think: bool) -> String {
+        let thinks = if think { ", reasoning: true" } else { "" };
         let mut text = format!("{MARK}providers:\n");
         for (kind, api) in KINDS {
             let path = if kind == "openai" { "openai/v1" } else { kind };
             text.push_str(&format!("  standin-{kind}:\n    baseUrl: http://127.0.0.1:{}/{path}\n    api: {api}\n    apiKey: standin-not-a-key\n    models:\n", self.port));
             for answer in ANSWERS {
-                text.push_str(&format!("      - {{ id: {answer}, name: Stand-in {answer}, contextWindow: 128000, maxTokens: 8192 }}\n"));
+                text.push_str(&format!("      - {{ id: {answer}, name: Stand-in {answer}, contextWindow: 128000, maxTokens: 8192{thinks} }}\n"));
             }
         }
         text
@@ -390,7 +399,8 @@ pub fn for_this_run() -> Result<(), String> {
         return Err(format!("{} is not the stand-in's own file, so NULL_MINI_STANDIN left it alone", file.display()));
     }
     let standin = StandIn::start();
-    std::fs::write(&file, standin.models_yml()).map_err(|e| format!("could not write {}: {e}", file.display()))?;
+    let think = std::env::var("NULL_MINI_STANDIN").is_ok_and(|kind| kind == "thinking");
+    std::fs::write(&file, standin.models_that(think)).map_err(|e| format!("could not write {}: {e}", file.display()))?;
     log!("the stand-in provider answers on port {}; its models are offered in {}", standin.port, file.display());
     Ok(())
 }

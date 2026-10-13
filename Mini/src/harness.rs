@@ -160,6 +160,9 @@ struct Conversation {
     /// A setting of the conversation other than its model, and its value. Setting
     /// it to that same value changes nothing and answers with the model in use.
     ask: Option<(String, Value)>,
+    /// How hard its model can be set to think, as the harness names the levels.
+    /// None of them when the harness gives the conversation no such setting.
+    levels: Vec<String>,
     /// Its reply ended while the box showed another conversation, and it has
     /// not been shown since. It is kept until it has been.
     unseen: bool,
@@ -1239,7 +1242,31 @@ impl Connection<'_> {
                 settings::update(self.app, |settings| settings.model = current.clone());
             }
         }
+        self.apply_level(which, &session).await;
         Ok(session)
+    }
+
+    /// Start a new conversation thinking as hard as the person last set with
+    /// the harness's own `/effort`, when the model it is on can be set to
+    /// that. The harness starts every conversation on its own level, so
+    /// without this the person sets theirs again in each one.
+    async fn apply_level(&mut self, which: u64, session: &str) {
+        let Some(wanted) = settings::get(self.app).thinking else { return };
+        let Some((offered, on)) = with(self.shared, which, |held| (held.levels.contains(&wanted), held.level())) else { return };
+        if !offered || on.as_deref() == Some(wanted.as_str()) {
+            return;
+        }
+        let Ok(request) = typed::<SetSessionConfigOptionRequest>(json!({ "sessionId": session, "configId": "thinking", "value": wanted })) else { return };
+        let was_settling = with(self.shared, which, |held| std::mem::replace(&mut held.settling, true)).unwrap_or(false);
+        let response = self.cx.send_request(request).block_task().await;
+        match &response {
+            Ok(response) => {
+                self.absorb_options(which, &as_json(response)["configOptions"]);
+                log!("the conversation starts on thinking level {wanted}, as last set in the box");
+            }
+            Err(error) => log!("could not start the conversation on thinking level {wanted}: {}", describe(error)),
+        }
+        with(self.shared, which, |held| held.settling = was_settling);
     }
 
     /// Move a conversation to another model. It keeps what was said so far.
@@ -1293,6 +1320,7 @@ impl Connection<'_> {
                 held.model = current;
             }
             held.ask = translate::other_option(options);
+            held.levels = translate::thinking_from_config_options(options).0;
         }
     }
 }
@@ -1306,6 +1334,28 @@ impl Conversation {
         if let Some(ask) = translate::other_option(options) {
             self.ask = Some(ask);
         }
+    }
+
+    /// How hard its model thinks, as far as Null has been told.
+    fn level(&self) -> Option<String> {
+        self.ask.as_ref().filter(|(setting, _)| setting == "thinking").and_then(|(_, value)| value.as_str().map(str::to_string))
+    }
+
+    /// The thinking level the person has just set, when these settings say so:
+    /// it is another than it was, on the same model, during a reply, which is
+    /// how the harness's own `/effort` arrives. A backup taking over can bring
+    /// another level with its model, and Null sets one itself as a conversation
+    /// opens: neither is the person choosing, and neither is remembered.
+    fn level_chosen(&self, options: &Value) -> Option<String> {
+        if !self.busy || self.settling {
+            return None;
+        }
+        let (_, model) = translate::models_from_config_options(options);
+        if model.is_some() && model != self.model {
+            return None;
+        }
+        let was = self.level()?;
+        translate::thinking_from_config_options(options).1.filter(|now| *now != was)
     }
 }
 
@@ -1354,7 +1404,16 @@ fn on_update(app: &AppHandle, shared: &Arc<Mutex<Shared>>, notification: &Sessio
             lock(shared).models = models;
         }
         // One of the harness's own commands may have changed a setting, as `/effort` does.
-        with(shared, which, |held| held.settings_said(&update["configOptions"]));
+        let chosen = with(shared, which, |held| {
+            let chosen = held.level_chosen(&update["configOptions"]);
+            held.settings_said(&update["configOptions"]);
+            chosen
+        });
+        // A level the person set is where their next conversations start.
+        if let Some(level) = chosen.flatten() {
+            log!("thinking level {level}, set in the box: new conversations start on it");
+            settings::update(app, |settings| settings.thinking = Some(level));
+        }
         moved(app, shared, which, current);
         return;
     }
@@ -1948,6 +2007,31 @@ mod tests {
         // Told nothing that can be asked with, what there was is kept.
         held.settings_said(&json!([{ "id": "model", "category": "model", "currentValue": "a/b" }]));
         assert_eq!(held.ask, Some(("thinking".to_string(), json!("low"))));
+    }
+
+    #[test]
+    fn a_thinking_level_is_remembered_only_when_the_person_set_it() {
+        let settings = |model: &str, thinking: &str| json!([{ "id": "model", "category": "model", "currentValue": model }, { "id": "thinking", "currentValue": thinking }]);
+        let mut shared = Shared::new(None, None);
+        let held = shared.open_one();
+        held.model = Some("a/b".into());
+        held.settings_said(&settings("a/b", "high"));
+        assert_eq!(held.level().as_deref(), Some("high"));
+        // No reply is under way: nobody typed `/effort`.
+        assert_eq!(held.level_chosen(&settings("a/b", "low")), None);
+        // `/effort low`, which the harness answers as it answers a message.
+        held.busy = true;
+        assert_eq!(held.level_chosen(&settings("a/b", "low")), Some("low".to_string()));
+        assert_eq!(held.level_chosen(&settings("a/b", "high")), None, "said again as it already is");
+        // A backup took over in the middle of a reply, and thinks at another level.
+        assert_eq!(held.level_chosen(&settings("c/d", "low")), None);
+        // Null is opening the conversation and setting its level itself.
+        held.settling = true;
+        assert_eq!(held.level_chosen(&settings("a/b", "low")), None);
+        // A model that does not think has no level to have been changed.
+        held.settling = false;
+        held.ask = None;
+        assert_eq!(held.level_chosen(&settings("a/b", "low")), None);
     }
 
     #[test]
