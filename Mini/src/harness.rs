@@ -293,6 +293,26 @@ impl Shared {
         self.told = (0, self.work());
     }
 
+    /// A conversation recalled at the start that the harness no longer has:
+    /// nothing is left to open, and it says so no longer. One this run has
+    /// held since, working or with something of it kept, is not touched. The
+    /// box's open one keeps its place and loses only what was recalled of it.
+    /// True when anything was let go.
+    fn let_go_of_recalled(&mut self, id: &str) -> bool {
+        let Some(which) = self.named(id) else { return false };
+        let open = which == self.open;
+        let Some(held) = self.of(which) else { return false };
+        if held.busy || !held.events.is_empty() || held.ended.is_none() {
+            return false;
+        }
+        if open {
+            (held.ended, held.unseen) = (None, false);
+        } else {
+            self.held.remove(&which);
+        }
+        true
+    }
+
     /// What is written down of the conversations this run holds: for one that
     /// is working, that it was, and for one that waits to be seen, how it
     /// ended. Quitting at the person's word leaves the working ones out.
@@ -660,7 +680,15 @@ pub fn init(app: &AppHandle) {
         !elsewhere
     });
     let mut shared = Shared::new(session, saved.model);
-    shared.recall(history::stood(app));
+    // Work Null noted and the harness never wrote down, as when Null went away
+    // between the harness opening the conversation and the message reaching
+    // it, is nothing to go back to: it would say it was cut off at every start
+    // and could not be opened. It is let go.
+    let (kept, gone): (BTreeMap<_, _>, BTreeMap<_, _>) = history::stood(app).into_iter().partition(|(id, _)| history::anything_said(id) != Some(false));
+    if !gone.is_empty() {
+        log!("{} conversation(s) noted as working had nothing in them at the harness; let go", gone.len());
+    }
+    shared.recall(kept);
     let shared = Arc::new(Mutex::new(shared));
     // What was working when Null went away is written down as cut off from now on.
     write_down(app, &shared);
@@ -1147,7 +1175,16 @@ impl Connection<'_> {
         if !self.can_load {
             return Err("this harness does not load a conversation back".into());
         }
-        let folder = self.folder_of(id).await.ok_or("the harness no longer lists it")?;
+        let Some(folder) = self.folder_of(id).await else {
+            // Recalled at the start, and gone from the harness since: deleted in
+            // a terminal, or never written down. It is let go, so that it stops
+            // saying it was cut off.
+            if lock(self.shared).let_go_of_recalled(id) {
+                log!("a conversation noted as cut off is gone from the harness; let go");
+                tell_work(self.app, self.shared);
+            }
+            return Err("the harness no longer lists it".into());
+        };
         // Said when it comes to the front, unless it is the box's own folder.
         let elsewhere = workspace(self.app).ok().filter(|own| *own != folder).map(|_| folder.clone());
         let servers = mcp_servers(&self.mcp_capabilities);
@@ -2463,5 +2500,26 @@ mod tests {
         assert!(!shared.open_one().comes_back());
         // A new conversation has nothing that could come back.
         assert!(!Shared::new(None, None).open_one().comes_back());
+    }
+
+    #[test]
+    fn recalled_work_the_harness_no_longer_has_is_let_go_and_nothing_else_is() {
+        let mut shared = Shared::new(Some("open".into()), None);
+        shared.recall(BTreeMap::from([("gone".to_string(), "working".to_string()), ("open".to_string(), "done".to_string())]));
+        assert_eq!(shared.work().len(), 2, "each says how it stands at the start");
+        // One that is held only for what was noted of it goes, and with it what it said.
+        assert!(shared.let_go_of_recalled("gone"));
+        assert!(shared.named("gone").is_none());
+        // The open one keeps its place in the box, without what was recalled of it.
+        assert!(shared.let_go_of_recalled("open"));
+        assert_eq!(shared.named("open"), Some(shared.open));
+        assert!(shared.work().is_empty(), "nothing is left to say");
+        // One working in this run, or with something of this run kept, is not touched.
+        let working = shared.hold(Conversation { session: Some("working".into()), busy: true, ended: Some(Ended::CutOff), ..Default::default() });
+        let spoken = shared.hold(Conversation { session: Some("spoken".into()), ended: Some(Ended::Done), unseen: true, ..Default::default() });
+        shared.record(spoken, json!({ "type": "user_message", "text": "hello" }));
+        assert!(!shared.let_go_of_recalled("working") && !shared.let_go_of_recalled("spoken"));
+        assert!(shared.of(working).is_some() && shared.of(spoken).is_some());
+        assert!(!shared.let_go_of_recalled("never held"));
     }
 }

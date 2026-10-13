@@ -358,6 +358,23 @@ pub fn file_of(sessions: &Path, id: &str) -> Option<PathBuf> {
     (found.len() == 1).then(|| found.remove(0))
 }
 
+/// Whether anything was said in a conversation, by the harness's own file of
+/// it: a message, or a skill's words. No file is nothing said. None when Null
+/// cannot tell, because it does not know where this harness keeps them.
+pub fn anything_said(id: &str) -> Option<bool> {
+    let sessions = sessions_folder()?;
+    Some(file_of(&sessions, id).is_some_and(|file| said_in(&file)))
+}
+
+/// Whether a conversation's file holds a message or a skill's words, read a
+/// line at a time up to the first. Nothing else in it is looked at or kept.
+fn said_in(file: &Path) -> bool {
+    use std::io::BufRead;
+    let Ok(opened) = std::fs::File::open(file) else { return false };
+    let kind = |line: &str| serde_json::from_str::<Value>(line).ok().and_then(|entry| entry.get("type")?.as_str().map(str::to_string));
+    std::io::BufReader::new(opened).lines().map_while(Result::ok).any(|line| matches!(kind(&line).as_deref(), Some("message" | "custom_message")))
+}
+
 /// What the harness keeps beside a conversation's file, when it keeps
 /// anything: a folder of the same name, for the conversations of the helpers
 /// it started. It goes where the conversation goes.
@@ -707,6 +724,22 @@ mod tests {
             std::fs::write(file, "{}\n").unwrap();
         }
         sessions
+    }
+
+    #[test]
+    fn a_conversation_s_file_says_whether_anything_was_said_in_it() {
+        let sessions = kept("said", &["-w-/2026-10-13T09-00-00-000Z_01a1-opened.jsonl", "-w-/2026-10-13T09-00-01-000Z_01a1-asked.jsonl", "-w-/2026-10-13T09-00-02-000Z_01a1-skill.jsonl"]);
+        let file = |id: &str| file_of(&sessions, id).unwrap();
+        // As Oh-my-pi 18.8.7 writes a conversation it has opened and been told nothing in.
+        let opened = "{\"type\":\"title\",\"title\":\"\"}\n{\"type\":\"session\",\"id\":\"01a1-opened\"}\n{\"type\":\"model_change\"}\n";
+        std::fs::write(file("01a1-opened"), opened).unwrap();
+        std::fs::write(file("01a1-asked"), format!("{opened}{{\"type\":\"message\",\"message\":{{\"role\":\"user\"}}}}\n")).unwrap();
+        std::fs::write(file("01a1-skill"), format!("{opened}{{\"type\":\"custom_message\",\"customType\":\"skill-prompt\"}}\n")).unwrap();
+        assert!(!said_in(&file("01a1-opened")));
+        assert!(said_in(&file("01a1-asked")));
+        assert!(said_in(&file("01a1-skill")), "a skill's words are something said");
+        assert!(!said_in(&sessions.join("-w-/no-such-file.jsonl")));
+        let _ = std::fs::remove_dir_all(sessions);
     }
 
     #[test]
