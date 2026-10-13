@@ -393,15 +393,18 @@ impl Shared {
     }
 
     /// Start over: the box turns to a new conversation in its own folder, which
-    /// the next message opens on the model the last one was on. Gives its
-    /// number, and what `turn_to` gives of the one that was left.
+    /// the next message opens on the model the person had the last one on. Gives
+    /// its number, and what `turn_to` gives of the one that was left.
     fn start_over(&mut self) -> (u64, Option<String>) {
         self.start_in(None)
     }
 
     /// The same, in a folder of the person's choosing when one is given.
     fn start_in(&mut self, folder: Option<PathBuf>) -> (u64, Option<String>) {
-        let model = self.open_one().model.clone();
+        // The model the person has the open one on: not a backup answering in
+        // its place, and not the harness's default while it is being opened.
+        let open = self.open_one();
+        let model = open.chosen.clone().or_else(|| open.model.clone());
         let which = self.hold(Conversation { model, folder, ..Default::default() });
         (which, self.turn_to(which))
     }
@@ -1296,7 +1299,15 @@ impl Connection<'_> {
         let request: NewSessionRequest = typed(json!({ "cwd": cwd, "mcpServers": servers }))?;
         let response = as_json(&self.cx.send_request(request).block_task().await.map_err(|e| describe(&e))?);
         let session = response["sessionId"].as_str().ok_or("the harness opened a session without an id")?.to_string();
-        let wanted = with(self.shared, which, |held| held.model.clone()).flatten();
+        // The harness opens every conversation on its own default, and Null then
+        // moves it to the model wanted. That model is the person's from now on, not
+        // only once it is moved, so that a conversation started from this one in
+        // between (`/new`) starts on it and not on the harness's default.
+        let wanted = with(self.shared, which, |held| {
+            held.opened();
+            held.chosen.clone()
+        })
+        .flatten();
         self.absorb_options(which, &response["configOptions"]);
         let open = {
             let mut shared = lock(self.shared);
@@ -1323,10 +1334,12 @@ impl Connection<'_> {
             if offered && current.as_deref() != Some(&wanted) {
                 if let Err(reason) = self.apply_model(which, &session, &wanted).await {
                     log!("staying on {}: {reason}", current.as_deref().unwrap_or("the default model"));
+                    with(self.shared, which, |held| held.chosen = current.clone());
                 }
             } else if !offered {
                 log!("{wanted} is no longer offered; staying on {}", current.as_deref().unwrap_or("the default model"));
                 settings::update(self.app, |settings| settings.model = current.clone());
+                with(self.shared, which, |held| held.chosen = current.clone());
             }
         }
         with(self.shared, which, |held| held.opened());
@@ -2258,6 +2271,28 @@ mod tests {
         held.model = Some("c/chosen".into());
         held.chosen = Some("c/chosen".into());
         assert!(!held.on_a_backup());
+    }
+
+    #[test]
+    fn a_new_conversation_starts_on_the_model_the_person_has_the_last_one_on() {
+        let model = |shared: &mut Shared, which: u64| shared.of(which).and_then(|held| held.model.clone());
+        // Never opened: the model last chosen, as it was kept.
+        let mut shared = Shared::new(None, Some("a/own".into()));
+        let (next, _) = shared.start_over();
+        assert_eq!(model(&mut shared, next).as_deref(), Some("a/own"));
+        // Being opened, as `open_quietly` does: the person's model is theirs before the
+        // harness, which opened it on its own default, has been told to move it.
+        let held = shared.open_one();
+        held.opened();
+        held.model = Some("z/default".into());
+        let (next, _) = shared.start_over();
+        assert_eq!(model(&mut shared, next).as_deref(), Some("a/own"), "not the harness's default");
+        // A backup answering in the open one does not carry over either.
+        let held = shared.open_one();
+        held.opened();
+        held.model = Some("b/backup".into());
+        let (next, _) = shared.start_over();
+        assert_eq!(model(&mut shared, next).as_deref(), Some("a/own"), "not the backup");
     }
 
     #[test]
