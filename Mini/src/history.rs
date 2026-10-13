@@ -309,9 +309,15 @@ pub async fn history(app: AppHandle) -> Result<Listed, String> {
 /// which goes on if it is working. One the harness loads arrives as an event,
 /// with what was said in it; when it will not load, the box is left as it
 /// was. One this run already held gives its number instead, and the page asks
-/// for what was kept of it.
+/// for what was kept of it. One a person has open in a terminal is refused,
+/// as deleting it is: a message from the box would have two harnesses writing
+/// the one conversation.
 #[tauri::command]
 pub async fn open_conversation(app: AppHandle, id: String) -> Result<Option<u64>, String> {
+    if open_in_a_terminal(&id) {
+        log!("a conversation was not opened: {IN_A_TERMINAL}");
+        return Err(IN_A_TERMINAL.to_string());
+    }
     harness::open_earlier(&app, id).await
 }
 
@@ -388,6 +394,45 @@ pub fn in_a_terminal(program: u32) -> bool {
     asked.is_ok_and(|answer| names_a_terminal(&String::from_utf8_lossy(&answer.stdout)))
 }
 
+/// The program that started this one, when there is one to name.
+fn parent_of(program: u32) -> Option<u32> {
+    let asked = std::process::Command::new("/bin/ps").args(["-o", "ppid=", "-p"]).arg(program.to_string()).output().ok()?;
+    String::from_utf8_lossy(&asked.stdout).trim().parse().ok()
+}
+
+/// Whether a program is this Null or one it started: its harness, and what
+/// that started. Run from a terminal, as in development or the box check,
+/// they are in that terminal too, and still nobody else's.
+fn ours(program: u32) -> bool {
+    let me = std::process::id();
+    let mut at = program;
+    for _ in 0..8 {
+        if at == me {
+            return true;
+        }
+        match parent_of(at) {
+            Some(parent) if parent > 1 => at = parent,
+            _ => return false,
+        }
+    }
+    false
+}
+
+/// What the box says of a conversation it leaves alone because a person has it
+/// open in a terminal: two harnesses writing one conversation spoil it.
+pub const IN_A_TERMINAL: &str = "that conversation is open in a terminal. close it there first";
+
+/// Whether a program in a terminal, and not Null's own, holds a file.
+fn held_in_a_terminal(file: &Path) -> bool {
+    held_by(file).into_iter().any(|program| !ours(program) && in_a_terminal(program))
+}
+
+/// Whether a person has a conversation open in a terminal. False when Null
+/// cannot find its file.
+pub fn open_in_a_terminal(id: &str) -> bool {
+    sessions_folder().and_then(|sessions| file_of(&sessions, id)).is_some_and(|file| held_in_a_terminal(&file))
+}
+
 /// Move a file or a folder to the Mac's Trash with macOS's own call for it,
 /// which writes down where it came from, so that the Trash can put it back.
 /// Gives where in the Trash it went.
@@ -448,10 +493,10 @@ pub async fn delete_conversation(app: AppHandle, id: String) -> Result<Option<u6
         return refuse("this harness keeps its conversations where Null cannot find them");
     };
     harness::close(&app, id.clone()).await;
-    let holders = held_by(&file);
-    if holders.iter().any(|program| in_a_terminal(*program)) {
-        return refuse("that conversation is open in a terminal. close it there first");
+    if held_in_a_terminal(&file) {
+        return refuse(IN_A_TERMINAL);
     }
+    let holders = held_by(&file);
     if !holders.is_empty() {
         log!("a program in the background still holds the conversation that is being deleted");
     }
@@ -716,6 +761,19 @@ mod tests {
         drop(open);
         assert_eq!(held_by(&file), Vec::<u32>::new());
         let _ = std::fs::remove_dir_all(sessions);
+    }
+
+    #[test]
+    fn null_s_own_programs_are_told_from_everyone_else_s() {
+        // Null itself, and a program it started, as its harness is.
+        assert!(ours(std::process::id()));
+        let mut started = std::process::Command::new("/bin/sleep").arg("5").spawn().unwrap();
+        assert!(ours(started.id()));
+        let _ = started.kill();
+        let _ = started.wait();
+        // What started Null, as a terminal does, and what started everything, are not.
+        assert!(!ours(parent_of(std::process::id()).unwrap()));
+        assert!(!ours(1));
     }
 
     #[test]

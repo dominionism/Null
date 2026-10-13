@@ -97,6 +97,16 @@ impl Mac {
         std::fs::read_to_string(self.folder.join(file)).unwrap_or_default()
     }
 
+    /// The harness's file of the conversation Null titled `title`.
+    fn conversation_file(&self, title: &str) -> PathBuf {
+        let titles: Value = serde_json::from_str(&self.kept("null/history.json")).expect("Null keeps its titles");
+        let id = titles["titles"].as_object().into_iter().flatten().find(|(_, kept)| kept.as_str() == Some(title)).map(|(id, _)| id.clone()).unwrap_or_else(|| panic!("no conversation titled {title}: {titles}"));
+        let ending = format!("_{id}.jsonl");
+        let sessions = std::fs::read_dir(self.folder.join("agent/sessions")).expect("the harness keeps its conversations");
+        let mut files = sessions.flatten().filter_map(|folder| std::fs::read_dir(folder.path()).ok()).flatten().flatten().map(|file| file.path());
+        files.find(|file| file.to_string_lossy().ends_with(&ending)).unwrap_or_else(|| panic!("no file for {id}"))
+    }
+
     /// Start Null here, have it carry out `lines`, and give back what it printed.
     fn run(&self, lines: &[&str]) -> Seen {
         let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|held| held.into_inner());
@@ -136,6 +146,43 @@ impl Drop for Mac {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.folder);
     }
+}
+
+/// A terminal, as a person has one open, with a program in it that holds a
+/// file: as a harness in a terminal holds the conversation it has open. It is
+/// `script`'s own terminal, so a Mac with no terminal of its own has one too.
+struct Terminal(std::process::Child);
+
+impl Terminal {
+    fn holding(file: &std::path::Path) -> Terminal {
+        let child = Command::new("/usr/bin/script")
+            .args(["-q", "/dev/null", "/bin/sh", "-c", "exec 3<\"$0\"; exec sleep 300"])
+            .arg(file)
+            // `script` stops when what it reads ends: this ends with the terminal.
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("a terminal opens");
+        let began = Instant::now();
+        while !held(file) {
+            assert!(began.elapsed() < Duration::from_secs(10), "the program in the terminal never opened {}", file.display());
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        Terminal(child)
+    }
+}
+
+impl Drop for Terminal {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// Whether any program has a file open.
+fn held(file: &std::path::Path) -> bool {
+    Command::new("/usr/sbin/lsof").arg("-t").arg("--").arg(file).output().is_ok_and(|listed| !listed.stdout.is_empty())
 }
 
 // ── What a run showed ─────────────────────────────────────────────────────
@@ -894,6 +941,42 @@ fn a_conversation_begun_while_another_works_has_its_own_title() {
     let first = list.lines().find(|row| row.contains("first alpha message")).unwrap_or_default();
     let second = list.lines().find(|row| row.contains("second beta message")).unwrap_or_default();
     assert!(second.trim_start().starts_with('●') && !first.contains('●'), "the open one is the new one {page}");
+}
+
+/// A conversation a person has open in a terminal is not opened in the box,
+/// as it is not deleted: a message from the box would have two harnesses
+/// writing the one conversation. The list says why.
+#[test]
+#[ignore]
+fn a_conversation_open_in_a_terminal_is_not_opened_from_history() {
+    let mac = Mac::on("ok");
+    mac.run(&["first maple message", "<settle>", "/new", "second cedar message", "<settle>"]);
+    let file = mac.conversation_file("first maple message");
+    let _terminal = Terminal::holding(&file);
+    let before = std::fs::metadata(&file).unwrap().len();
+    let seen = mac.run(&["/history", "<until list first maple message>", "first maple message", "<until shows open in a terminal>", "<show refused>"]);
+    let page = seen.at("refused");
+    assert!(page.has("shows", "could not open that conversation: that conversation is open in a terminal. close it there first"), "{page}");
+    assert!(seen.logged("a conversation was not opened: that conversation is open in a terminal"), "{}", seen.log);
+    assert_eq!(std::fs::metadata(&file).unwrap().len(), before, "the box wrote nothing to it");
+}
+
+/// The conversation the box was on when Null went away is loaded back with
+/// the next message, unless a person has opened it in a terminal since: then
+/// the box starts a new one, and the terminal's is left as it was.
+#[test]
+#[ignore]
+fn after_a_restart_a_conversation_now_open_in_a_terminal_is_left_to_it() {
+    let mac = Mac::on("ok");
+    mac.run(&["only maple message", "<settle>"]);
+    let file = mac.conversation_file("only maple message");
+    let _terminal = Terminal::holding(&file);
+    let before = std::fs::metadata(&file).unwrap().len();
+    let seen = mac.run(&["new birch message", "<settle>", "<show after>"]);
+    assert!(seen.logged("the conversation that was open is open in a terminal now; the box starts a new one"), "{}", seen.log);
+    let page = seen.at("after");
+    assert!(page.has("shows", "new birch message") && !page.has("shows", "only maple message"), "a new conversation {page}");
+    assert_eq!(std::fs::metadata(&file).unwrap().len(), before, "the box wrote nothing to it");
 }
 
 // ── Work in the background ────────────────────────────────────────────────
