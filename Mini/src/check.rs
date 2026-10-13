@@ -1269,3 +1269,24 @@ fn set_back_on_a_model_that_refused_the_harness_tries_it_again_before_the_backup
     assert!(!translate::reply_failed(&ended), "the backup's reply was taken for a refusal: {ended}");
     assert!(asked.first().map(String::as_str) == Some("codex/limit") && asked.last().map(String::as_str) == Some("anthropic/ok"), "set back on the model that refused, the message went to {asked:?}");
 }
+
+/// Null counts the steps of a reply and the steps among them that failed
+/// (`routing.rs`), and has only the harness's word for either. A step begins
+/// as one `tool_call`, and how it went comes in a `tool_call_update` for that
+/// same step: `failed` when it failed, `completed` when it did not.
+#[test]
+#[ignore]
+fn a_step_is_said_once_and_one_that_fails_is_said_to_have_failed() {
+    let (_standin, _folder, mut agent, session, _) = conversation_on("standin-anthropic/ok", None);
+    for (command, went) in [("false", "failed"), ("true", "completed")] {
+        let before = agent.updates.len();
+        agent.say(&session, &format!("{MESSAGE}\n{}{command}", standin::ASK_THE_SHELL)).expect("the message is answered");
+        let heard = agent.heard(&session, before);
+        let begun: Vec<&Value> = heard.iter().filter(|update| update["sessionUpdate"] == "tool_call").collect();
+        assert_eq!(begun.len(), 1, "`{command}` is one step, said once: {heard:?}");
+        let id = &begun[0]["toolCallId"];
+        assert!(id.is_string(), "a step has an id: {}", begun[0]);
+        let last = heard.iter().filter(|update| update["sessionUpdate"] == "tool_call_update" && &update["toolCallId"] == id).filter_map(|update| update["status"].as_str()).last();
+        assert_eq!(last, Some(went), "how `{command}` went: {heard:?}");
+    }
+}
