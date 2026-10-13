@@ -573,6 +573,29 @@ fn an_answer_that_took_a_step_is_verified_by_the_model_named_for_it() {
     assert_eq!(settings["verifier"], "standin-openai/ok", "{settings}");
 }
 
+/// While a backup is answering in place of the person's model, an answer is
+/// verified where the conversation is: the model that answered goes over it,
+/// and Null sets no model. Moved to the model named for it, the conversation
+/// would have to be put somewhere afterwards. On the backup it would stay
+/// there as if the person had chosen it, and on their own model that one
+/// would be tried again before every reply while it still refuses.
+#[test]
+#[ignore]
+fn while_a_backup_is_answering_an_answer_is_verified_without_moving_the_conversation() {
+    let mac = Mac::new();
+    mac.keep("null/settings.json", r#"{"model":"standin-codex/limit","welcomed":true,"asked_full_disk":true,"backups":["standin-anthropic/ok"],"verifier":"standin-openai/ok"}"#);
+    let lines = ["ask the shell: true &", "<until shows verifying the answer with standin-anthropic/ok>", "<settle>", "<show verified>"];
+    let seen = mac.run(&lines);
+    let page = seen.at("verified");
+    assert!(page.has("shows", "standin-codex/limit did not answer. now on standin-anthropic/ok"), "the backup did not take over {page}");
+    assert!(page.parts().ends_with("note,reply"), "the box says who verifies, and that model's reply follows {page}");
+    assert!(!page.is("busy"), "{page}");
+    assert!(seen.logged("the answer is verified by standin-anthropic/ok"), "{}", seen.log);
+    assert!(!seen.logged("the conversation is back on"), "the conversation was moved {}", seen.log);
+    let settings: Value = serde_json::from_str(&mac.kept("null/settings.json")).unwrap();
+    assert_eq!(settings["model"], "standin-codex/limit", "the person's own model is still the one chosen {settings}");
+}
+
 /// The harness starts every conversation thinking at its own level. The level
 /// a person sets with the harness's own `/effort` is where their next
 /// conversations start, in this run and once Null has been started again.

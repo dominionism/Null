@@ -156,6 +156,10 @@ struct Conversation {
     events: VecDeque<(u64, Value)>,
     busy: bool,
     model: Option<String>,
+    /// The model the person has it on: the one it opened on, or the one they
+    /// chose with `/model`. A backup taking over leaves it as it is, and so
+    /// does Null moving the conversation for one reply. None until it is open.
+    chosen: Option<String>,
     tools: HashMap<String, Value>,
     pending: HashMap<String, Responder<RequestPermissionResponse>>,
     replay: Replay,
@@ -1173,6 +1177,7 @@ impl Connection<'_> {
         };
         settings::update(self.app, |settings| settings.session = Some(id.to_string()));
         self.absorb_options(which, &response["configOptions"]);
+        with(self.shared, which, |held| held.opened());
         log!("opened the earlier conversation {id} in {}", folder.display());
 
         let events = history::replayed(&replayed);
@@ -1239,7 +1244,10 @@ impl Connection<'_> {
             match loaded {
                 Ok(response) => {
                     self.absorb_options(which, &as_json(&response)["configOptions"]);
-                    with(self.shared, which, |held| held.loaded = true);
+                    with(self.shared, which, |held| {
+                        held.loaded = true;
+                        held.opened();
+                    });
                     log!("loaded the conversation {session} back");
                     return Ok(session);
                 }
@@ -1284,6 +1292,7 @@ impl Connection<'_> {
                 settings::update(self.app, |settings| settings.model = current.clone());
             }
         }
+        with(self.shared, which, |held| held.opened());
         self.apply_level(which, &session).await;
         Ok(session)
     }
@@ -1323,7 +1332,9 @@ impl Connection<'_> {
     async fn apply_model(&mut self, which: u64, session: &str, id: &str) -> Result<(), String> {
         {
             let mut shared = lock(self.shared);
-            if shared.of(which).is_some_and(|held| held.model.as_deref() == Some(id)) {
+            // Already on it, as when a backup took over and the person then chooses that one.
+            if let Some(held) = shared.of(which).filter(|held| held.model.as_deref() == Some(id)) {
+                held.chosen = Some(id.to_string());
                 return Ok(());
             }
             if !shared.models.is_empty() && !shared.models.iter().any(|model| model.id == id) {
@@ -1331,6 +1342,7 @@ impl Connection<'_> {
             }
         }
         self.move_to(which, session, id).await?;
+        with(self.shared, which, |held| held.chosen = Some(id.to_string()));
         settings::update(self.app, |settings| settings.model = Some(id.to_string()));
         publish(self.app, self.shared, which, json!({ "type": "model_changed", "model": id }));
         Ok(())
@@ -1359,13 +1371,17 @@ impl Connection<'_> {
     async fn verify(&mut self, which: u64) -> Result<(), String> {
         let Some(verifier) = settings::get(self.app).verifier else { return Ok(()) };
         let offered = lock(self.shared).models.iter().any(|model| model.id == verifier);
-        let Some((reply, session, on)) = with(self.shared, which, |held| {
+        let Some((reply, session, on, on_a_backup)) = with(self.shared, which, |held| {
             let reply = verify::Reply { ended_well: !held.busy && held.ended == Some(Ended::Done), steps: held.steps, verification: held.verifying, own_folder: held.folder.is_none(), offered };
-            (reply, held.session.clone().filter(|_| held.loaded), held.model.clone())
+            (reply, held.session.clone().filter(|_| held.loaded), held.model.clone(), held.on_a_backup())
         }) else {
             return Ok(());
         };
         let (true, Some(session)) = (verify::due(&reply), session) else { return Ok(()) };
+        // While a backup is answering the conversation is not moved: the model
+        // that answered goes over its own answer, and when to go back to the
+        // person's model is left to the harness, as it is when nothing verifies.
+        let verifier = on.clone().filter(|_| on_a_backup).unwrap_or(verifier);
         with(self.shared, which, |held| {
             held.busy = true;
             held.verifying = true;
@@ -1469,6 +1485,25 @@ impl Conversation {
         }
         let was = self.level()?;
         translate::thinking_from_config_options(options).1.filter(|now| *now != was)
+    }
+
+    /// The conversation is open. Unless the person has chosen a model for it
+    /// since Null came to hold it, the one it is on now is the one they have
+    /// it on.
+    fn opened(&mut self) {
+        if self.chosen.is_none() {
+            self.chosen = self.model.clone();
+        }
+    }
+
+    /// Whether a backup is answering in place of the model the person has it
+    /// on: the harness moved the conversation and has not moved it back. Null
+    /// then sets no model on it. Set on the backup by Null's own order, the
+    /// conversation would stay there as if the person had chosen it; set on
+    /// the person's model, the harness would try that one again and again
+    /// before every reply while it still refuses.
+    fn on_a_backup(&self) -> bool {
+        matches!((&self.chosen, &self.model), (Some(chosen), Some(on)) if chosen != on)
     }
 }
 
@@ -2159,6 +2194,31 @@ mod tests {
         held.settling = false;
         held.ask = None;
         assert_eq!(held.level_chosen(&settings("a/b", "low")), None);
+    }
+
+    #[test]
+    fn a_backup_is_answering_when_the_conversation_is_not_on_the_model_the_person_has_it_on() {
+        let mut shared = Shared::new(None, None);
+        let held = shared.open_one();
+        assert!(!held.on_a_backup(), "nothing is known of a conversation that has not been opened");
+        // It opens on a model, and nothing moves it.
+        held.model = Some("a/own".into());
+        held.opened();
+        assert!(!held.on_a_backup());
+        // A backup took over during a reply, which `moved` writes here.
+        held.model = Some("b/backup".into());
+        assert!(held.on_a_backup());
+        // Loaded back while the backup answers, it is still the other that the person has it on.
+        held.opened();
+        assert_eq!(held.chosen.as_deref(), Some("a/own"));
+        assert!(held.on_a_backup());
+        // The harness goes back to their model by itself.
+        held.model = Some("a/own".into());
+        assert!(!held.on_a_backup());
+        // The person chooses another with `/model`, which `apply_model` writes in both places.
+        held.model = Some("c/chosen".into());
+        held.chosen = Some("c/chosen".into());
+        assert!(!held.on_a_backup());
     }
 
     #[test]

@@ -10,6 +10,11 @@
 //! first saw. The answer is not held for this: it is on the page before the
 //! second model is asked.
 //!
+//! While a backup is answering in place of the person's model, the
+//! conversation is not moved: the model that answered goes over its own
+//! answer. A move would have to be undone, and there is nowhere good to undo
+//! it to (`harness.rs`, `on_a_backup`).
+//!
 //! The harness has a checker of its own, a second model that reads along.
 //! Through the protocol it keeps what that model finds and never passes it on
 //! (asked of Oh-my-pi 18.8.7 with the stand-in, and seen with a real model), so
