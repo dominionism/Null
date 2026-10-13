@@ -609,7 +609,10 @@ fn a_thinking_level_set_once_is_where_new_conversations_start() {
     assert!(seen.logged("thinking level low, set in the box"), "what the person set is not remembered:\n{}", seen.log);
     assert!(seen.logged("the conversation starts on thinking level low"), "the next conversation did not start there:\n{}", seen.log);
     let page = seen.at("new");
-    assert!(page.parts().ends_with("you,reply"), "an answer, and not a failed one {page}");
+    // A line saying it was moved to the model chosen may stand between the two:
+    // where the harness opens it on another, as on a Mac with a model server of its own.
+    let parts = page.parts();
+    assert!(parts.starts_with("you") && parts.ends_with(",reply"), "an answer, and not a failed one {page}");
     let settings: Value = serde_json::from_str(&mac.kept("null/settings.json")).unwrap();
     assert_eq!(settings["thinking"], "low", "{settings}");
 
