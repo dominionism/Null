@@ -146,14 +146,22 @@ pub fn folder_of(listed: &[Value], id: &str) -> Option<PathBuf> {
 /// back to. `titles` are the ones Null keeps, `own` is the folder the box's
 /// conversations work in, and `open` is the conversation open now. A title
 /// the owner gave comes first, then the harness's, then the one Null made.
+///
+/// The harness's count of messages is not enough to tell. Oh-my-pi 18.8.7
+/// lists a conversation from the first 4 KB of its file and counts the
+/// messages that begin there, so one begun with a skill, whose words come
+/// first and fill that, is counted at none however much was said in it. So a
+/// count of none is believed only of a conversation nobody has a title for:
+/// Null titles one the moment the box sends it a message (`said`), and the
+/// harness titles one in a terminal.
 pub fn entries(listed: &[Value], titles: &Titles, own: &Path, open: Option<&str>) -> Vec<Entry> {
     let entry = |kept: &Value| {
         let id = kept.get("sessionId")?.as_str()?;
-        if kept.pointer("/_meta/messageCount").and_then(Value::as_u64) == Some(0) {
-            return None;
-        }
         let folder = kept.get("cwd").and_then(Value::as_str).unwrap_or_default();
         let title = titles.given.get(id).cloned().or_else(|| kept.get("title").and_then(Value::as_str).and_then(title_from)).or_else(|| titles.made.get(id).cloned());
+        if title.is_none() && kept.pointer("/_meta/messageCount").and_then(Value::as_u64) == Some(0) {
+            return None;
+        }
         let used = kept.get("updatedAt").and_then(Value::as_str).map(str::to_string);
         Some(Entry { id: id.to_string(), title, folder: folder.to_string(), own: Path::new(folder) == own, used, open: open == Some(id) })
     };
@@ -552,6 +560,23 @@ mod tests {
         // No count of messages, no time, no folder: only that it exists.
         let shown = entries(&[json!({ "sessionId": "bare" }), json!({ "cwd": "/nameless" })], &Titles::default(), Path::new("/own"), None);
         assert_eq!(shown, vec![Entry { id: "bare".into(), title: None, folder: String::new(), own: false, used: None, open: false }]);
+    }
+
+    #[test]
+    fn a_conversation_the_harness_counts_at_no_message_is_listed_when_it_has_a_title() {
+        // As Oh-my-pi 18.8.7 listed two conversations of the owner's on 2026-10-13,
+        // each begun with `/research` and hundreds of kilobytes long, and one in
+        // which nothing was said.
+        let listed = [
+            json!({ "sessionId": "skill", "cwd": "/own", "updatedAt": "2026-10-13T10:54:01.798Z", "_meta": { "messageCount": 0, "size": 759654 } }),
+            json!({ "sessionId": "terminal", "cwd": "/elsewhere", "title": "Research the build", "_meta": { "messageCount": 0, "size": 616232 } }),
+            json!({ "sessionId": "renamed", "cwd": "/own", "_meta": { "messageCount": 0, "size": 9000 } }),
+            json!({ "sessionId": "empty", "cwd": "/own", "_meta": { "messageCount": 0, "size": 786 } }),
+        ];
+        let mut titles = Titles { made: BTreeMap::from([("skill".to_string(), "/skill:research Null".to_string())]), ..Default::default() };
+        titles.rename("renamed", "the owner's name for it");
+        let shown = entries(&listed, &titles, Path::new("/own"), None);
+        assert_eq!(shown.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), ["skill", "terminal", "renamed"]);
     }
 
     #[test]

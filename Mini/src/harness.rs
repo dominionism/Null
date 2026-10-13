@@ -521,10 +521,12 @@ fn tell_work(app: &AppHandle, shared: &Arc<Mutex<Shared>>) {
     panel::settle(app);
 }
 
-/// PROTOTYPE (item 15). Whether any conversation is working, asking or unseen:
-/// what the pet alone stays for.
-pub fn anything_to_say(app: &AppHandle) -> bool {
-    !lock(&app.state::<Harness>().shared).work().is_empty()
+/// PROTOTYPE (item 15). Whether any conversation is working, or asking the
+/// person something: what the pet alone stays for. One that has ended and
+/// waits to be seen does not keep it: the pet says how it ended and goes
+/// (`panel::settle`), and "now" in `/history` and the notice line still name it.
+pub fn anything_at_work(app: &AppHandle) -> bool {
+    lock(&app.state::<Harness>().shared).working() > 0
 }
 
 /// PROTOTYPE (item 15). The box is up again: what ended in the open
@@ -1985,6 +1987,9 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
             shows: out.innerText,
             lines: [...out.children].map((one) => one.className).join(','),
             tags: [...out.querySelectorAll('*')].reduce((count, one) => ({ ...count, [one.tagName]: (count[one.tagName] || 0) + 1 }), {}),
+            // How far the page has moved sideways inside its window, and how wide that is.
+            aside: document.scrollingElement.scrollLeft,
+            wide: window.innerWidth,
           }),
         });
       }

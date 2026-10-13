@@ -861,6 +861,41 @@ fn a_conversation_is_moved_to_the_trash_and_leaves_the_list() {
     assert!(seen.logged("a conversation was moved to the Trash"));
 }
 
+/// The harness lists a conversation from the first 4 KB of its file and counts
+/// the messages it finds there (Oh-my-pi 18.8.7). A conversation begun with a
+/// skill has the skill's words first, and with a skill as long as most are,
+/// that 4 KB holds no message: it is counted at none, and Null took that for a
+/// conversation in which nothing was said. It went from `/history` while it
+/// was still working, and could not be opened again.
+#[test]
+#[ignore]
+fn a_conversation_begun_with_a_skill_is_in_history() {
+    let mac = Mac::on("ok");
+    // A skill of the run's own, longer than the harness reads of a conversation to list it.
+    let words = vec![WORDS; 40].join("\n");
+    mac.keep("agent/skills/box-check-long/SKILL.md", &format!("---\nname: box-check-long\ndescription: A long skill. Made by the box check.\n---\n\nSay pong.\n\n{words}\n"));
+    let lines = ["<type />", "<until list /box-check-long>", "<key Escape>", "<until no list>", "/box-check-long cedar maple", "<settle>", "/new", "beta maple message", "<settle>", "/history", "<until list beta maple message>", "<show listed>", "<key Escape>"];
+    let seen = mac.run(&lines);
+    let page = seen.at("listed");
+    assert!(page.has("list", "box-check-long cedar maple"), "the conversation begun with a skill is listed {page}");
+}
+
+/// A new conversation started while another one works is a conversation of
+/// its own, with its own title, and the one left working keeps its title.
+#[test]
+#[ignore]
+fn a_conversation_begun_while_another_works_has_its_own_title() {
+    let working = format!("first alpha message {} &", long(2));
+    let lines = [working.as_str(), "<wait 800>", "/new", "second beta message", "<settle>", "/history", "<until list second beta message>", "<show listed>", "<key Escape>"];
+    let seen = Mac::on("slow").run(&lines);
+    let page = seen.at("listed");
+    let list = page.text("list");
+    assert_eq!((list.matches("first alpha message").count(), list.matches("second beta message").count()), (1, 1), "each title once {page}");
+    let first = list.lines().find(|row| row.contains("first alpha message")).unwrap_or_default();
+    let second = list.lines().find(|row| row.contains("second beta message")).unwrap_or_default();
+    assert!(second.trim_start().starts_with('●') && !first.contains('●'), "the open one is the new one {page}");
+}
+
 // ── Work in the background ────────────────────────────────────────────────
 
 #[test]
@@ -1031,4 +1066,31 @@ fn with_the_box_put_away_the_pet_stays_while_work_goes_on() {
     let seen = Mac::on("slow").run(&[working.as_str(), "<wait 800>", "<away>", "<show alone>", "<pet>", "<show back>", "<key ctrl+c>", "<settle>"]);
     assert_eq!(seen.at("alone").text("pet"), "pet work");
     assert!(seen.logged("the box is put away (esc); the pet stays") && seen.logged("the pet stands alone") && seen.logged("shown, back from the pet alone"), "{}", seen.log);
+}
+
+/// The pet alone is a window as small as the pet, cut out of the page. Bringing
+/// a row of an open list into view moved the whole page sideways inside it,
+/// and the window showed a strip of the box with its words where the pet had
+/// been. The list behind the pet changes whenever a conversation does.
+#[test]
+#[ignore]
+fn the_pet_alone_stays_in_view_while_the_list_behind_it_changes() {
+    let working = format!("{} &", long(2));
+    let lines = [working.as_str(), "<wait 800>", "/new", "one two three four five six &", "<wait 600>", "/history", "<until list now>", "<away>", "<wait 5000>", "<show alone>", "<pet>", "<key Escape>"];
+    let seen = Mac::on("slow").run(&lines);
+    let page = seen.at("alone");
+    assert_eq!(page.number("wide"), 56.0, "still the pet alone: the first conversation works on {page}");
+    assert_eq!(page.number("aside"), 0.0, "the page has not moved sideways under the pet {page}");
+}
+
+/// With nothing working the pet says how the last reply ended, and goes; the
+/// box comes back whole, not at the pet's size.
+#[test]
+#[ignore]
+fn with_nothing_working_the_pet_says_how_it_ended_and_goes() {
+    let lines = ["one two three four five six &", "<wait 600>", "<away>", "<wait 7000>", "<pet>", "<show back>"];
+    let seen = Mac::on("slow").run(&lines);
+    assert!(seen.logged("the pet stands alone") && seen.logged("the pet has gone: nothing is working"), "{}", seen.log);
+    let page = seen.at("back");
+    assert!(page.number("wide") > 600.0, "the box came back whole {page}");
 }
