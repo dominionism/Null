@@ -1149,12 +1149,9 @@ fn setting_chrome_up_waits_for_the_extension_and_stops_the_relay_it_started() {
 /// Chrome for Testing loads an extension from the command line, so the check
 /// needs one: `NULL_MINI_CHROME` names its program, and without it this
 /// question is passed over, saying so. It runs headless, with a profile of its
-/// own, and nothing is shown, unless `NULL_MINI_CHROME_SHOWN` asks for a window,
-/// as on GitHub's Mac: a headless Chrome has no tab groups at all, so only a
-/// Chrome with a window can show the group's title. Null's copy is pointed at
-/// the check's own relay on a free port, the one word changed from what
-/// `/browser` makes, so that it never reaches a relay a person's own Chrome
-/// may be linked to.
+/// own, and nothing is shown. Null's copy is pointed at the check's own relay
+/// on a free port, the one word changed from what `/browser` makes, so that it
+/// never reaches a relay a person's own Chrome may be linked to.
 #[test]
 #[ignore]
 fn chrome_loads_null_s_copy_and_the_agent_works_a_tab_through_it_under_null_s_name() {
@@ -1175,12 +1172,7 @@ fn chrome_loads_null_s_copy_and_the_agent_works_a_tab_through_it_under_null_s_na
     let _relay = Stopped(folder.command(&binary).args(["browser-relay", "--port", &port.to_string()]).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().expect("the relay starts"));
     let profile = folder.root.join("chrome");
     let page = "data:text/html,<title>null-link-check</title><p>read through the link</p>";
-    let shown = std::env::var_os("NULL_MINI_CHROME_SHOWN").is_some();
-    let mut flags = vec![format!("--user-data-dir={}", profile.display()), format!("--load-extension={}", link.display()), "--no-first-run".into(), "--no-default-browser-check".into(), "--remote-debugging-port=0".into()];
-    if !shown {
-        flags.push("--headless=new".into());
-    }
-    flags.push(page.into());
+    let flags = [format!("--user-data-dir={}", profile.display()), format!("--load-extension={}", link.display()), "--headless=new".into(), "--no-first-run".into(), "--no-default-browser-check".into(), "--remote-debugging-port=0".into(), page.into()];
     let _chrome = Stopped(Command::new(&chrome).args(&flags).stdout(Stdio::null()).stderr(Stdio::null()).spawn().expect("Chrome for Testing starts"));
     let until = Instant::now() + PATIENCE;
     while browser::relay_says(port).get("ompExtensionDiscardedTabsProtocol").is_none() {
@@ -1200,15 +1192,13 @@ fn chrome_loads_null_s_copy_and_the_agent_works_a_tab_through_it_under_null_s_na
     let sent = last_sent(&standin);
     assert!(sent.contains("read through the link"), "the agent did not read the tab through the link: {sent}");
 
-    if !shown {
-        eprintln!("the group's title is passed over: a headless Chrome has no tab groups; NULL_MINI_CHROME_SHOWN=1 gives it a window");
-        return;
-    }
     let active = std::fs::read_to_string(profile.join("DevToolsActivePort")).expect("Chrome says where its DevTools are");
     let devtools = active.lines().next().unwrap_or_default().trim().to_string();
     let targets: Value = serde_json::from_str(&http_get(&format!("127.0.0.1:{devtools}"), "/json/list")).expect("Chrome lists what it runs");
-    let worker = targets.as_array().into_iter().flatten().find(|t| t["type"] == "service_worker" && t["url"].as_str().is_some_and(|url| url.ends_with("/background.js"))).expect("the extension's worker is running");
-    let answer = devtools_evaluate(worker["webSocketDebuggerUrl"].as_str().unwrap(), "chrome.tabGroups.query({}).then((groups) => groups.map((group) => group.title).join(','))");
+    // Chrome runs extensions of its own as well, so Null's worker is known by the name in its manifest.
+    let workers = targets.as_array().into_iter().flatten().filter(|t| t["type"] == "service_worker").filter_map(|t| t["webSocketDebuggerUrl"].as_str());
+    let worker = workers.into_iter().find(|address| devtools_evaluate(address, "chrome.runtime.getManifest().name")["result"]["value"] == "Null").expect("Null's copy has a worker running");
+    let answer = devtools_evaluate(worker, "chrome.tabGroups.query({}).then((groups) => groups.map((group) => group.title).join(','))");
     assert_eq!(answer["result"]["value"], json!("Null"), "the agent's tab is not gathered under Null's name: {answer}");
 }
 
