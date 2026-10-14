@@ -27,7 +27,7 @@ use serde_json::{json, Value};
 
 use crate::history;
 use crate::standin::{self, StandIn};
-use crate::{attach, backups, engine, harness, search, translate};
+use crate::{attach, backups, browser, engine, harness, search, translate};
 
 /// How long one answer from the harness is waited for. It tries a provider that
 /// refuses several times before it gives up, which takes a quarter of a minute.
@@ -1004,7 +1004,7 @@ fn the_extension_the_engine_writes_speaks_the_relay_s_protocol() {
     let mut said = Value::Null;
     while said.get("ompExtensionDiscardedTabsProtocol").is_none() && Instant::now() < until {
         std::thread::sleep(Duration::from_millis(100));
-        said = relay_says(port);
+        said = browser::relay_says(port);
     }
     drop(relay);
     assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err(), "the relay went on listening once it was stopped");
@@ -1021,6 +1021,81 @@ impl Drop for Stopped {
         let _ = self.0.kill();
         let _ = self.0.wait();
     }
+}
+
+/// Null offers the link under its own name: it makes its own copy of the
+/// extension the engine in use writes, and changes what Chrome shows of it.
+/// Each change looks for words that stand once in the engine's extension, so
+/// an engine whose extension has moved them would give a link half under the
+/// harness's name; Null then makes none. The extension this engine writes has
+/// to be one Null knows how to name, and a copy made again, as for a newer
+/// engine, has to stand in the same folder Chrome loads.
+#[test]
+#[ignore]
+fn the_extension_null_makes_from_the_engine_is_under_null_s_name() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let binary = engine::under_test();
+    let link = browser::folder(&folder.root);
+    let read = |file: &str| std::fs::read_to_string(link.join(file)).unwrap_or_default();
+    for time in ["first", "again"] {
+        browser::make(&binary, &link).unwrap_or_else(|why| panic!("Null could not make its copy, the {time} time: {why}"));
+        let manifest: Value = serde_json::from_str(&read("manifest.json")).expect("the copy has a manifest");
+        assert_eq!((&manifest["name"], &manifest["action"]["default_title"]), (&json!("Null"), &json!("Null")), "{manifest}");
+        for (_, icon) in manifest["icons"].as_object().expect("the copy names its icons") {
+            assert!(link.join(icon.as_str().unwrap()).is_file(), "the icon {icon} is in the copy");
+        }
+        assert!(read("background.js").contains("const title = \"Null\";"), "the agent's tabs are gathered under Null's name");
+        assert!(read("options.html").contains("<h1>Null</h1>"), "its settings page is headed with Null's name");
+        assert!(link.join("LICENSE").is_file() && link.join("THIRD-PARTY-NOTICES.txt").is_file(), "the harness's licence and notices stay with it");
+        assert!(!link.with_extension("new").exists(), "nothing is left beside the folder");
+    }
+}
+
+/// Setting Chrome up waits for the extension to reach the link, so that the
+/// box can say "Chrome is linked" before the agent ever needs it. With no
+/// relay running, Null starts one of the harness's for the wait, on the port
+/// the extension looks for, and stops it afterwards. So that relay has to
+/// start when asked to, say when an extension of this engine has reached it,
+/// and stop when Null stops it. No Chrome is needed: the check says hello as
+/// the extension does.
+#[test]
+#[ignore]
+fn setting_chrome_up_waits_for_the_extension_and_stops_the_relay_it_started() {
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin);
+    let binary = engine::under_test();
+    let link = browser::folder(&folder.root);
+    browser::make(&binary, &link).expect("Null makes its copy of the extension");
+    let script = std::fs::read_to_string(link.join("background.js")).expect("the copy has its script");
+    let stated: u64 = script.split("discardedTabsProtocol:").nth(1).expect("the extension states its protocol").trim_start().chars().take_while(char::is_ascii_digit).collect::<String>().parse().expect("a number");
+    let relay = |port: u16| {
+        let mut command = folder.command(&binary);
+        command.args(["browser-relay", "--port", &port.to_string()]);
+        command
+    };
+    let free = || std::net::TcpListener::bind("127.0.0.1:0").and_then(|free| free.local_addr()).expect("a free port").port();
+
+    // Nothing reaches it: the wait ends, said as not seen, and the relay is gone.
+    let port = free();
+    assert!(!browser::wait_for_extension(relay(port), port, Duration::from_secs(3)), "no extension reached the relay, yet one was seen");
+    assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err(), "the relay Null started went on listening");
+
+    // The extension comes while Null waits.
+    let port = free();
+    let hello = json!({ "t": "hello", "instanceId": "harness-check", "userAgent": "Chrome/155.0", "browserVersion": "Chrome/155.0", "discardedTabsProtocol": stated, "tabs": [], "attachedTabIds": [] });
+    let chrome = std::thread::spawn(move || {
+        let until = Instant::now() + PATIENCE;
+        while std::net::TcpStream::connect(("127.0.0.1", port)).is_err() && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let extension = as_the_extension(port, &hello);
+        std::thread::sleep(Duration::from_secs(3));
+        drop(extension);
+    });
+    assert!(browser::wait_for_extension(relay(port), port, PATIENCE), "the extension reached the relay and was not seen");
+    chrome.join().expect("the stand-in for Chrome");
+    assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err(), "the relay Null started went on listening once the wait was over");
 }
 
 /// Connect to a relay as its extension does, with no origin, and say one
@@ -1049,16 +1124,6 @@ fn as_the_extension(port: u16, said: &Value) -> std::net::TcpStream {
     frame.extend(text.iter().enumerate().map(|(at, byte)| byte ^ mask[at % 4]));
     socket.write_all(&frame).unwrap();
     socket
-}
-
-/// What a relay says of itself at `/json/version`, or nothing.
-fn relay_says(port: u16) -> Value {
-    use std::io::Read;
-    let Ok(mut socket) = std::net::TcpStream::connect(("127.0.0.1", port)) else { return Value::Null };
-    let _ = write!(socket, "GET /json/version HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
-    let mut answer = String::new();
-    let _ = socket.read_to_string(&mut answer);
-    answer.find('{').and_then(|start| serde_json::from_str(&answer[start..answer.rfind('}')? + 1]).ok()).unwrap_or(Value::Null)
 }
 
 /// What the model was last sent in the stand-in's hearing: for a tool it asked

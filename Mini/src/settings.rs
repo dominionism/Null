@@ -48,6 +48,12 @@ pub struct Settings {
     /// The model that looks at a finished answer again before it is relied on
     /// (`/verify`). Nothing here means no answer is verified.
     pub verifier: Option<String>,
+    /// Whether the agent may work the person's own Chrome through the browser link
+    /// (`/browser`). Nothing here means it may not.
+    pub browser: Option<bool>,
+    /// Whether Chrome was seen to load the link's extension Null set up, the last
+    /// time it was set up. Only the extension reaching the link can say so.
+    pub browser_linked: bool,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -175,6 +181,8 @@ mod tests {
             computer: Some(true),
             thinking: Some("low".into()),
             verifier: Some("e/f".into()),
+            browser: Some(true),
+            browser_linked: true,
         };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);

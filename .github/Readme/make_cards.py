@@ -260,6 +260,7 @@ def commands(c):
         ("/rename <title>", "Give the open conversation a title of your own. In /history, Command+R does it for the chosen row, and Command+Delete moves that row to the Trash"),
         ("/pet", "Show the pet beside the box, or put it away"),
         ("/computer", "See whether the agent may see the screen and work the apps on this Mac, and switch it. While it is on, the list also says how the two permissions macOS wants for it stand, and Enter on a missing one asks macOS for it"),
+        ("/browser", "Let the agent work your own Chrome, with your sign-ins, through OMP's browser link, shown in Chrome as Null. The list sets Chrome up: Null makes the extension, opens Chrome's extensions page for you to load it once, and says when Chrome is linked"),
         ("/folder [path]", "Start a new conversation in a folder of your choosing, where the agent has that project's files and instructions: pick one that conversations already work in, walk to another, or give its path. The box says where each time such a conversation comes to the front"),
         ("/new", "Start a fresh conversation on the last selected model, in the box's own folder. A conversation that is working goes on; at most four work at once"),
         ("/quit", "Quit and clear the saved conversation pointer. With conversations still working it says how many first, and quits when asked again"),
@@ -302,6 +303,7 @@ def privacy(c):
     c.row("Shortcut", "Control+Space needs no Accessibility or Input Monitoring permission. If registration fails, the box opens with a notice")
     c.row("Approvals", "Null passes on OMP's approval setting and adds none of its own. OMP's own default lets the agent act without asking you first, and the first opening says so")
     c.row("Computer use", "Off until you switch it on with /computer. Then the agent may read what any window holds and press and type in any app, and, with Screen Recording, take pictures of the screen. OMP does this, not Null: Null neither looks at the screen nor keeps what the agent saw. While it is on, Null also tells the agent its own rules for working a Mac: the ways in, few turns, and leaving your things alone. They are the same for everyone and say nothing about you. It follows OMP's approval setting like any other tool, so with OMP's default the agent uses your Mac without asking you first. Set to ask, this OMP cannot put its question through the box and refuses computer use")
+    c.row("Browser link", "Off until you set Chrome up and switch it on with /browser. Then the agent may work your Chrome as you, on any site you are signed in to, in tabs of its own, gathered in a tab group named Null. OMP does this through its own extension, which Null copies under its name; your sign-ins stay in Chrome. While the link's relay runs, it listens on this Mac only, refuses web pages, and takes no password: another program on this Mac could drive Chrome through it, as with OMP's own")
     c.row("Verifying", "Off until you name a model with /verify. Then, when a reply that took steps has ended, Null moves that conversation to the model you named, sends it one message of Null's own that asks it to check the answer against what was seen, and puts the conversation back. While a backup is answering, the conversation is not moved: the model that answered is asked instead. It is the only message Null sends that you did not type, and the box says so each time. Conversations started with /folder are left alone")
     c.row("Its permissions", "Two: Accessibility and Screen Recording, which macOS charges to Null because Null starts the agent. Null asks macOS for them only when you switch computer use on or choose one in the /computer list, never at a start. Screen Recording may be left off: the agent then reads and presses, and has no pictures")
     c.row("Full Disk Access", "A separate choice, asked once, after the first reply, with an explanation: macOS attributes the agent's file access to Null. It is broader file access, not a sandbox, and it does not replace OMP's approval rules. The box opens without it")
@@ -327,11 +329,12 @@ def signing(c):
 
 def what_null_keeps(c):
     c.sub("Under ~/Library/Application Support/io.github.dominionism.null-mini/")
-    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, whether computer use is switched on, the thinking level you last set with /effort, and the model you named to verify answers")
+    c.row("settings.json", "Window position, chosen model, saved session ID, Full Disk Access prompt state, whether the first opening has happened, backup order, your own harness if you chose it, whether the pet shows, whether computer use is switched on, the thinking level you last set with /effort, the model you named to verify answers, and whether the browser link is on and Chrome was seen to load it")
     c.row("history.json", "A title for each conversation made in the box: the first line of its first message, at most 80 characters, since OMP gives none for these. Any title you gave with /rename. And, while there are any, which conversations are working or not yet looked at: an id and one word each, so that work cut off by a restart is found again")
     c.row("routing.json", "What each of the last 500 replies cost, in numbers: how many steps it took, how many of them failed, how long it ran, when it ended and how, the model and its thinking level, whether the conversation was in the box's own folder, and whether the reply was a second model verifying. No word that was typed, shown or read, and no conversation's id or title. Nothing is done with the numbers yet, and they do not leave this Mac")
     c.row("harness.yml", "Settings handed to OMP at every start: no update check, your backup order when there is one, and computer use on or off once you have used its switch. Rewritten each time")
-    c.row("rules.md", "While computer use is on: Null's own rules for working a Mac, which OMP adds to what it tells the model. The same words for everyone, carried in the app. Rewritten at every start, and removed when computer use is off")
+    c.row("rules.md", "While computer use or the browser link is on: Null's own rules for each, which OMP adds to what it tells the model. The same words for everyone, carried in the app. Rewritten at every start, and removed when both are off")
+    c.row("BrowserLink/", "Null's copy of OMP's browser extension, under Null's name, which Chrome loads from here. Made when you set Chrome up")
     c.row("Workspace/", "Default working directory for conversations; not a filesystem access boundary")
     c.note("Your own OMP settings are not modified. OMP "
            "owns the transcript and the credentials: a restart resumes the saved session, while "
@@ -380,7 +383,8 @@ def source_map(c):
         ("welcome.rs", "The first opening: with no provider signed in, the box opens once with the sign-in list"),
         ("backups.rs", "The fallback order written for OMP, and the switch reporting it"),
         ("computer.rs", "The switch for computer use: what is handed to OMP for it, and how it stands"),
-        ("rules.rs", "Null's own rules for working a Mac (Mini/Rules/), told to the agent while computer use is on"),
+        ("rules.rs", "Null's own rules (Mini/Rules/), told to the agent while computer use or the browser link is on"),
+        ("browser.rs", "The browser link: Null's copy of the extension, setting Chrome up and waiting for it, and the switch"),
         ("verify.rs", "The second model that checks an answer: when it is asked, and the words it is asked with"),
         ("routing.rs", "What each reply cost, kept in numbers: its steps, the ones that failed, how long it ran, the model, and how it ended"),
         ("markdown.rs", "Reply text into structured parts, including partial streamed input"),

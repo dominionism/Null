@@ -35,6 +35,7 @@ compile_error!("Null is macOS-only for now");
 mod access;
 mod attach;
 mod backups;
+mod browser;
 #[cfg(test)]
 mod check;
 mod computer;
@@ -153,6 +154,10 @@ fn main() {
             computer::computer,
             computer::set_computer,
             computer::ask_permission,
+            browser::browser,
+            browser::set_browser,
+            browser::link_browser,
+            browser::browser_linked,
             verify::verifier,
             verify::set_verifier,
             engine::harnesses,
