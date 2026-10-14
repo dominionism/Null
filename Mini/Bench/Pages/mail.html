@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Postbox – Inbox</title>
+<link rel="stylesheet" href="/static/bench.css">
+</head>
+<body>
+<header class="top">
+  <span class="brand">Postbox</span>
+  <form id="find" class="row" role="search"><input id="q" type="search" placeholder="Search mail" aria-label="Search mail" style="width: 360px;"><button>Search</button></form>
+  <span class="who">robin@vale.test</span>
+</header>
+<main>
+  <nav class="side" aria-label="Folders">
+    <button class="primary" id="compose" style="width: 100%; margin-bottom: 10px;">Compose</button>
+    <div id="folders"></div>
+    <h3>Labels</h3>
+    <div id="labels"></div>
+  </nav>
+  <section class="content" id="view"></section>
+</main>
+<script src="/static/bench.js"></script>
+<script>
+  // A mail site: folders, a list a page at a time, a letter, and writing one.
+  // Where the page is lives in its address (#/inbox/2, #/m/m001, #/search/word/1),
+  // so a link can open any of it.
+  const view = document.getElementById('view');
+  const FOLDERS = { inbox: 'Inbox', archive: 'Archive', sent: 'Sent', drafts: 'Drafts', receipts: 'Receipts', spam: 'Spam', trash: 'Trash' };
+  let labels = [];
+
+  async function sideBar() {
+    const got = await api.get('mail', 'folders');
+    labels = got.labels;
+    const here = location.hash.split('/')[1] || 'inbox';
+    clear(document.getElementById('folders')).append(...got.folders.map((f) =>
+      el('a', { href: `#/${f.name}/1`, class: f.name === here ? 'on' : '' }, el('span', {}, FOLDERS[f.name]), el('span', { class: 'muted' }, f.unread ? String(f.unread) : ''))));
+    clear(document.getElementById('labels')).append(...labels.map((l) => el('a', { href: `#/label/${encodeURIComponent(l)}/1` }, l)));
+  }
+
+  function moveMenu(ids) {
+    return el('select', { 'aria-label': 'Move to', on: { change: async (e) => { if (!e.target.value) return; await api.post('mail', 'move', { ids: ids(), folder: e.target.value }); toast('Moved'); route(); } } },
+      el('option', { value: '' }, 'Move to…'), ...['inbox', 'archive', 'receipts', 'spam', 'trash'].map((f) => el('option', { value: f }, FOLDERS[f])));
+  }
+
+  function labelMenu(ids) {
+    return el('select', { 'aria-label': 'Label', on: { change: async (e) => {
+      const name = e.target.value;
+      if (!name) return;
+      const label = async (words) => { await api.post('mail', 'label', { ids: ids(), label: words, on: true }); toast(`Labelled ${words}`); route(); };
+      if (name !== '__new') return label(name);
+      const field = el('input', { id: 'new-label', 'aria-label': 'New label name', style: 'width:100%' });
+      modal('New label', el('div', {}, el('label', { for: 'new-label' }, 'Label name'), field), [['Cancel', () => { e.target.value = ''; }], ['Create', () => (field.value.trim() ? label(field.value.trim()) : false), true]]);
+    } } }, el('option', { value: '' }, 'Label…'), ...labels.map((l) => el('option', { value: l }, l)), el('option', { value: '__new' }, 'New label…'));
+  }
+
+  async function list(kind, value, page) {
+    loading(view);
+    const params = kind === 'search' ? { q: value, page } : kind === 'label' ? { label: value, page } : { folder: value, page };
+    const got = await api.get('mail', 'list', params);
+    const title = kind === 'search' ? `Search: ${value}` : kind === 'label' ? `Label: ${value}` : FOLDERS[value];
+    document.title = `Postbox – ${title}`;
+    const checked = () => [...view.querySelectorAll('input.pick:checked')].map((box) => box.value);
+    const bulk = (action, words) => el('button', { on: { click: async () => {
+      const ids = checked();
+      if (!ids.length) return toast('Select some mail first', true);
+      await api.post('mail', action, action === 'mark' ? { ids, read: true } : { ids });
+      toast(words);
+      route();
+    } } }, words);
+    const first = (got.page - 1) * 25 + 1;
+    clear(view).append(
+      el('h1', { style: 'font-size:18px' }, title),
+      el('div', { class: 'row', style: 'margin-bottom:8px' },
+        el('input', { type: 'checkbox', 'aria-label': 'Select all', on: { change: (e) => view.querySelectorAll('input.pick').forEach((b) => (b.checked = e.target.checked)) } }),
+        bulk('archive', 'Archive'), bulk('trash', 'Delete'), bulk('mark', 'Mark as read'), moveMenu(checked), labelMenu(checked),
+        el('span', { class: 'muted', style: 'margin-left:auto' }, got.total ? `${first}–${first + got.rows.length - 1} of ${got.total}` : 'Nothing here'),
+        el('button', { disabled: got.page <= 1, 'aria-label': 'Newer', on: { click: () => (location.hash = `#/${kind === 'folder' ? value : kind + '/' + encodeURIComponent(value)}/${got.page - 1}`) } }, '‹ Newer'),
+        el('button', { disabled: got.page >= got.pages, 'aria-label': 'Older', on: { click: () => (location.hash = `#/${kind === 'folder' ? value : kind + '/' + encodeURIComponent(value)}/${got.page + 1}`) } }, 'Older ›')),
+      el('div', { class: 'list' }, got.rows.map((m) => el('div', { class: m.read ? 'item' : 'item unread', on: { click: (e) => { if (e.target.type !== 'checkbox') location.hash = m.folder === 'drafts' ? `#/compose/${m.id}` : `#/m/${m.id}`; } } },
+        el('input', { type: 'checkbox', class: 'pick', value: m.id, 'aria-label': `Select ${m.subject}` }),
+        el('span', { style: 'width:180px;flex:none;overflow:hidden;white-space:nowrap' }, m.folder === 'sent' || m.folder === 'drafts' ? 'To: ' + m.subject : m.from_name),
+        el('span', { style: 'flex:1;overflow:hidden;white-space:nowrap' }, m.subject, el('span', { class: 'muted', style: 'font-weight:400' }, ' – ' + m.snippet)),
+        m.labels.map((l) => el('span', { class: 'pill' }, l)), m.attachments ? '📎' : '', el('span', { class: 'muted' }, shortDate(m.date))))));
+  }
+
+  async function letter(id) {
+    loading(view);
+    const m = await api.get('mail', 'message', { id });
+    document.title = `Postbox – ${m.subject}`;
+    const ids = () => [m.id];
+    const act = (action, words, extra = {}) => el('button', { on: { click: async () => { await api.post('mail', action, { ids: [m.id], ...extra }); toast(words); history.back(); } } }, words);
+    clear(view).append(
+      el('div', { class: 'row', style: 'margin-bottom:10px' },
+        el('button', { on: { click: () => history.back() } }, '← Back'),
+        el('button', { on: { click: () => compose({ to: m.from_addr, subject: m.subject.startsWith('Re:') ? m.subject : 'Re: ' + m.subject, body: `\n\nOn ${shortDate(m.date)}, ${m.from_name} wrote:\n> ${m.body.replace(/\n/g, '\n> ')}`, reply_to: m.id }) } }, 'Reply'),
+        el('button', { on: { click: () => compose({ to: '', subject: 'Fwd: ' + m.subject, body: '', forward_of: m.id }) } }, 'Forward'),
+        act('archive', 'Archive'), act('trash', 'Delete'), act('mark', 'Mark as unread', { read: false }), moveMenu(ids), labelMenu(ids)),
+      el('div', { class: 'card' },
+        el('h1', { style: 'font-size:20px;margin-top:0' }, m.subject),
+        el('div', {}, el('b', {}, m.from_name), el('span', { class: 'muted' }, ` <${m.from_addr}>`)),
+        el('div', { class: 'muted' }, `to ${m.to.join(', ')} · ${shortDate(m.date)}`),
+        el('pre', { class: 'body' }, m.body),
+        m.attachments.map((a) => el('details', { class: 'card' }, el('summary', {}, '📎 ' + a.name), el('pre', { class: 'body' }, a.text)))));
+  }
+
+  function compose(draft = {}) {
+    document.title = 'Postbox – New message';
+    const to = el('input', { id: 'to', value: Array.isArray(draft.to) ? draft.to.join(', ') : draft.to || '', style: 'width:100%' });
+    const subject = el('input', { id: 'subject', value: draft.subject || '', style: 'width:100%' });
+    const body = el('textarea', { id: 'body', 'aria-label': 'Message' });
+    body.value = draft.body || '';
+    const fields = () => ({ to: to.value, subject: subject.value, body: body.value, reply_to: draft.reply_to || null, forward_of: draft.forward_of || null, draft: draft.id || null });
+    clear(view).append(el('div', { class: 'card' },
+      el('h1', { style: 'font-size:18px;margin-top:0' }, draft.forward_of ? 'Forward' : draft.reply_to ? 'Reply' : 'New message'),
+      el('label', { for: 'to' }, 'To'), to, el('label', { for: 'subject' }, 'Subject'), subject, el('label', { for: 'body' }, 'Message'), body,
+      draft.forward_of ? el('p', { class: 'muted' }, 'The original letter and its attachments go with it.') : '',
+      el('div', { class: 'row end' },
+        el('button', { on: { click: () => history.back() } }, 'Discard'),
+        el('button', { on: { click: async () => { const got = await api.post('mail', 'save_draft', fields()); draft.id = got.draft; toast('Draft saved'); } } }, 'Save draft'),
+        el('button', { class: 'primary', on: { click: async () => {
+          try {
+            await api.post('mail', 'send', fields());
+            toast('Message sent');
+            location.hash = '#/sent/1';
+          } catch (error) {
+            toast(error.message, true);
+          }
+        } } }, 'Send'))));
+  }
+
+  async function route() {
+    const [, a = 'inbox', b, c] = location.hash.split('/');
+    try {
+      await sideBar();
+      if (a === 'm') return await letter(b);
+      if (a === 'compose') {
+        if (b) {
+          const d = await api.get('mail', 'message', { id: b });
+          return compose({ id: d.id, to: d.to, subject: d.subject, body: d.body, reply_to: d.reply_to, forward_of: d.forward_of });
+        }
+        return compose();
+      }
+      if (a === 'search') return await list('search', decodeURIComponent(b || ''), c || 1);
+      if (a === 'label') return await list('label', decodeURIComponent(b || ''), c || 1);
+      return await list('folder', a, b || 1);
+    } catch (error) {
+      if (error.message !== 'signed out') clear(view).append(el('p', { class: 'muted' }, `Could not load: ${error.message}`));
+    }
+  }
+
+  document.getElementById('compose').addEventListener('click', () => (location.hash = '#/compose'));
+  document.getElementById('find').addEventListener('submit', (e) => {
+    e.preventDefault();
+    location.hash = `#/search/${encodeURIComponent(document.getElementById('q').value)}/1`;
+  });
+  addEventListener('hashchange', route);
+  route();
+</script>
+</body>
+</html>

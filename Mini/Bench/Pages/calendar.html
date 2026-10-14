@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Calendar</title>
+<link rel="stylesheet" href="/static/bench.css">
+<style>
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .day { background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; min-height: 360px; padding: 6px; }
+  .day.today { border-color: #2b59c3; }
+  .day h2 { font-size: 13px; margin: 0 0 6px; }
+  .event { background: #e7eefc; border-left: 3px solid #2b59c3; border-radius: 4px; padding: 4px 6px; margin-bottom: 4px; cursor: pointer; font-size: 12px; }
+  .event.flight { background: #fdf0e1; border-color: #c76b00; }
+</style>
+</head>
+<body>
+<header class="top"><span class="brand">Calendar</span><span class="who">robin@vale.test</span></header>
+<main><section class="content" id="view"></section></main>
+<script src="/static/bench.js"></script>
+<script>
+  // A calendar: one week at a time, Monday first, invitations above it.
+  // An event's day is kept as days after the Monday of this week.
+  const view = document.getElementById('view');
+  let cal;
+  const todayOffset = () => Math.round((new Date(new Date().toDateString()) - new Date(cal.base + 'T00:00:00')) / 86400000);
+  const label = (n) => day(cal.base, n).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const iso = (n) => { const d = day(cal.base, n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const offsetOf = (value) => Math.round((new Date(value + 'T12:00:00') - new Date(cal.base + 'T12:00:00')) / 86400000);
+
+  function form(e, after) {
+    const f = {
+      title: el('input', { id: 'ev-title', value: e.title || '', style: 'width:100%' }),
+      date: el('input', { id: 'ev-date', type: 'date', value: iso(e.day ?? todayOffset()) }),
+      start: el('input', { id: 'ev-start', type: 'time', value: e.start || '09:00' }),
+      end: el('input', { id: 'ev-end', type: 'time', value: e.end || '10:00' }),
+      guests: el('input', { id: 'ev-guests', value: (e.guests || []).join(', '), placeholder: 'Emails, separated by commas', style: 'width:100%' }),
+      repeat: el('select', { id: 'ev-repeat' }, [['none', 'Does not repeat'], ['weekdays', 'Every weekday'], ['weekly', 'Every week'], ['monthly', 'Every month']].map(([v, w]) => el('option', { value: v, selected: v === (e.repeat || 'none') }, w))),
+    };
+    modal(e.id ? 'Edit event' : 'New event', el('div', {},
+      el('label', { for: 'ev-title' }, 'Title'), f.title, el('label', { for: 'ev-date' }, 'Date'), f.date,
+      el('div', { class: 'row' }, el('div', {}, el('label', { for: 'ev-start' }, 'Starts'), f.start), el('div', {}, el('label', { for: 'ev-end' }, 'Ends'), f.end)),
+      el('label', { for: 'ev-guests' }, 'Guests'), f.guests, el('label', { for: 'ev-repeat' }, 'Repeat'), f.repeat), [
+      ['Cancel', () => true],
+      ['Save', async () => {
+        const fields = { title: f.title.value, day: offsetOf(f.date.value), start: f.start.value, end: f.end.value, guests: f.guests.value.split(',').map((g) => g.trim()).filter(Boolean), repeat: f.repeat.value };
+        try {
+          if (e.id) await api.post('calendar', 'update', { id: e.id, ...fields });
+          else await api.post('calendar', 'create', fields);
+        } catch (error) {
+          toast(error.message, true);
+          return false;
+        }
+        toast('Saved');
+        after();
+      }, true]]);
+  }
+
+  function details(e, after) {
+    modal(e.title, el('div', {}, el('p', {}, `${label(e.day)}, ${e.start}–${e.end}`), e.guests.length ? el('p', {}, 'Guests: ' + e.guests.join(', ')) : '',
+      e.repeat !== 'none' ? el('p', { class: 'muted' }, `Repeats: ${e.repeat}`) : '', e.kind === 'flight' ? el('p', { class: 'muted' }, 'Added from your airline booking. Changes are made with the airline.') : ''), [
+      ['Delete', async () => { await api.post('calendar', 'delete', { id: e.id }); toast('Event deleted'); after(); }],
+      ['Edit', () => { setTimeout(() => form(e, after)); return true; }, true]]);
+  }
+
+  async function show(week) {
+    loading(view);
+    cal = await api.get('calendar', 'state');
+    const first = week * 7;
+    const today = todayOffset();
+    const again = () => show(week);
+    document.title = `Calendar – week of ${label(first)}`;
+    const pending = cal.invites.filter((i) => !i.answer);
+    clear(view).append(
+      pending.length ? el('div', { class: 'card' }, el('b', {}, 'Invitations'), pending.map((i) => el('div', { class: 'row' },
+        el('span', { style: 'flex:1' }, `${i.title} from ${i.from}: ${label(i.day)}, ${i.start}–${i.end}`),
+        el('button', { on: { click: async () => { await api.post('calendar', 'respond', { id: i.id, answer: 'no' }); again(); } } }, 'Decline'),
+        el('button', { class: 'primary', on: { click: async () => { await api.post('calendar', 'respond', { id: i.id, answer: 'yes' }); again(); } } }, 'Accept')))) : '',
+      el('div', { class: 'row', style: 'margin-bottom:10px' },
+        el('button', { 'aria-label': 'Previous week', on: { click: () => (location.hash = `#/${week - 1}`) } }, '‹'),
+        el('button', { on: { click: () => (location.hash = '#/0') } }, 'Today'),
+        el('button', { 'aria-label': 'Next week', on: { click: () => (location.hash = `#/${week + 1}`) } }, '›'),
+        el('h1', { style: 'font-size:18px;margin:0' }, `Week of ${label(first)}`),
+        el('button', { class: 'primary', style: 'margin-left:auto', on: { click: () => form({}, again) } }, 'Create')),
+      el('div', { class: 'week' }, [0, 1, 2, 3, 4, 5, 6].map((d) => el('div', { class: first + d === today ? 'day today' : 'day' },
+        el('h2', {}, label(first + d), first + d === today ? el('span', { class: 'pill' }, 'Today') : ''),
+        cal.events.filter((e) => e.day === first + d).sort((a, b) => a.start.localeCompare(b.start)).map((e) =>
+          el('div', { class: e.kind === 'flight' ? 'event flight' : 'event', on: { click: () => details(e, again) } }, el('b', {}, `${e.start}–${e.end}`), ' ', e.title))))));
+  }
+
+  async function route() {
+    try {
+      await show(Number(location.hash.slice(2)) || 0);
+    } catch (error) {
+      if (error.message !== 'signed out') clear(view).append(el('p', { class: 'muted' }, `Could not load: ${error.message}`));
+    }
+  }
+  addEventListener('hashchange', route);
+  route();
+</script>
+</body>
+</html>

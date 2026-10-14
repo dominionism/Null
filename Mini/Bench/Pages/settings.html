@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lumen Cloud – Settings</title>
+<link rel="stylesheet" href="/static/bench.css">
+</head>
+<body>
+<header class="top"><span class="brand">Lumen Cloud</span><span class="who">robin@vale.test</span></header>
+<main>
+  <nav class="side" aria-label="Settings">
+    <a href="#/profile">Profile</a><a href="#/notifications">Notifications</a><a href="#/privacy">Privacy</a><a href="#/plan">Plan</a>
+    <a href="#/password">Password</a><a href="#/data">Your data</a><a href="#/danger">Delete account</a>
+  </nav>
+  <section class="content" id="view"></section>
+</main>
+<script src="/static/bench.js"></script>
+<script>
+  // An account's settings: each section a form of its own, saved with its own
+  // button. Nothing changes until it is saved.
+  const view = document.getElementById('view');
+  let s;
+  const TIMEZONES = ['America/Los_Angeles', 'America/Denver', 'America/Chicago', 'America/New_York', 'Europe/London', 'Europe/Lisbon', 'Europe/Berlin', 'Asia/Tokyo'];
+  const LANGUAGES = ['English', 'Español', 'Français', 'Deutsch', 'Português'];
+  const NOTES = { marketing_email: 'Offers and news by email', product_updates: 'Product updates', security_alerts: 'Security alerts', weekly_digest: 'Weekly activity digest', sms_alerts: 'Text message alerts' };
+
+  function section(title, body, fields, name) {
+    clear(view).append(el('div', { class: 'card' }, el('h1', { style: 'font-size:18px;margin-top:0' }, title), body,
+      fields ? el('div', { class: 'row end' }, el('button', { class: 'primary', on: { click: async () => {
+        try {
+          await api.post('settings', 'save', { section: name, fields: fields() });
+          toast('Saved');
+          await load();
+        } catch (error) {
+          toast(error.message, true);
+        }
+      } } }, 'Save changes')) : ''));
+  }
+
+  async function load() {
+    s = await api.get('settings', 'state');
+  }
+
+  function profile() {
+    const p = s.profile;
+    const f = { name: el('input', { id: 'name', value: p.name, style: 'width:100%' }), display_name: el('input', { id: 'display', value: p.display_name, style: 'width:100%' }),
+      timezone: el('select', { id: 'tz' }, TIMEZONES.map((t) => el('option', { value: t, selected: t === p.timezone }, t))),
+      language: el('select', { id: 'lang' }, LANGUAGES.map((l) => el('option', { value: l, selected: l === p.language }, l))) };
+    section('Profile', el('div', {}, el('label', { for: 'name' }, 'Full name'), f.name, el('label', { for: 'display' }, 'Display name'), f.display_name,
+      el('label', {}, 'Email'), el('div', { class: 'muted' }, p.email), el('label', { for: 'tz' }, 'Time zone'), f.timezone, el('label', { for: 'lang' }, 'Language'), f.language),
+      () => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.value])), 'profile');
+  }
+
+  function notifications() {
+    const boxes = Object.fromEntries(Object.keys(NOTES).map((k) => [k, el('input', { type: 'checkbox', id: k, checked: s.notifications[k] })]));
+    section('Notifications', el('div', {}, Object.entries(NOTES).map(([k, words]) => el('label', { for: k, style: 'color:inherit;font-size:14px' }, boxes[k], ' ', words))),
+      () => Object.fromEntries(Object.entries(boxes).map(([k, b]) => [k, b.checked])), 'notifications');
+  }
+
+  function privacy() {
+    const p = s.privacy;
+    const pub = el('input', { type: 'radio', name: 'vis', id: 'vis-public', checked: p.profile_visibility === 'public' });
+    const priv = el('input', { type: 'radio', name: 'vis', id: 'vis-private', checked: p.profile_visibility === 'private' });
+    const online = el('input', { type: 'checkbox', id: 'online', checked: p.show_online_status });
+    const search = el('input', { type: 'checkbox', id: 'search', checked: p.search_engines });
+    section('Privacy', el('div', {}, el('b', {}, 'Who can see your profile'),
+      el('label', { for: 'vis-public', style: 'color:inherit' }, pub, ' Everyone'), el('label', { for: 'vis-private', style: 'color:inherit' }, priv, ' Only people I approve'),
+      el('label', { for: 'online', style: 'color:inherit' }, online, ' Show when I am online'), el('label', { for: 'search', style: 'color:inherit' }, search, ' Let search engines find my profile')),
+      () => ({ profile_visibility: priv.checked ? 'private' : 'public', show_online_status: online.checked, search_engines: search.checked }), 'privacy');
+  }
+
+  function plan() {
+    section('Plan', el('div', {}, el('p', {}, el('b', {}, s.plan.name), ` · ${s.plan.price}`), el('p', {}, `Renews on ${s.plan.renews}.`),
+      el('button', { on: { click: () => toast('Plans are changed from the billing page, which is not open yet.', true) } }, 'Change plan')));
+  }
+
+  function password() {
+    const cur = el('input', { id: 'cur', type: 'password', autocomplete: 'current-password' });
+    const fresh = el('input', { id: 'new', type: 'password', autocomplete: 'new-password' });
+    section('Password', el('div', {}, el('label', { for: 'cur' }, 'Current password'), cur, el('label', { for: 'new' }, 'New password'), fresh,
+      el('div', { class: 'row end' }, el('button', { class: 'primary', on: { click: async () => { try { await api.post('settings', 'password', { current: cur.value, new: fresh.value }); } catch (e) { toast(e.message, true); } } } }, 'Change password'))));
+  }
+
+  function data() {
+    section('Your data', el('div', {}, el('p', {}, 'Ask for a copy of everything in your account. We email you a link when it is ready.'),
+      s.account.export_requested ? el('p', { class: 'pill' }, 'Requested') : el('button', { on: { click: async () => { await api.post('settings', 'export', {}); await load(); data(); } } }, 'Request a copy')));
+  }
+
+  function danger() {
+    section('Delete account', el('div', {}, el('p', {}, 'Deleting your account removes your files, your plan and your history. It cannot be undone.'),
+      el('button', { class: 'danger', on: { click: () => {
+        const field = el('input', { id: 'confirm', placeholder: 'DELETE' });
+        modal('Delete your account?', el('div', {}, el('p', {}, 'Type DELETE to confirm.'), field), [['Cancel', () => true], ['Delete my account', async () => { try { await api.post('settings', 'delete_account', { confirm: field.value }); toast('Your account is deleted'); } catch (e) { toast(e.message, true); return false; } }, true]]);
+      } } }, 'Delete my account')));
+  }
+
+  async function route() {
+    const pages = { profile, notifications, privacy, plan, password, data, danger };
+    try {
+      await load();
+      const name = location.hash.slice(2) || 'profile';
+      document.title = `Lumen Cloud – ${name[0].toUpperCase() + name.slice(1)}`;
+      (pages[name] || profile)();
+    } catch (error) {
+      if (error.message !== 'signed out') clear(view).append(el('p', { class: 'muted' }, `Could not load: ${error.message}`));
+    }
+  }
+  addEventListener('hashchange', route);
+  route();
+</script>
+</body>
+</html>

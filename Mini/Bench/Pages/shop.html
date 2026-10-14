@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shopwell</title>
+<link rel="stylesheet" href="/static/bench.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .grid .card { cursor: pointer; margin: 0; }
+  .price { font-weight: 700; font-size: 16px; }
+  .stars { color: #b8860b; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  td, th { padding: 8px; border-bottom: 1px solid #eef0f3; text-align: left; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/" style="color:inherit;text-decoration:none">Shopwell</a>
+  <form id="find" class="row" role="search"><input id="q" type="search" placeholder="Search Shopwell" aria-label="Search Shopwell" style="width:340px"><button>Search</button></form>
+  <nav class="row" style="margin-left:auto"><a href="#/orders">Orders</a><a href="#/wishlist">Wishlist</a><a href="#/account">Account</a><a href="#/cart" id="cart-link">Cart</a></nav>
+</header>
+<main><section class="content" id="view"></section></main>
+<script src="/static/bench.js"></script>
+<script>
+  // A shop: search, a product, the cart, checkout, orders and returns, the
+  // wishlist, and the account's addresses. Nothing is paid until "Place order"
+  // on the checkout page.
+  const view = document.getElementById('view');
+  let shop;
+  const product = (id) => shop.products.find((p) => p.id === id);
+  const money = (n) => '$' + n.toFixed(2);
+  const stars = (r) => el('span', { class: 'stars', 'aria-label': `${r} out of 5 stars` }, '★'.repeat(Math.round(r)) + '☆'.repeat(5 - Math.round(r)), el('span', { class: 'muted' }, ` ${r}`));
+
+  async function load() {
+    shop = await api.get('shop', 'state');
+    document.getElementById('cart-link').textContent = `Cart (${shop.cart.reduce((n, l) => n + l.qty, 0)})`;
+    if (shop.popup) cookieBanner();
+  }
+
+  function cards(products) {
+    return el('div', { class: 'grid' }, products.map((p) => el('div', { class: 'card', on: { click: () => (location.hash = `#/p/${p.id}`) } },
+      el('div', { style: 'height:90px;background:#eef1f6;border-radius:6px;margin-bottom:8px' }), el('div', {}, p.name), el('div', { class: 'price' }, money(p.price)), stars(p.rating),
+      p.colors.length > 1 ? el('div', { class: 'muted' }, p.colors.join(' · ')) : '', p.in_stock ? '' : el('div', { class: 'muted' }, 'Out of stock'))));
+  }
+
+  async function home() {
+    document.title = 'Shopwell';
+    clear(view).append(el('h1', { style: 'font-size:18px' }, 'Picked for you'), cards(shop.products.slice(0, 12)));
+  }
+
+  async function search(q) {
+    document.title = `Shopwell – ${q}`;
+    loading(view, 'Searching…');
+    const got = await api.get('shop', 'search', { q });
+    clear(view).append(el('h1', { style: 'font-size:18px' }, `${got.results.length} results for “${q}”`), cards(got.results));
+  }
+
+  function item(id) {
+    const p = product(id);
+    document.title = `Shopwell – ${p.name}`;
+    const color = el('select', { id: 'color' }, p.colors.map((c) => el('option', { value: c }, c)));
+    const qty = el('input', { id: 'qty', type: 'number', min: '1', value: '1', style: 'width:70px' });
+    clear(view).append(el('div', { class: 'card' },
+      el('h1', { style: 'font-size:20px;margin-top:0' }, p.name), el('div', { class: 'price' }, money(p.price)), stars(p.rating),
+      el('div', { class: 'row', style: 'margin-top:10px' }, el('label', { for: 'color' }, 'Colour'), color, el('label', { for: 'qty' }, 'Quantity'), qty,
+        el('button', { class: 'primary', on: { click: async () => { try { await api.post('shop', 'cart_add', { product: p.id, qty: Number(qty.value), color: color.value }); await load(); toast('Added to your cart'); } catch (error) { toast(`Could not add it: ${error.message}`, true); } } } }, 'Add to cart')),
+      el('h2', { style: 'font-size:16px' }, 'Reviews'),
+      p.reviews.length ? p.reviews.map((r) => el('div', { class: 'card' }, el('b', {}, r.author), ' ', stars(r.stars), el('p', {}, r.text))) : el('p', { class: 'muted' }, 'No reviews yet')));
+  }
+
+  function cart() {
+    document.title = 'Shopwell – Cart';
+    const code = el('input', { id: 'coupon', placeholder: 'Coupon code' });
+    const subtotal = shop.cart.reduce((n, l) => n + product(l.product).price * l.qty, 0);
+    const total = shop.coupon ? subtotal * 0.85 : subtotal;
+    clear(view).append(el('h1', { style: 'font-size:18px' }, 'Your cart'),
+      shop.cart.length ? el('table', {}, el('tr', {}, el('th', {}, 'Item'), el('th', {}, 'Colour'), el('th', {}, 'Quantity'), el('th', {}, 'Price'), el('th', {}, '')),
+        shop.cart.map((l) => el('tr', {}, el('td', {}, product(l.product).name), el('td', {}, l.color),
+          el('td', {}, el('input', { type: 'number', min: '0', value: String(l.qty), style: 'width:60px', 'aria-label': `Quantity of ${product(l.product).name}`, on: { change: async (e) => { await api.post('shop', 'cart_set', { line: l.line, qty: Number(e.target.value) }); await load(); cart(); } } })),
+          el('td', {}, money(product(l.product).price * l.qty)),
+          el('td', {}, el('button', { on: { click: async () => { await api.post('shop', 'cart_remove', { line: l.line }); await load(); cart(); } } }, 'Remove'))))) : el('p', { class: 'muted' }, 'Your cart is empty'),
+      el('div', { class: 'card', style: 'margin-top:12px' },
+        el('div', { class: 'row' }, code, el('button', { on: { click: async () => { try { await api.post('shop', 'coupon', { code: code.value }); await load(); cart(); toast('Coupon applied'); } catch (e) { toast(e.message, true); } } } }, 'Apply')),
+        shop.coupon ? el('p', {}, `Coupon ${shop.coupon}: 15% off`) : '',
+        el('p', {}, 'Subtotal: ', money(subtotal)), el('p', { class: 'price', id: 'total' }, 'Total: ', money(total)),
+        el('div', { class: 'row end' }, el('button', { class: 'primary', disabled: !shop.cart.length, on: { click: () => (location.hash = '#/checkout') } }, 'Check out'))));
+  }
+
+  function checkout() {
+    document.title = 'Shopwell – Checkout';
+    const address = shop.addresses.find((a) => a.default);
+    const subtotal = shop.cart.reduce((n, l) => n + product(l.product).price * l.qty, 0);
+    clear(view).append(el('div', { class: 'card' }, el('h1', { style: 'font-size:18px;margin-top:0' }, 'Checkout'),
+      el('p', {}, 'Ship to: ', `${address.label}, ${address.line1}, ${address.city} ${address.zip}`), el('p', {}, 'Pay with: ', shop.card),
+      shop.cart.map((l) => el('div', {}, `${l.qty} × ${product(l.product).name} (${l.color})`)),
+      el('p', { class: 'price' }, 'Order total: ', money(shop.coupon ? subtotal * 0.85 : subtotal)),
+      el('div', { class: 'row end' }, el('button', { on: { click: () => (location.hash = '#/cart') } }, 'Back to cart'),
+        el('button', { class: 'primary', on: { click: async () => { const got = await api.post('shop', 'checkout', {}); await load(); toast(`Order ${got.order} placed`); location.hash = '#/orders'; } } }, 'Place order'))));
+  }
+
+  function orders() {
+    document.title = 'Shopwell – Orders';
+    clear(view).append(el('h1', { style: 'font-size:18px' }, 'Your orders'), [...shop.orders].reverse().map((o) => el('div', { class: 'card' },
+      el('div', { class: 'row' }, el('b', {}, `Order ${o.id}`), el('span', { class: 'muted' }, `placed ${shortDate(o.date)}`), el('span', { class: 'pill' }, o.status), el('span', { style: 'margin-left:auto' }, money(o.total))),
+      o.items.map((i) => el('div', {}, `${i.qty} × ${i.name} – ${money(i.price)}`)),
+      o.tracking ? el('p', {}, `Tracking ${o.tracking}. Arriving ${shortDate(o.eta)}.`) : o.eta ? el('p', {}, `Arriving ${shortDate(o.eta)}.`) : '',
+      o.status === 'delivered' ? el('button', { on: { click: () => returnForm(o) } }, 'Return an item') : '')));
+  }
+
+  function returnForm(o) {
+    const which = el('select', { id: 'return-item' }, o.items.map((i) => el('option', { value: i.product }, i.name)));
+    const why = el('select', { id: 'return-reason' }, ['Damaged', 'Wrong item', 'No longer needed', 'Other'].map((r) => el('option', { value: r }, r)));
+    modal(`Return from ${o.id}`, el('div', {}, el('label', { for: 'return-item' }, 'Item'), which, el('label', { for: 'return-reason' }, 'Reason'), why),
+      [['Cancel', () => true], ['Start return', async () => { await api.post('shop', 'return', { order: o.id, product: which.value, reason: why.value }); await load(); toast('Return started. We emailed you a label.'); }, true]]);
+  }
+
+  function wishlist() {
+    document.title = 'Shopwell – Wishlist';
+    clear(view).append(el('h1', { style: 'font-size:18px' }, 'Wishlist'), shop.wishlist.length ? shop.wishlist.map((id) => el('div', { class: 'card row' }, el('span', { style: 'flex:1' }, product(id).name), money(product(id).price),
+      el('button', { on: { click: async () => { await api.post('shop', 'wishlist_move', { product: id }); await load(); wishlist(); toast('Moved to cart'); } } }, 'Move to cart'),
+      el('button', { on: { click: async () => { await api.post('shop', 'wishlist_remove', { product: id }); await load(); wishlist(); } } }, 'Remove'))) : el('p', { class: 'muted' }, 'Nothing saved'));
+  }
+
+  function account() {
+    document.title = 'Shopwell – Account';
+    const form = (a = {}) => {
+      const f = Object.fromEntries(['label', 'line1', 'city', 'zip'].map((k) => [k, el('input', { id: `addr-${k}`, value: a[k] || '', style: 'width:100%' })]));
+      const def = el('input', { type: 'checkbox', id: 'addr-default', checked: !!a.default });
+      modal(a.id ? 'Edit address' : 'Add an address', el('div', {}, el('label', { for: 'addr-label' }, 'Name for it'), f.label, el('label', { for: 'addr-line1' }, 'Street and number'), f.line1,
+        el('label', { for: 'addr-city' }, 'City'), f.city, el('label', { for: 'addr-zip' }, 'ZIP code'), f.zip, el('label', {}, def, ' Use as my default address')),
+        [['Cancel', () => true], ['Save', async () => { await api.post('shop', 'address', { id: a.id || null, label: f.label.value, line1: f.line1.value, city: f.city.value, zip: f.zip.value, default: def.checked }); await load(); account(); toast('Address saved'); }, true]]);
+    };
+    clear(view).append(el('h1', { style: 'font-size:18px' }, 'Addresses'), shop.addresses.map((a) => el('div', { class: 'card row' },
+      el('span', { style: 'flex:1' }, el('b', {}, a.label), ` ${a.line1}, ${a.city} ${a.zip}`, a.default ? el('span', { class: 'pill' }, 'Default') : ''), el('button', { on: { click: () => form(a) } }, 'Edit'))),
+      el('button', { on: { click: () => form() } }, 'Add an address'));
+  }
+
+  async function route() {
+    const [, a, b] = location.hash.split('/');
+    try {
+      await load();
+      if (a === 'search') return await search(decodeURIComponent(b || ''));
+      if (a === 'p') return item(b);
+      if (a === 'cart') return cart();
+      if (a === 'checkout') return checkout();
+      if (a === 'orders') return orders();
+      if (a === 'wishlist') return wishlist();
+      if (a === 'account') return account();
+      return home();
+    } catch (error) {
+      if (error.message !== 'signed out') clear(view).append(el('p', { class: 'muted' }, `Could not load: ${error.message}`));
+    }
+  }
+  document.getElementById('find').addEventListener('submit', (e) => { e.preventDefault(); location.hash = `#/search/${encodeURIComponent(document.getElementById('q').value)}`; });
+  addEventListener('hashchange', route);
+  route();
+</script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pages – My documents</title>
+<link rel="stylesheet" href="/static/bench.css">
+<style>
+  .toolbar { display: flex; gap: 4px; padding: 6px; background: #fff; border: 1px solid #e3e6ea; border-radius: 8px 8px 0 0; flex-wrap: wrap; }
+  .sheet { background: #fff; border: 1px solid #e3e6ea; border-top: 0; min-height: 520px; padding: 40px 60px; }
+  .sheet:focus { outline: 2px solid #c9d6f5; }
+  .layout { display: flex; gap: 16px; }
+  .layout .doc { flex: 1; min-width: 0; }
+  .layout aside { width: 280px; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<header class="top"><span class="brand">Pages</span><span class="who">robin@vale.test</span></header>
+<main><section class="content" id="view"></section></main>
+<script src="/static/bench.js"></script>
+<script>
+  // A documents site. Most documents are written in the page; two are drawn on
+  // a canvas, as an online editor draws its words, so the page holds no text
+  // for them. Every document can be downloaded as text (File, Download), at its
+  // own address: /docs/export?id=<id>.
+  const view = document.getElementById('view');
+
+  async function home() {
+    document.title = 'Pages – My documents';
+    loading(view);
+    const { docs } = await api.get('docs', 'list');
+    clear(view).append(
+      el('div', { class: 'row', style: 'margin-bottom:10px' }, el('h1', { style: 'font-size:18px;margin:0' }, 'My documents'),
+        el('button', { class: 'primary', style: 'margin-left:auto', on: { click: async () => { const got = await api.post('docs', 'create', { title: 'Untitled document' }); location.hash = `#/d/${got.id}`; } } }, 'New document')),
+      el('div', { class: 'list' }, el('div', { class: 'item muted', style: 'cursor:default' }, el('span', { style: 'flex:1' }, 'Name'), el('span', { style: 'width:160px' }, 'Folder'), el('span', { style: 'width:120px' }, 'Modified')),
+        docs.map((d) => el('div', { class: 'item', on: { click: () => (location.hash = `#/d/${d.id}`) } },
+          el('span', { style: 'flex:1' }, '📄 ' + d.title), el('span', { style: 'width:160px', class: 'muted' }, d.folder), el('span', { style: 'width:120px', class: 'muted' }, shortDate(d.modified))))));
+  }
+
+  function draw(canvas, text) {
+    const g = canvas.getContext('2d');
+    const lines = [];
+    for (const block of text.split('\n')) {
+      const words = block.split(' ');
+      let line = '';
+      for (const w of words) {
+        if ((line + ' ' + w).length > 70) { lines.push(line); line = w; } else line = line ? line + ' ' + w : w;
+      }
+      lines.push(line);
+    }
+    canvas.width = 700;
+    canvas.height = Math.max(500, 40 + lines.length * 26);
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.fillStyle = '#1d2330';
+    lines.forEach((line, i) => {
+      g.font = i === 0 ? 'bold 22px Georgia' : '16px Georgia';
+      g.fillText(line, 20, 40 + i * 26);
+    });
+  }
+
+  function textOf(html) {
+    const box = document.createElement('div');
+    box.innerHTML = html.replace(/<\/(p|h1|h2|h3|li)>/g, '</$1>\n').replace(/<li>/g, '<li>- ');
+    return box.textContent.trim();
+  }
+
+  async function open(id) {
+    loading(view);
+    const doc = await api.get('docs', 'doc', { id });
+    document.title = `Pages – ${doc.title}`;
+    let saving = null;
+    const state = el('span', { class: 'muted', 'aria-live': 'polite' }, 'All changes saved');
+    const title = el('input', { value: doc.title, 'aria-label': 'Document title', style: 'font-size:18px;width:420px;border:0;background:none' });
+    const save = (fields) => {
+      state.textContent = 'Saving…';
+      clearTimeout(saving);
+      saving = setTimeout(async () => {
+        try {
+          await api.post('docs', 'save', { id: doc.id, ...fields() });
+          state.textContent = 'All changes saved';
+        } catch (error) {
+          state.textContent = 'Not saved: ' + error.message;
+        }
+      }, 500);
+    };
+    title.addEventListener('input', () => save(() => ({ title: title.value })));
+    let sheet;
+    if (doc.drawn) {
+      sheet = el('div', { class: 'sheet', style: 'padding:20px' }, el('canvas', { 'aria-label': 'Document' }));
+      draw(sheet.firstChild, textOf(doc.html));
+    } else {
+      sheet = el('div', { class: 'sheet', contenteditable: 'true', role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Document', html: doc.html });
+      sheet.addEventListener('input', () => save(() => ({ html: sheet.innerHTML })));
+    }
+    const format = (command, value) => el('button', { on: { mousedown: (e) => e.preventDefault(), click: () => { document.execCommand(command, false, value); sheet.dispatchEvent(new Event('input')); } } });
+    const tool = (command, words, value) => { const b = format(command, value); b.textContent = words; return b; };
+    const share = () => {
+      const email = el('input', { id: 'share-email', type: 'email', placeholder: 'name@example', style: 'width:100%' });
+      const role = el('select', { id: 'share-role' }, ['viewer', 'commenter', 'editor'].map((r) => el('option', { value: r }, r[0].toUpperCase() + r.slice(1))));
+      const anyone = el('input', { type: 'checkbox', id: 'share-public', checked: doc.public });
+      modal(`Share “${doc.title}”`, el('div', {},
+        el('label', { for: 'share-email' }, 'Add people'), email, el('label', { for: 'share-role' }, 'Their access'), role,
+        el('p', {}, 'People with access: ', doc.shared.map((s) => `${s.email} (${s.role})`).join(', ') || 'only you'),
+        el('label', {}, anyone, ' Anyone with the link can view')), [
+        ['Cancel', () => true],
+        ['Share', async () => {
+          if (email.value) await api.post('docs', 'share', { id: doc.id, email: email.value, role: role.value });
+          if (anyone.checked !== doc.public) await api.post('docs', 'public', { id: doc.id, on: anyone.checked });
+          toast('Sharing updated');
+          open(doc.id);
+        }, true]]);
+    };
+    const words = () => modal('Word count', el('p', {}, `${textOf(doc.drawn ? doc.html : sheet.innerHTML).split(/\s+/).filter(Boolean).length} words`), [['Close', () => true, true]]);
+    const comments = el('aside', {}, el('h3', { style: 'margin-top:0' }, 'Comments'),
+      doc.comments.length ? doc.comments.map((c) => {
+        const answer = el('input', { 'aria-label': `Reply to ${c.author}`, placeholder: 'Reply…', style: 'width:100%' });
+        return el('div', { class: 'card' }, el('div', { class: 'muted' }, `“${c.quote}”`), el('b', {}, c.author), el('p', {}, c.text),
+          c.replies.map((r) => el('p', { class: 'muted' }, `${r.author}: ${r.text}`)), c.resolved ? el('span', { class: 'pill' }, 'Resolved') : '',
+          answer, el('div', { class: 'row end' },
+            el('button', { on: { click: async () => { await api.post('docs', 'resolve', { id: doc.id, comment: c.id }); open(doc.id); } } }, 'Resolve'),
+            el('button', { class: 'primary', on: { click: async () => { if (!answer.value) return; await api.post('docs', 'reply', { id: doc.id, comment: c.id, text: answer.value }); open(doc.id); } } }, 'Reply')));
+      }) : el('p', { class: 'muted' }, 'No comments'));
+    clear(view).append(
+      el('div', { class: 'row', style: 'margin-bottom:8px' }, el('button', { on: { click: () => (location.hash = '') } }, '← All documents'), title, state,
+        el('a', { href: `/docs/export?id=${doc.id}`, download: `${doc.title}.txt`, style: 'margin-left:auto' }, el('button', {}, 'File: Download as text')),
+        el('button', { on: { click: words } }, 'Tools: Word count'), el('button', { class: 'primary', on: { click: share } }, 'Share')),
+      el('div', { class: 'layout' }, el('div', { class: 'doc' },
+        doc.drawn ? el('div', { class: 'toolbar muted' }, 'Viewing') : el('div', { class: 'toolbar', role: 'toolbar', 'aria-label': 'Formatting' },
+          tool('bold', 'Bold'), tool('italic', 'Italic'), tool('formatBlock', 'Heading 1', 'h1'), tool('formatBlock', 'Heading 2', 'h2'), tool('formatBlock', 'Normal text', 'p'),
+          tool('insertUnorderedList', 'Bulleted list'), tool('insertOrderedList', 'Numbered list'), tool('justifyLeft', 'Align left'), tool('justifyCenter', 'Center')),
+        sheet), comments));
+  }
+
+  async function route() {
+    const [, a, b] = location.hash.split('/');
+    try {
+      if (a === 'd' && b) return await open(b);
+      return await home();
+    } catch (error) {
+      if (error.message !== 'signed out') clear(view).append(el('p', { class: 'muted' }, `Could not load: ${error.message}`));
+    }
+  }
+  addEventListener('hashchange', route);
+  route();
+</script>
+</body>
+</html>

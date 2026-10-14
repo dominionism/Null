@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Huddle</title>
+<link rel="stylesheet" href="/static/bench.css">
+<style>
+  .msg { display: flex; gap: 10px; padding: 6px 8px; border-radius: 6px; position: relative; }
+  .msg:hover { background: #f1f3f7; }
+  .msg .tools { display: none; position: absolute; right: 8px; top: 4px; background: #fff; border: 1px solid #e3e6ea; border-radius: 6px; }
+  .msg:hover .tools { display: flex; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: #c9d6f5; flex: none; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .chip { display: inline-flex; gap: 4px; border: 1px solid #d5dbe6; border-radius: 10px; padding: 0 6px; margin-right: 4px; font-size: 12px; cursor: pointer; background: #fff; }
+  .chip.mine { border-color: #2b59c3; background: #eef3ff; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .online { background: #2e9d5b; } .idle { background: #e0a400; } .offline { background: #b8bfcc; }
+  .banner { background: #eef3ff; border: 1px solid #c9d6f5; padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; display: flex; gap: 10px; align-items: center; }
+  .picker { position: absolute; right: 8px; top: 30px; background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; padding: 4px; z-index: 5; display: flex; }
+</style>
+</head>
+<body>
+<header class="top"><span class="brand">Huddle</span><span class="muted">Riverside Crew</span><span class="who">robin.v</span></header>
+<main>
+  <nav class="side" aria-label="Conversations">
+    <input id="find" type="search" placeholder="Find or start a conversation" style="width:100%">
+    <h3>Channels</h3><div id="channels"></div>
+    <h3>Direct messages</h3><div id="dms"></div>
+  </nav>
+  <section class="content" id="view"></section>
+</main>
+<script src="/static/bench.js"></script>
+<script>
+  // A chat site. The buttons over a conversation and on a message are icons
+  // only, with no words: call, video, pinned messages, people, mute; react,
+  // edit, delete.
+  const view = document.getElementById('view');
+  const ICON = {
+    call: '<svg viewBox="0 0 24 24"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z" fill="#3b4558"/></svg>',
+    video: '<svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z" fill="#3b4558"/></svg>',
+    pin: '<svg viewBox="0 0 24 24"><path d="M16 3l5 5-3 1-4 4 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 4-4z" fill="#3b4558"/></svg>',
+    people: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4" fill="#3b4558"/><path d="M1 20c0-4 4-6 8-6s8 2 8 6z" fill="#3b4558"/><circle cx="18" cy="9" r="3" fill="#7d8799"/></svg>',
+    bell: '<svg viewBox="0 0 24 24"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 0 0-5-6V4a1 1 0 0 0-2 0v1a6 6 0 0 0-5 6v5l-2 2v1h16v-1z" fill="#3b4558"/></svg>',
+    muted: '<svg viewBox="0 0 24 24"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 0 0-5-6V4a1 1 0 0 0-2 0v1a6 6 0 0 0-5 6v5l-2 2v1h16v-1z" fill="#b8bfcc"/><path d="M3 3l18 18" stroke="#b3261e" stroke-width="2"/></svg>',
+    smile: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#3b4558" stroke-width="2"/><circle cx="9" cy="10" r="1.3" fill="#3b4558"/><circle cx="15" cy="10" r="1.3" fill="#3b4558"/><path d="M8 14c2 2.5 6 2.5 8 0" stroke="#3b4558" stroke-width="2" fill="none"/></svg>',
+    pencil: '<svg viewBox="0 0 24 24"><path d="M3 17v4h4l11-11-4-4zM20.7 7.3a1 1 0 0 0 0-1.4l-2.6-2.6a1 1 0 0 0-1.4 0l-1.8 1.8 4 4z" fill="#3b4558"/></svg>',
+    bin: '<svg viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z" fill="#3b4558"/></svg>',
+  };
+  const icon = (name, fn, extra = {}) => el('button', { class: 'icon', 'data-icon': name, html: ICON[name], on: { click: fn }, ...extra });
+  let chat;
+  const user = (id) => chat.users.find((u) => u.id === id);
+
+  async function load() {
+    chat = await api.get('chat', 'state');
+  }
+
+  function sideBar(here) {
+    const term = document.getElementById('find').value.toLowerCase();
+    const show = (c) => !term || c.name.toLowerCase().includes(term) || (c.kind === 'dm' && user(c.members[1]).username.includes(term));
+    clear(document.getElementById('channels')).append(...chat.channels.filter((c) => c.kind === 'channel' && show(c)).map((c) =>
+      el('a', { href: `#/${c.id}`, class: c.id === here ? 'on' : '' }, '# ' + c.name, chat.muted.includes(c.id) ? el('span', { class: 'muted' }, 'muted') : '')));
+    clear(document.getElementById('dms')).append(...chat.channels.filter((c) => c.kind === 'dm' && show(c)).map((c) => {
+      const u = user(c.members[1]);
+      return el('a', { href: `#/${c.id}`, class: c.id === here ? 'on' : '' }, el('span', {}, el('span', { class: `dot ${u.status}` }), u.name), el('span', { class: 'muted' }, u.username));
+    }));
+  }
+
+  function conversation(id) {
+    const ch = chat.channels.find((c) => c.id === id) || chat.channels[0];
+    const other = ch.kind === 'dm' ? user(ch.members[1]) : null;
+    document.title = `Huddle – ${other ? other.name : '#' + ch.name}`;
+    sideBar(ch.id);
+    const live = chat.calls.filter((c) => c.channel === ch.id && c.live);
+    const mine = chat.calls.find((c) => c.channel === ch.id && c.started_by === 'u-robin');
+    const panel = el('div', {});
+    const send = async () => {
+      const text = box.value.trim();
+      if (!text) return;
+      try {
+        await api.post('chat', 'send', { channel: ch.id, text });
+        box.value = '';
+        await refresh(ch.id);
+      } catch (error) {
+        toast(`Message failed to send. ${error.message}`, true);
+      }
+    };
+    const box = el('textarea', { 'aria-label': `Message ${other ? other.name : '#' + ch.name}`, placeholder: `Message ${other ? other.name : '#' + ch.name}`, style: 'min-height:60px' });
+    box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+    const messages = chat.messages.filter((m) => m.channel === ch.id);
+    clear(view).append(
+      el('div', { class: 'row', style: 'border-bottom:1px solid #e3e6ea;padding-bottom:8px;margin-bottom:8px' },
+        el('h1', { style: 'font-size:18px;margin:0' }, other ? other.name : '# ' + ch.name), other ? el('span', { class: 'muted' }, `@${other.username} · ${other.status}`) : '',
+        el('span', { style: 'margin-left:auto' }),
+        other ? icon('call', async () => { await api.post('chat', 'call', { user: other.id }); await refresh(ch.id); }) : '',
+        other ? icon('video', () => toast('Video is not available on this plan', true)) : '',
+        icon('pin', () => { clear(panel).append(el('div', { class: 'card' }, el('b', {}, 'Pinned'), ch.pinned.length ? ch.pinned.map((p) => { const m = chat.messages.find((x) => x.id === p); return el('p', {}, `${user(m.author).name}: ${m.text}`); }) : el('p', { class: 'muted' }, 'Nothing pinned'))); }),
+        icon('people', () => { clear(panel).append(el('div', { class: 'card' }, el('b', {}, 'People'), ch.members.map((u) => el('div', {}, el('span', { class: `dot ${user(u).status}` }), `${user(u).name} @${user(u).username}`)))); }),
+        icon(chat.muted.includes(ch.id) ? 'muted' : 'bell', async () => { await api.post('chat', 'mute', { channel: ch.id, on: !chat.muted.includes(ch.id) }); await refresh(ch.id); })),
+      live.map((c) => el('div', { class: 'banner' }, c.started_by === 'u-robin' ? `Calling ${user(c.with[0]).name}…` : `${user(c.started_by).name} is in a call`,
+        c.started_by === 'u-robin' || chat.joined.includes(c.id) ? el('span', { class: 'pill' }, 'You are in this call') : el('button', { on: { click: async () => { await api.post('chat', 'join', { call: c.id }); await refresh(ch.id); } } }, 'Join'))),
+      panel,
+      el('div', {}, messages.map((m) => {
+        const u = user(m.author);
+        const tools = el('div', { class: 'tools' }, icon('smile', (e) => {
+          e.stopPropagation();
+          const pick = el('div', { class: 'picker' }, ['👍', '❤️', '😂', '🎉', '1', '2'].map((emoji) => el('button', { class: 'icon', style: 'line-height:1;font-size:16px', on: { click: async () => { await api.post('chat', 'react', { id: m.id, emoji }); await refresh(ch.id); } } }, emoji)));
+          row.append(pick);
+        }), m.author === 'u-robin' ? icon('pencil', () => {
+          const field = el('input', { value: m.text, 'aria-label': 'Edit message', style: 'width:100%' });
+          const save = async () => { if (field.value !== m.text) await api.post('chat', 'edit', { id: m.id, text: field.value }); await refresh(ch.id); };
+          field.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') refresh(ch.id); });
+          clear(row.querySelector('.text')).append(field, el('div', { class: 'row' }, el('button', { on: { click: () => refresh(ch.id) } }, 'Cancel'), el('button', { class: 'primary', on: { click: save } }, 'Save')));
+          field.focus();
+        }) : '', m.author === 'u-robin' ? icon('bin', () => modal('Delete message', el('p', {}, 'Delete this message for everyone?'), [['Cancel', () => true], ['Delete', async () => { await api.post('chat', 'delete', { id: m.id }); await refresh(ch.id); }, true]])) : '');
+        const row = el('div', { class: 'msg', 'data-id': m.id }, el('div', { class: 'avatar' }, u.name[0]),
+          el('div', { style: 'flex:1' }, el('b', {}, u.name), el('span', { class: 'muted' }, ` ${shortDate(m.at)} ${m.at.slice(11, 16)}`), el('div', { class: 'text' }, m.text, m.edited ? el('span', { class: 'muted' }, ' (edited)') : ''),
+            el('div', {}, Object.entries(m.reactions).map(([emoji, who]) => el('span', { class: who.includes('u-robin') ? 'chip mine' : 'chip', on: { click: async () => { await api.post('chat', 'react', { id: m.id, emoji }); await refresh(ch.id); } } }, emoji, String(who.length))))),
+          tools);
+        return row;
+      })),
+      el('div', { class: 'row', style: 'margin-top:12px' }, box, el('button', { class: 'primary', on: { click: send } }, 'Send')));
+  }
+
+  async function refresh(id) {
+    await load();
+    conversation(id);
+  }
+
+  async function route() {
+    try {
+      await refresh(location.hash.slice(2) || 'c-general');
+    } catch (error) {
+      if (error.message !== 'signed out') clear(view).append(el('p', { class: 'muted' }, `Could not load: ${error.message}`));
+    }
+  }
+  document.getElementById('find').addEventListener('input', () => sideBar(location.hash.slice(2)));
+  addEventListener('hashchange', route);
+  route();
+</script>
+</body>
+</html>
