@@ -92,12 +92,12 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="development"></a>
 <p align="center">
-  <img src=".github/Readme/development.svg" width="100%" alt="Development: Mini/Scripts/engine once to fetch the Oh-my-pi the build takes in, cd Mini and cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle, why not to use bunx tauri, the harness check, the key check and the box check." />
+  <img src=".github/Readme/development.svg" width="100%" alt="Development: Mini/Scripts/engine once to fetch the Oh-my-pi the build takes in, cd Mini and cargo test for offline unit tests, cargo build for a debug binary, cargo tauri build for the app bundle, why not to use bunx tauri, the harness check, the key check and the box check, and the bench that measures the browser link." />
 </p>
 
 <a id="development-switches-and-smoke-checks"></a>
 <p align="center">
-  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the ten NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider that can also answer slowly or ask for a tool, and the warning that profile isolation does not isolate MCP." />
+  <img src=".github/Readme/dev-switches.svg" width="100%" alt="Development switches and smoke checks: the eleven NULL_MINI_ environment variables, a startup-only check that leaves the installed shortcut alone, a run on a folder of its own with a stand-in provider that can also answer slowly or ask for a tool, and the warning that profile isolation does not isolate MCP." />
 </p>
 
 <a id="status-and-direction"></a>
@@ -107,7 +107,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="repository-layout"></a>
 <p align="center">
-  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout: Mini/ holds Null, with the Rust host, the page, the tests and the scripts; .github/workflows holds Null's tests, its releases and the weekly Oh-my-pi check; .github/Readme holds this README's banner and cards. Context/ and Memories/ are the owner's own and are not tracked in Git." />
+  <img src=".github/Readme/layout.svg" width="100%" alt="Repository layout: Mini/ holds Null, with the Rust host, the page, the tests and the scripts, and Mini/Bench the made-up sites that measure the browser link; .github/workflows holds Null's tests, its releases and the weekly Oh-my-pi check; .github/Readme holds this README's banner and cards. Context/ and Memories/ are the owner's own and are not tracked in Git." />
 </p>
 
 <a id="license"></a>

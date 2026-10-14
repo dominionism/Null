@@ -400,6 +400,7 @@ def development(c):
     c.command("cd Mini && cargo test        # offline unit tests; live ones are ignored")
     c.command("cargo build                  # local debug binary")
     c.command("cargo tauri build            # app bundle, no installation")
+    c.command("python3 -m unittest discover -s Mini/Bench   # the browser link's bench, its checkers")
     c.note("Use cargo tauri, not bunx tauri: the latter names a different npm package. "
            "cargo test -- --ignored is the harness check: live tests on the carried Oh-my-pi with a "
            "stand-in provider, one of which reaches a real provider with a dummy key. With them "
@@ -410,7 +411,11 @@ def development(c):
            "alone and unlocked meanwhile. "
            "NULL_MINI_ENGINE=<path> runs the harness check on another Oh-my-pi, and "
            "Mini/Scripts/engine --to <version> moves Null to that version only if it passes. "
-           "Repository CI runs all three on a Mac runner whenever Mini/ changes.")
+           "NULL_MINI_CHROME=<Chrome for Testing> lets one question load Null's copy of the browser "
+           "link's extension in a Chrome of its own. "
+           "Repository CI runs all three on a Mac runner whenever Mini/ changes. Mini/Bench/ measures "
+           "the browser link on made-up signed-in sites; python3 Mini/Bench/bench.py check proves, "
+           "with no model, that its runs cannot reach your own Chrome.")
 
 
 def dev_switches(c):
@@ -424,6 +429,7 @@ def dev_switches(c):
         ("UPDATES=<address>", "Where /update reads which Oh-my-pi is checked, in place of the repository: a made-up file as a file:// address"),
         ("RELEASE=<address>", "Where /update learns which Null is the newest, in place of GitHub: a made-up address whose last part is a tag, null-v0.2.0"),
         ("FOLDER=<path>", "Run on that folder in place of yours, made if missing: OMP's folder, its MCP definitions and Null's own files are all under it, so a new one is a Mac with nothing signed in"),
+        ("LINK_COPY=<folder>", "Make Null's copy of the browser link's extension in that folder, as /browser makes it, and exit without a window; LINK_ENGINE names the Oh-my-pi to make it from. For a Chrome of its own, such as the bench's"),
         ("STANDIN=1", "Offer a stand-in provider in that folder, so a message is answered or refused with no real sign-in: standin-anthropic/ok, /limit, /auth, /noaccess, and /slow, which says the message back a word at a time; the same for openai and codex; needs FOLDER. Told to by a message's last line (ask the shell: <command>), standin-anthropic/ok asks the harness for that tool, as a model would"),
     ]:
         c.row(f"NULL_MINI_{key}", value)
@@ -453,6 +459,7 @@ def status(c):
         "A small pet beside the box that shows what the agent is doing",
         "Work in the background: several conversations at once, each seen at a glance, in a folder you choose",
         "Computer use, switched on with /computer: Oh-my-pi reads windows and works the Mac's apps",
+        "The browser link, set up with /browser: the agent works your own Chrome as you, in tabs of its own, under Null's name",
         "A second model that checks each answer, named with /verify",
     ])
     c.head("Planned or incomplete", MUTED)
@@ -463,7 +470,7 @@ def status(c):
         "Cloned-voice conversation and other platforms",
     ], muted=True)
     c.note("The latest display, the pet, attached files, history with its renaming, deleting and "
-           "searching, work in the background, computer use with its two permissions, and some "
+           "searching, work in the background, computer use with its two permissions, the browser link, and some "
            "provider flows still need hands-on validation, and no real "
            "provider quota exhaustion has been verified. See the plans for evidence and open "
            "decisions rather than assuming every implemented path is finished.")
@@ -471,6 +478,7 @@ def status(c):
 
 def layout(c):
     c.raw("Mini/                  Null: the Rust host in src/, the page in Page/, tests/, Scripts/\n"
+          "Mini/Bench/            Made-up signed-in sites that measure the browser link, and their runner\n"
           ".github/workflows/     Null's tests, its releases, and the weekly Oh-my-pi check\n"
           ".github/Readme/        The banner and the cards of this README, and the scripts that draw them")
     c.note("Context/ and Memories/ hold the owner's own plans, decisions, research and handoffs, and "
