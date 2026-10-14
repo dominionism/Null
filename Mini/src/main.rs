@@ -2,7 +2,7 @@
 //! own agent harness. It is one app with no server; the page in `Page/` talks to
 //! this process through commands and events.
 //!
-//! Nine switches for development, all read from the environment:
+//! Ten switches for development, all read from the environment:
 //! - `NULL_MINI_EXIT_WHEN_READY`: quit as soon as the page has loaded, which makes
 //!   "start, load the page, stop" a check a script can run.
 //! - `NULL_MINI_NO_SHORTCUT`: do not listen for Control+Space, and show the box at
@@ -26,6 +26,10 @@
 //!   message is answered, or refused, with no real sign-in. Needs
 //!   `NULL_MINI_FOLDER`. The models are `standin-anthropic/ok` and the like.
 //!   Set to `thinking`, they say they can think, so that `/effort` has a level to set.
+//! - `NULL_MINI_LINK_COPY`: make Null's copy of the browser link's extension in
+//!   that folder, as `/browser` makes it, and quit. No window and no harness.
+//!   It is made from the Oh-my-pi `NULL_MINI_LINK_ENGINE` names, or else the one
+//!   Null carries. For a Chrome of its own, such as the bench's (`Bench/`).
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -117,6 +121,10 @@ fn main() {
     if let Err(reason) = settings::enter_own_folder().and_then(|()| standin::for_this_run()) {
         log!("not started: {reason}");
         std::process::exit(2);
+    }
+    if let Some(folder) = std::env::var_os("NULL_MINI_LINK_COPY") {
+        let engine = std::env::var_os("NULL_MINI_LINK_ENGINE").map(std::path::PathBuf::from).or_else(engine::carried);
+        std::process::exit(browser::copy(engine.as_deref(), std::path::Path::new(&folder)));
     }
     tauri::Builder::default()
         .plugin(tauri_nspanel::init())

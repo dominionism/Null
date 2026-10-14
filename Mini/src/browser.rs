@@ -74,6 +74,23 @@ pub fn make(binary: &Path, folder: &Path) -> Result<(), String> {
     std::fs::rename(&fresh, folder).map_err(|e| format!("could not put Null's copy of the extension in place: {e}"))
 }
 
+/// Make a copy for a Chrome of its own, such as the bench's, from `engine`, and
+/// say how it went (`NULL_MINI_LINK_COPY`). The exit status for the process: 0
+/// when the copy is there, 2 when it is not.
+pub fn copy(engine: Option<&Path>, folder: &Path) -> i32 {
+    let made = engine.ok_or_else(|| format!("no {} to write the extension with", harness::HARNESS_NAME)).and_then(|binary| make(binary, folder));
+    match made {
+        Ok(()) => {
+            log!("Null's copy of the browser link's extension is in {}", folder.display());
+            0
+        }
+        Err(why) => {
+            log!("no copy of the browser link's extension was made: {why}");
+            2
+        }
+    }
+}
+
 /// Have the harness write its extension into `folder`.
 fn write(binary: &Path, folder: &Path) -> Result<(), String> {
     let written = Command::new(binary)
