@@ -33,7 +33,7 @@ pub fn own_read(printed: &[u8]) -> Option<bool> {
 }
 
 /// What the harness's own settings say of computer use, or none when it has none.
-fn own(binary: &Path) -> Option<bool> {
+pub fn own(binary: &Path) -> Option<bool> {
     let output = std::process::Command::new(binary).args(harness::extra_args()).args(["config", "get", "computer.enabled", "--json"]).output().ok()?;
     own_read(&output.stdout)
 }
@@ -56,20 +56,26 @@ pub struct Standing {
     pub needs: Vec<Need>,
 }
 
+/// Whether computer use is on: switched in the box, or, when the person never
+/// used the switch, in the harness's own settings. Never with a harness that
+/// does not have it.
+pub fn on(chosen: Option<bool>, own: Option<bool>) -> bool {
+    own.is_some() && chosen.or(own).unwrap_or(false)
+}
+
 /// How it stands, from the person's choice, the harness's own setting, what the
 /// harness is set to do about asking, and what macOS has given Null.
 pub fn standing(chosen: Option<bool>, own: Option<bool>, asking: Option<&str>, needs: Vec<Need>) -> Standing {
-    Standing { known: own.is_some(), on: own.is_some() && chosen.or(own).unwrap_or(false), freely: !matches!(asking, Some("always-ask" | "write")), needs }
+    Standing { known: own.is_some(), on: on(chosen, own), freely: !matches!(asking, Some("always-ask" | "write")), needs }
 }
 
 /// The harness settings for computer use as the person chose it, for the
-/// harness about to be started. None when they never chose, and when that
-/// harness does not know the setting: one handed a setting it does not know
-/// might not start.
-pub fn harness_settings(app: &AppHandle, binary: &Path) -> Option<Value> {
-    let chosen = settings::get(app).computer?;
-    own(binary)?;
-    overlay(Some(chosen))
+/// harness about to be started, given what its own settings say (`own`). None
+/// when they never chose, and when that harness does not know the setting: one
+/// handed a setting it does not know might not start.
+pub fn harness_settings(chosen: Option<bool>, own: Option<bool>) -> Option<Value> {
+    own?;
+    overlay(chosen)
 }
 
 /// How computer use stands with the harness in use.

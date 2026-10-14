@@ -935,29 +935,39 @@ fn with_computer_use_handed_over_the_model_is_told_of_the_desktop() {
     assert!(with.contains(named), "with computer use handed over, the model is not told of the desktop");
 }
 
-/// With the browser link on, Null tells the model how to use it in a few lines
-/// of its own, handed over on the start line as `--append-system-prompt`,
-/// while the harness's own link setting stays off. So the harness has to pass
-/// those lines to the model in a conversation opened over the protocol, and
-/// pass nothing when none were handed over.
+/// While computer use is on, Null tells the model its rules for working the
+/// Mac, in a file of its own named on the start line as
+/// `--append-system-prompt`. So the harness has to read that file and pass its
+/// words to the model in a conversation opened over the protocol, and pass
+/// nothing when none was named.
 #[test]
 #[ignore]
-fn a_rule_handed_over_at_start_reaches_the_model() {
+fn rules_handed_over_in_a_file_at_start_reach_the_model() {
     const RULE: &str = "Box check rule: open a tab of your own, never the one in view.";
-    let told = |flags: &[&str]| {
+    let told = |rules: Option<&str>| {
         let standin = StandIn::start();
         let folder = Folder::new(&standin);
-        let mut agent = Agent::start_with(&engine::under_test(), &folder, None, "yolo", flags);
+        let file = folder.root.join("rules.md");
+        let flags: Vec<String> = match rules {
+            Some(rules) => {
+                std::fs::write(&file, rules).expect("the rules are written");
+                vec!["--append-system-prompt".into(), file.display().to_string()]
+            }
+            None => Vec::new(),
+        };
+        let flags: Vec<&str> = flags.iter().map(String::as_str).collect();
+        let mut agent = Agent::start_with(&engine::under_test(), &folder, None, "yolo", &flags);
         let (session, _) = agent.open_in(&folder.work());
         agent.set(&session, "model", json!("standin-anthropic/ok"));
         agent.say(&session, MESSAGE).unwrap_or_else(|error| panic!("a message was answered with an error: {error}"));
         standin.heard().first().map(Value::to_string).unwrap_or_default()
     };
-    let without = told(&[]);
+    let without = told(None);
     assert!(without.contains(MESSAGE), "the message did not reach the model, so nothing can be told: {without}");
     assert!(!without.contains(RULE), "the model is told the rule though none was handed over");
-    let with = told(&["--append-system-prompt", RULE]);
-    assert!(with.contains(RULE), "a rule handed over at start does not reach the model: {with}");
+    let with = told(Some(RULE));
+    assert!(with.contains(RULE), "rules handed over in a file at start do not reach the model: {with}");
+    assert!(!with.contains("rules.md"), "the harness passed the file's name, not its words: {with}");
 }
 
 /// Null makes its own copy of the browser link's extension from the engine it

@@ -41,7 +41,7 @@ use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::history;
-use crate::{access, attach, backups, computer, panel, providers, routing, settings, verify};
+use crate::{access, attach, backups, computer, panel, providers, routing, rules, settings, verify};
 
 /// What the box says when the harness has to be started again while conversations are working.
 const RESTART_WAITS: &str = "that takes effect once nothing is working: the harness starts again then";
@@ -839,7 +839,9 @@ async fn serve(
     let mut argv = vec![binary.display().to_string()];
     argv.extend(extra_args());
     argv.extend(launch_args(&binary));
-    argv.extend(settings_args(app, &binary));
+    let computer = (settings::get(app).computer, computer::own(&binary));
+    argv.extend(settings_args(app, &binary, computer));
+    argv.extend(rules::args(app, computer::on(computer.0, computer.1)));
     argv.push("acp".into());
     let whose = if origin == Origin::BuiltIn { "the built-in harness" } else { "the user's own harness" };
     log!("starting {whose}: {}", argv.join(" "));
@@ -903,14 +905,15 @@ pub fn together(parts: impl IntoIterator<Item = Option<Value>>) -> Option<Value>
 /// What to add when starting the harness so that it reads those settings. They
 /// go in a file of Null's own beside Null's settings, written afresh each time;
 /// the user's own Oh-my-pi settings are not touched. The text is JSON, which the
-/// harness's settings format accepts.
-fn settings_args(app: &AppHandle, binary: &Path) -> Vec<String> {
+/// harness's settings format accepts. `computer` is the person's choice of
+/// computer use and what the harness's own settings say of it.
+fn settings_args(app: &AppHandle, binary: &Path, computer: (Option<bool>, Option<bool>)) -> Vec<String> {
     let Some(dir) = settings::dir(app) else { return Vec::new() };
     let path = dir.join(settings::file_name("harness", "yml"));
     let _ = std::fs::create_dir_all(&dir);
     // The file had another name while the backup order was all it held.
     let _ = std::fs::remove_file(dir.join(settings::file_name("backups", "yml")));
-    let more = together([backups::harness_settings(app, binary), computer::harness_settings(app, binary)]);
+    let more = together([backups::harness_settings(app, binary), computer::harness_settings(computer.0, computer.1)]);
     match std::fs::write(&path, own_settings(more).to_string()) {
         Ok(()) => vec!["--config".into(), path.display().to_string()],
         Err(e) => {
