@@ -71,8 +71,6 @@ jobs:
             rm ~/ChromeForTesting/chrome.zip
           fi
           echo "NULL_MINI_CHROME=$HOME/ChromeForTesting/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" >> "$GITHUB_ENV"
-          # The runner has a screen of its own, so Chrome gets a window: only then has it tab groups.
-          echo "NULL_MINI_CHROME_SHOWN=1" >> "$GITHUB_ENV"
 
       # The live checks start the real Oh-my-pi against a stand-in provider. A hosted
       # runner has few cores, so they take turns four at a time.
