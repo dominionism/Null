@@ -12,6 +12,7 @@
   .layout .doc { flex: 1; min-width: 0; }
   .layout aside { width: 280px; }
   canvas { display: block; }
+  .sheet hr { border: 0; border-top: 2px dashed #c9d0db; margin: 28px -60px; }
 </style>
 </head>
 <body>
@@ -95,6 +96,25 @@
     }
     const format = (command, value) => el('button', { on: { mousedown: (e) => e.preventDefault(), click: () => { document.execCommand(command, false, value); sheet.dispatchEvent(new Event('input')); } } });
     const tool = (command, words, value) => { const b = format(command, value); b.textContent = words; return b; };
+    // The paragraphs the selection touches, or the one the cursor is in, for the tools that
+    // set how a paragraph stands: its first-line indent and its line spacing.
+    const blocks = () => {
+      const picked = getSelection();
+      if (!picked.rangeCount) return [];
+      const range = picked.getRangeAt(0);
+      const all = [...sheet.querySelectorAll('p, h1, h2, h3, li, div')].filter((node) => range.intersectsNode(node));
+      return all.filter((node) => !all.some((other) => other !== node && node.contains(other) && other.tagName !== 'LI'));
+    };
+    const paragraphs = (words, apply) => el('button', { on: { mousedown: (e) => e.preventDefault(), click: () => { blocks().forEach(apply); sheet.dispatchEvent(new Event('input')); } } }, words);
+    const spacing = el('select', { 'aria-label': 'Line spacing', on: { mousedown: () => {}, change: (e) => {
+      const value = e.target.value;
+      e.target.value = '';
+      if (!value) return;
+      (window.lastBlocks || []).forEach((node) => (node.style.lineHeight = value));
+      sheet.dispatchEvent(new Event('input'));
+    } } }, el('option', { value: '' }, 'Line spacing'), ['1', '1.15', '1.5', '2'].map((v) => el('option', { value: v }, v === '1' ? 'Single' : v === '2' ? 'Double' : v)));
+    spacing.addEventListener('focus', () => (window.lastBlocks = blocks()));
+    spacing.addEventListener('mousedown', () => (window.lastBlocks = blocks()));
     const share = () => {
       const email = el('input', { id: 'share-email', type: 'email', placeholder: 'name@example', style: 'width:100%' });
       const role = el('select', { id: 'share-role' }, ['viewer', 'commenter', 'editor'].map((r) => el('option', { value: r }, r[0].toUpperCase() + r.slice(1))));
@@ -128,7 +148,8 @@
       el('div', { class: 'layout' }, el('div', { class: 'doc' },
         doc.drawn ? el('div', { class: 'toolbar muted' }, 'Viewing') : el('div', { class: 'toolbar', role: 'toolbar', 'aria-label': 'Formatting' },
           tool('bold', 'Bold'), tool('italic', 'Italic'), tool('formatBlock', 'Heading 1', 'h1'), tool('formatBlock', 'Heading 2', 'h2'), tool('formatBlock', 'Normal text', 'p'),
-          tool('insertUnorderedList', 'Bulleted list'), tool('insertOrderedList', 'Numbered list'), tool('justifyLeft', 'Align left'), tool('justifyCenter', 'Center')),
+          tool('formatBlock', 'Heading 3', 'h3'), tool('insertUnorderedList', 'Bulleted list'), tool('insertOrderedList', 'Numbered list'), tool('justifyLeft', 'Align left'), tool('justifyCenter', 'Center'),
+          paragraphs('Indent first line', (node) => (node.style.textIndent = node.style.textIndent ? '' : '2em')), spacing, tool('insertHTML', 'Page break', '<hr>')),
         sheet), comments));
   }
 

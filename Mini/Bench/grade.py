@@ -214,6 +214,9 @@ def doc_has(end, reply, spec):
     for pattern in spec.get("html", []):
         if not re.search(pattern, doc["html"], re.I | re.S):
             return False, f"the document's formatting lacks {pattern}"
+    for pattern in spec.get("html_lacks", []):
+        if re.search(pattern, doc["html"], re.I | re.S):
+            return False, f"the document's formatting still has {pattern}"
     return True, ""
 
 
@@ -227,6 +230,24 @@ def doc_new(end, reply, spec):
         if all(re.search(p, doc["html"], re.I | re.S) for p in spec.get("html", [])):
             return True, ""
     return False, f"no new document titled {spec.get('title')} with {spec.get('has')} {spec.get('html', '')}"
+
+
+def words_in(html_text):
+    """The words of a document, as a word count counts them: what has a letter or a digit in it."""
+    return [w for w in re.sub(r"<[^>]+>", " ", html_text).split() if re.search(r"[0-9A-Za-z]", w)]
+
+
+@check
+def doc_words(end, reply, spec):
+    """A document of a set length: an existing one by its id, or a new one by its title."""
+    if "doc" in spec:
+        doc = _doc(end, spec["doc"])
+    else:
+        doc = next((d for d in new_items(end, "docs", "docs") if has_all(d["title"], spec.get("title", []))[0]), None)
+    if doc is None:
+        return False, "no such document"
+    count = len(words_in(doc["html"]))
+    return spec["min"] <= count <= spec["max"], f"the document has {count} words, wanted {spec['min']} to {spec['max']}"
 
 
 @check
