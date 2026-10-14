@@ -1151,7 +1151,10 @@ fn setting_chrome_up_waits_for_the_extension_and_stops_the_relay_it_started() {
 /// question is passed over, saying so. It runs headless, with a profile of its
 /// own, and nothing is shown. Null's copy is pointed at the check's own relay
 /// on a free port, the one word changed from what `/browser` makes, so that it
-/// never reaches a relay a person's own Chrome may be linked to.
+/// never reaches a relay a person's own Chrome may be linked to. Named but not
+/// there, the Chrome fails the question: it is passed over only when unnamed.
+/// Once it has held, it says so in the file `NULL_MINI_CHROME_RAN` names, which
+/// CI shows, so that a run where it was passed over is told from one where it held.
 #[test]
 #[ignore]
 fn chrome_loads_null_s_copy_and_the_agent_works_a_tab_through_it_under_null_s_name() {
@@ -1159,6 +1162,7 @@ fn chrome_loads_null_s_copy_and_the_agent_works_a_tab_through_it_under_null_s_na
         eprintln!("passed over: NULL_MINI_CHROME names no Chrome for Testing to load Null's copy in");
         return;
     };
+    assert!(translate::runnable(&chrome), "NULL_MINI_CHROME names {}, and no Chrome for Testing can be run from there", chrome.display());
     let standin = StandIn::start();
     let folder = Folder::new(&standin).with_own_services();
     let binary = engine::under_test();
@@ -1200,6 +1204,15 @@ fn chrome_loads_null_s_copy_and_the_agent_works_a_tab_through_it_under_null_s_na
     let worker = workers.into_iter().find(|address| devtools_evaluate(address, "chrome.runtime.getManifest().name")["result"]["value"] == "Null").expect("Null's copy has a worker running");
     let answer = devtools_evaluate(worker, "chrome.tabGroups.query({}).then((groups) => groups.map((group) => group.title).join(','))");
     assert_eq!(answer["result"]["value"], json!("Null"), "the agent's tab is not gathered under Null's name: {answer}");
+    if let Some(said) = std::env::var_os("NULL_MINI_CHROME_RAN") {
+        let version = Command::new(&chrome).arg("--version").output().map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string()).unwrap_or_default();
+        std::fs::write(said, format!("Null's copy of the browser link's extension loaded in {version}, reached the relay of {HARNESS_VERSION}, and the agent read a tab through it, gathered in a group titled Null.\n", HARNESS_VERSION = engine_version(&binary))).expect("the note is written");
+    }
+}
+
+/// The version an Oh-my-pi says it is.
+fn engine_version(binary: &Path) -> String {
+    Command::new(binary).arg("--version").output().map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string()).unwrap_or_default()
 }
 
 /// One plain request to a server on this Mac, and the body of its answer.
