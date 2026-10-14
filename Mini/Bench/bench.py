@@ -281,11 +281,15 @@ class Stage:
 
 
 def usage(omp, provider):
-    """The highest share used of any window of the provider's limits, by the harness's own report."""
+    """The highest share used of any window of the provider's limits, by the harness's own
+    report; how each window stands; and when the last of those past the bench's limit resets,
+    in seconds since 1970."""
     done = subprocess.run([omp, "usage", "--json", "--redact"], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
     report = json.loads(done.stdout)
-    shares = [l["amount"]["usedFraction"] for r in report.get("reports", []) if r.get("provider") == provider for l in r.get("limits", []) if l.get("amount", {}).get("usedFraction") is not None]
-    return max(shares) if shares else None, {l["label"]: l["amount"]["usedFraction"] for r in report.get("reports", []) if r.get("provider") == provider for l in r.get("limits", [])}
+    limits = [l for r in report.get("reports", []) if r.get("provider") == provider for l in r.get("limits", []) if l.get("amount", {}).get("usedFraction") is not None]
+    shares = [l["amount"]["usedFraction"] for l in limits]
+    resets = [l.get("window", {}).get("resetsAt", 0) / 1000 for l in limits if l["amount"]["usedFraction"] > LIMIT]
+    return max(shares) if shares else None, {l["label"]: l["amount"]["usedFraction"] for l in limits}, max(resets) if resets else None
 
 
 def tmp_names():
@@ -397,17 +401,41 @@ def cmd_run(args):
     picked = [found[i] for i in args.task]
     check_or_stop()
     provider = args.model.split("/")[0]
+    if args.skip_done and os.path.exists(args.out):
+        done = {(l["task"], l["arm"], l["model"], l["thinking"]) for l in map(json.loads, open(args.out, encoding="utf-8")) if l.get("exit") != "error"}
+        picked = [t for t in picked if (t["id"], args.arm, args.model, args.thinking) not in done]
+        say(f"{len(picked)} tasks still to run")
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    failures = 0
     with Stage(args, args.arm) as stage:
         for i, task in enumerate(picked * args.times):
-            share, windows = usage(args.omp, provider)
-            if share is not None and share > LIMIT:
-                say(f"stopped: a usage window of {provider} is past {LIMIT:.0%}: {windows}")
-                break
-            run_one(stage, task, args, i)
+            while True:
+                share, windows, resets = usage(args.omp, provider)
+                if share is None or share <= LIMIT:
+                    break
+                if not args.wait:
+                    say(f"stopped: a usage window of {provider} is past {LIMIT:.0%}: {windows}")
+                    return
+                # The person's own use is never left short: the batch waits for the window to reset.
+                pause = max(60, (resets or time.time() + 600) - time.time() + 120)
+                say(f"waiting {pause / 60:.0f} min: a usage window of {provider} is past {LIMIT:.0%}: {windows}")
+                time.sleep(pause)
+            with open(os.path.join(os.path.dirname(args.out), "usage.jsonl"), "a") as f:
+                f.write(json.dumps({"at": datetime.datetime.now().isoformat(timespec="seconds"), "before": task["id"], "provider": provider, "windows": windows}) + "\n")
+            try:
+                run_one(stage, task, args, i)
+                failures = 0
+            except Exception as e:  # one run that breaks is written down, and the batch goes on
+                failures += 1
+                say(f"ERROR  {task['id']}: {type(e).__name__}: {e}")
+                with open(args.out, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"task": task["id"], "arm": args.arm, "model": args.model, "thinking": args.thinking, "exit": "error", "error": f"{type(e).__name__}: {e}"}) + "\n")
+                if failures >= 3:
+                    raise SystemExit("three runs in a row broke; the batch stops")
 
 
 def cmd_runs(args):
-    args.task = [t["id"] for t in tasks(args.half) if not args.tier or t["tier"] == args.tier]
+    args.task = [t["id"] for t in tasks(None if args.half == "both" else args.half) if not args.tier or t["tier"] == args.tier]
     cmd_run(args)
 
 
@@ -433,7 +461,7 @@ def main():
         if name == "run":
             p.add_argument("task", nargs="+")
         else:
-            p.add_argument("--half", choices=["visible", "hidden"], required=True)
+            p.add_argument("--half", choices=["visible", "hidden", "both"], required=True)
             p.add_argument("--tier", choices=["everyday", "long"])
         p.add_argument("--model", required=True, help="a model the harness offers, as it names it")
         p.add_argument("--thinking", default="low")
@@ -444,6 +472,8 @@ def main():
         p.add_argument("--omp", default=os.path.expanduser("~/.omp/bin/omp"))
         p.add_argument("--null", default=os.path.join(MINI, "target", "debug", "null-mini"), help="Null, built, to make the link's copy with")
         p.add_argument("--out", default=os.path.join(RESULTS, "results.jsonl"))
+        p.add_argument("--skip-done", action="store_true", help="leave out the tasks this file already holds a run of, for this arm, model and level")
+        p.add_argument("--wait", action="store_true", help="when a usage window passes the limit, wait for it to reset instead of stopping")
     p = sub.add_parser("report")
     p.add_argument("results", nargs="?", default=os.path.join(RESULTS, "results.jsonl"))
     args = parser.parse_args()
