@@ -2170,6 +2170,8 @@
           line('error', `could not ask about the browser link: ${error}`);
           return;
         }
+        // Null's copy follows the harness in use: said once, when it was made again.
+        if (standing.said) line('note', standing.said);
         picker = { browser: true, standing, models: [], current: null, shown: [{ on: false }, { on: true }, { setUp: true }], index: standing.on ? 1 : 0, backups: null, saved: [], spent: new Set(), left: new Map() };
         out.style.display = 'none';
         pick.style.display = 'block';

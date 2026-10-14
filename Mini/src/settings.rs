@@ -54,6 +54,9 @@ pub struct Settings {
     /// Whether Chrome was seen to load the link's extension Null set up, the last
     /// time it was set up. Only the extension reaching the link can say so.
     pub browser_linked: bool,
+    /// The version of Oh-my-pi Null's copy of the link's extension was made from,
+    /// so that it is made again when the one in use is another.
+    pub browser_engine: Option<String>,
 }
 
 pub struct Store(Mutex<Settings>);
@@ -183,6 +186,7 @@ mod tests {
             verifier: Some("e/f".into()),
             browser: Some(true),
             browser_linked: true,
+            browser_engine: Some("18.8.7".into()),
         };
         let text = serde_json::to_string(&settings).unwrap();
         assert_eq!(serde_json::from_str::<Settings>(&text).unwrap(), settings);

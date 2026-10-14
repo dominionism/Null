@@ -94,7 +94,8 @@ fn version_from(printed: &str) -> Option<String> {
     version.starts_with(|c: char| c.is_ascii_digit()).then(|| version.to_string())
 }
 
-fn version_of(binary: &Path) -> Option<String> {
+/// What a program says its version is, when it says.
+pub fn version_of(binary: &Path) -> Option<String> {
     let output = Command::new(binary).arg("--version").output().ok()?;
     version_from(&String::from_utf8_lossy(&output.stdout))
 }

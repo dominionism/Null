@@ -839,6 +839,8 @@ async fn serve(
     let mut argv = vec![binary.display().to_string()];
     argv.extend(extra_args());
     argv.extend(launch_args(&binary));
+    // Null's copy of the link's extension follows the engine, whichever way it changed.
+    browser::follow_engine_aside(app);
     let kept = settings::get(app);
     let computer = (kept.computer, computer::own(&binary));
     argv.extend(settings_args(app, &binary, computer));

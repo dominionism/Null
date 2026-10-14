@@ -17,10 +17,10 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde_json::{json, Value};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 use crate::log::log;
-use crate::{engine, harness, settings};
+use crate::{engine, harness, panel, settings};
 
 /// The port the harness's relay listens on, and where the extension looks for it.
 const PORT: u16 = 9224;
@@ -74,6 +74,11 @@ pub fn make(binary: &Path, folder: &Path) -> Result<(), String> {
     std::fs::rename(&fresh, folder).map_err(|e| format!("could not put Null's copy of the extension in place: {e}"))
 }
 
+/// Null's copy is made one at a time: the harness's start, `/browser` and setting
+/// Chrome up can each ask at the same moment, and two makings at once would spoil
+/// each other's. The second finds the copy done.
+static MAKING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// What the box says, once, when Null's copy was made again for another engine.
 /// Chrome goes on running the copy it loaded until it is told to read it again.
 pub const MADE_AGAIN: &str = "Chrome's copy of Null was updated: press reload on Null in Chrome's extensions page";
@@ -95,17 +100,33 @@ fn held(folder: &Path) -> Vec<(std::ffi::OsString, Vec<u8>)> {
     files
 }
 
-/// The engine in use has changed (`/update`, `/harness`). When the link is set
-/// up, Null's copy is made again in the folder Chrome loads, so that it speaks
-/// the protocol of the relay this engine starts: the relay refuses an
+/// Whether Null's copy has to be made again: it is there, and the engine in
+/// use is not the version it was made from. A copy made before Null noted the
+/// version is made again once.
+fn behind(made: bool, made_from: Option<&str>, in_use: Option<&str>) -> bool {
+    made && in_use.is_some() && made_from != in_use
+}
+
+/// The engine in use may not be the one Null's copy was made from: `/update`
+/// or `/harness` changed it, a newer Null came with a newer one, or the
+/// person updated their own Oh-my-pi. So whenever the harness starts or
+/// `/browser` is asked, the versions are compared, and when the link is set up
+/// and they differ, the copy is made again in the folder Chrome loads, to
+/// speak the protocol of the relay this engine starts: the relay refuses an
 /// extension of another ("out of date"). What the box is to say of it, when
 /// there is anything to say: that Chrome has to reload the copy, or that this
 /// engine's extension is not one Null can name, and then the agent is no
 /// longer told to use the link until Chrome is set up again.
 pub fn follow_engine(app: &AppHandle) -> Option<String> {
-    let folder = folder_of(app).ok().filter(|folder| folder.join("manifest.json").is_file())?;
+    let _turn = MAKING.lock().unwrap_or_else(|held| held.into_inner());
+    let folder = folder_of(app).ok()?;
+    let made = folder.join("manifest.json").is_file();
     let (binary, _) = engine::in_use(app)?;
-    match make_again(&binary, &folder) {
+    let version = made.then(|| engine::version_of(&binary)).flatten();
+    if !behind(made, settings::get(app).browser_engine.as_deref(), version.as_deref()) {
+        return None;
+    }
+    let said = match make_again(&binary, &folder) {
         Ok(false) => None,
         Ok(true) => {
             log!("Null's copy of the browser link's extension is made again for the harness now in use");
@@ -114,9 +135,21 @@ pub fn follow_engine(app: &AppHandle) -> Option<String> {
         Err(why) => {
             log!("Null's copy of the browser link's extension could not be made again: {why}");
             settings::update(app, |settings| settings.browser_linked = false);
-            Some(format!("Chrome's copy of Null could not be made from this Oh-my-pi, so the agent no longer uses your Chrome: {why}"))
+            return Some(format!("Chrome's copy of Null could not be made from this Oh-my-pi, so the agent no longer uses your Chrome: {why}"));
         }
-    }
+    };
+    settings::update(app, |settings| settings.browser_engine = version.clone());
+    said
+}
+
+/// The same when the harness starts, out of its way: the box says it on its notice line.
+pub fn follow_engine_aside(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Some(said) = follow_engine(&app) {
+            let _ = app.emit_to(panel::LABEL, "mini:notice", json!({ "text": said, "stay": true }));
+        }
+    });
 }
 
 /// Whether the agent is told the link's rules when the harness starts: while
@@ -217,6 +250,9 @@ pub struct Standing {
     pub freely: bool,
     /// The folder Chrome is to load, for the steps the box shows.
     pub folder: String,
+    /// What the box is to say once of Null's copy, made again for another harness.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub said: Option<String>,
 }
 
 /// Whether Google Chrome is on this Mac, in the system's Applications or the person's own.
@@ -230,9 +266,16 @@ fn folder_of(app: &AppHandle) -> Result<PathBuf, String> {
     settings::dir(app).map(|dir| folder(&dir)).ok_or_else(|| "Null has no folder of its own to keep the extension in".to_string())
 }
 
-/// How the link stands with the harness in use.
+/// How the link stands with the harness in use, and, once, what came of
+/// making Null's copy again when that harness is not the one it was made from.
 #[tauri::command(async)]
 pub fn browser(app: AppHandle) -> Result<Standing, String> {
+    let said = follow_engine(&app);
+    standing(app).map(|standing| Standing { said, ..standing })
+}
+
+/// How the link stands with the harness in use.
+fn standing(app: AppHandle) -> Result<Standing, String> {
     let (binary, _) = engine::in_use(&app).ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
     let folder = folder_of(&app)?;
     let kept = settings::get(&app);
@@ -244,6 +287,7 @@ pub fn browser(app: AppHandle) -> Result<Standing, String> {
         on: kept.browser == Some(true),
         freely: !matches!(harness::approval_mode(&binary).as_deref(), Some("always-ask" | "write")),
         folder: folder.display().to_string(),
+        said: None,
     })
 }
 
@@ -252,14 +296,14 @@ pub fn browser(app: AppHandle) -> Result<Standing, String> {
 /// set up first: the box sets it up when it is not.
 #[tauri::command(async)]
 pub fn set_browser(app: AppHandle, on: bool) -> Result<Standing, String> {
-    let now = browser(app.clone())?;
+    let now = standing(app.clone())?;
     if on && !now.linked {
         return Err("Chrome is not linked yet: choose set up Chrome first".into());
     }
     settings::update(&app, |settings| settings.browser = Some(on));
     log!("browser link: {}", if on { "on" } else { "off" });
     harness::restart(&app);
-    browser(app)
+    standing(app)
 }
 
 /// Set Chrome up: make Null's copy of the extension from the harness in use,
@@ -273,8 +317,14 @@ pub fn link_browser(app: AppHandle) -> Result<Standing, String> {
     }
     let (binary, _) = engine::in_use(&app).ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
     let folder = folder_of(&app)?;
+    let turn = MAKING.lock().unwrap_or_else(|held| held.into_inner());
     make(&binary, &folder)?;
-    settings::update(&app, |settings| settings.browser_linked = false);
+    let version = engine::version_of(&binary);
+    settings::update(&app, |settings| {
+        settings.browser_linked = false;
+        settings.browser_engine = version;
+    });
+    drop(turn);
     log!("Null's copy of the browser link's extension is made");
     if settings::own_folder().is_some() {
         // A scripted run on a folder of its own sends nobody anywhere.
@@ -290,7 +340,7 @@ pub fn link_browser(app: AppHandle) -> Result<Standing, String> {
         let _ = Command::new("open").arg("-R").arg(&folder).status();
         let _ = Command::new("open").args(["-a", "Google Chrome", "chrome://extensions"]).status();
     }
-    browser(app)
+    standing(app)
 }
 
 /// Wait for Chrome to load the extension: true once it reaches the link,
@@ -309,7 +359,7 @@ pub fn browser_linked(app: AppHandle) -> Result<Standing, String> {
     };
     log!("{}", if seen { "Chrome loaded the browser link" } else { "Chrome was not seen to load the browser link" });
     settings::update(&app, |settings| settings.browser_linked = seen);
-    browser(app)
+    standing(app)
 }
 
 /// A relay of Null's own, stopped however the wait ends.
@@ -484,6 +534,15 @@ mod tests {
         assert!(std::fs::read_to_string(link.join("background.js")).unwrap().contains("discardedTabsProtocol: 2"), "the copy in the folder Chrome loads is the newer one");
         let manifest: Value = serde_json::from_str(&std::fs::read_to_string(link.join("manifest.json")).unwrap()).unwrap();
         assert_eq!(manifest["name"], "Null", "and still under Null's name");
+    }
+
+    #[test]
+    fn the_copy_is_made_again_only_when_the_engine_in_use_is_not_the_one_it_was_made_from() {
+        assert!(!behind(true, Some("18.8.7"), Some("18.8.7")), "the same version");
+        assert!(behind(true, Some("18.8.7"), Some("18.10.2")), "a newer Null, /update or the person's own omp update");
+        assert!(behind(true, None, Some("18.8.7")), "a copy made before Null noted the version, made again once");
+        assert!(!behind(false, Some("18.8.7"), Some("18.10.2")), "never set up: nothing to make");
+        assert!(!behind(true, Some("18.8.7"), None), "an engine that does not say its version is left alone");
     }
 
     #[test]
