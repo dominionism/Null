@@ -41,7 +41,7 @@ use crate::engine::{self, Origin};
 use crate::log::log;
 use crate::translate::{self, ModelChoice};
 use crate::history;
-use crate::{access, attach, backups, computer, panel, providers, routing, rules, settings, verify};
+use crate::{access, attach, backups, browser, computer, panel, providers, routing, rules, settings, verify};
 
 /// What the box says when the harness has to be started again while conversations are working.
 const RESTART_WAITS: &str = "that takes effect once nothing is working: the harness starts again then";
@@ -842,7 +842,7 @@ async fn serve(
     let kept = settings::get(app);
     let computer = (kept.computer, computer::own(&binary));
     argv.extend(settings_args(app, &binary, computer));
-    argv.extend(rules::args(app, computer::on(computer.0, computer.1), kept.browser == Some(true) && kept.browser_linked));
+    argv.extend(rules::args(app, computer::on(computer.0, computer.1), browser::told(&kept)));
     argv.push("acp".into());
     let whose = if origin == Origin::BuiltIn { "the built-in harness" } else { "the user's own harness" };
     log!("starting {whose}: {}", argv.join(" "));

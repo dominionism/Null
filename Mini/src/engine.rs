@@ -25,7 +25,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::harness::{self, HARNESS, HARNESS_NAME};
 use crate::log::log;
-use crate::{panel, providers, settings, translate};
+use crate::{browser, panel, providers, settings, translate};
 
 /// Where a program came from.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -47,6 +47,9 @@ pub struct Choice {
     /// Whether that is the version Null carries and was checked with.
     pub checked: bool,
     pub current: bool,
+    /// What the box is to say of the browser link, once, when choosing this one changed it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser: Option<String>,
 }
 
 /// Where `/update` reads which version the repository has checked.
@@ -189,7 +192,7 @@ fn same_file(one: &Path, other: &Path) -> bool {
 
 fn choice(app: &AppHandle, path: &Path, origin: Origin, current: bool) -> Choice {
     let version = version_of(path);
-    Choice { origin, path: path.display().to_string(), checked: version.as_deref().is_some_and(|version| checked(app, version)), version, current }
+    Choice { origin, path: path.display().to_string(), checked: version.as_deref().is_some_and(|version| checked(app, version)), version, current, browser: None }
 }
 
 /// The programs the box can run: the one that came with Null, then the user's own.
@@ -221,7 +224,7 @@ pub fn set_harness(app: AppHandle, path: Option<String>) -> Result<Choice, Strin
     let (binary, origin) = in_use(&app).ok_or(format!("{HARNESS_NAME} is not installed"))?;
     let chosen = choice(&app, &binary, origin, true);
     log!("the harness is now {}, version {}", binary.display(), chosen.version.as_deref().unwrap_or("unknown"));
-    Ok(chosen)
+    Ok(Choice { browser: browser::follow_engine(&app), ..chosen })
 }
 
 // ── /update ───────────────────────────────────────────────────────────────
@@ -340,6 +343,8 @@ pub struct Update {
     /// A released Null newer than this one, when there is one, and what gets it.
     pub newer_null: Option<String>,
     pub install: &'static str,
+    /// What the box is to say of the browser link, once, when the newer harness changed it.
+    pub browser: Option<String>,
 }
 
 /// Move the built-in harness to the newest version the repository has checked,
@@ -364,7 +369,7 @@ fn update(app: &AppHandle) -> Result<Update, String> {
         if let Some(newer) = &newer_null {
             log!("/update: Null {newer} is out; this is Null {this_null}");
         }
-        Update { outcome, version, null, this_null, on_own, newer_null, install: INSTALL }
+        Update { outcome, version, null, this_null, on_own, newer_null, install: INSTALL, browser: None }
     };
     match step(&toml, &built_in, this_null)? {
         Step::Stay => {
@@ -385,7 +390,9 @@ fn update(app: &AppHandle) -> Result<Update, String> {
             harness::restart(&app);
             providers::forget(&app);
             log!("/update: the built-in harness is now {}, version {version}", program.display());
-            Ok(did("updated", version, None))
+            // Null's copy of the link's extension follows the harness that is in use now.
+            let browser = if on_own { None } else { browser::follow_engine(&app) };
+            Ok(Update { browser, ..did("updated", version, None) })
         }
     }
 }

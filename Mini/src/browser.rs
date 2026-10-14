@@ -74,6 +74,57 @@ pub fn make(binary: &Path, folder: &Path) -> Result<(), String> {
     std::fs::rename(&fresh, folder).map_err(|e| format!("could not put Null's copy of the extension in place: {e}"))
 }
 
+/// What the box says, once, when Null's copy was made again for another engine.
+/// Chrome goes on running the copy it loaded until it is told to read it again.
+pub const MADE_AGAIN: &str = "Chrome's copy of Null was updated: press reload on Null in Chrome's extensions page";
+
+/// Make Null's copy in `folder` again, in place, from the one `binary` writes.
+/// True when it came out different from the copy that was there, which is
+/// when Chrome has to reload it. One that cannot be made leaves that copy as
+/// it was.
+pub fn make_again(binary: &Path, folder: &Path) -> Result<bool, String> {
+    let before = held(folder);
+    make(binary, folder)?;
+    Ok(held(folder) != before)
+}
+
+/// Every file a copy holds, by name, with what it holds.
+fn held(folder: &Path) -> Vec<(std::ffi::OsString, Vec<u8>)> {
+    let mut files: Vec<_> = std::fs::read_dir(folder).into_iter().flatten().flatten().map(|file| (file.file_name(), std::fs::read(file.path()).unwrap_or_default())).collect();
+    files.sort();
+    files
+}
+
+/// The engine in use has changed (`/update`, `/harness`). When the link is set
+/// up, Null's copy is made again in the folder Chrome loads, so that it speaks
+/// the protocol of the relay this engine starts: the relay refuses an
+/// extension of another ("out of date"). What the box is to say of it, when
+/// there is anything to say: that Chrome has to reload the copy, or that this
+/// engine's extension is not one Null can name, and then the agent is no
+/// longer told to use the link until Chrome is set up again.
+pub fn follow_engine(app: &AppHandle) -> Option<String> {
+    let folder = folder_of(app).ok().filter(|folder| folder.join("manifest.json").is_file())?;
+    let (binary, _) = engine::in_use(app)?;
+    match make_again(&binary, &folder) {
+        Ok(false) => None,
+        Ok(true) => {
+            log!("Null's copy of the browser link's extension is made again for the harness now in use");
+            Some(MADE_AGAIN.to_string())
+        }
+        Err(why) => {
+            log!("Null's copy of the browser link's extension could not be made again: {why}");
+            settings::update(app, |settings| settings.browser_linked = false);
+            Some(format!("Chrome's copy of Null could not be made from this Oh-my-pi, so the agent no longer uses your Chrome: {why}"))
+        }
+    }
+}
+
+/// Whether the agent is told the link's rules when the harness starts: while
+/// the person has it on and Chrome was seen to load the copy.
+pub fn told(kept: &settings::Settings) -> bool {
+    kept.browser == Some(true) && kept.browser_linked
+}
+
 /// Make a copy for a Chrome of its own, such as the bench's, from `engine`, and
 /// say how it went (`NULL_MINI_LINK_COPY`). The exit status for the process: 0
 /// when the copy is there, 2 when it is not.
@@ -333,17 +384,117 @@ mod tests {
         assert!(!reached(&Value::Null), "no relay answered");
     }
 
-    /// As Oh-my-pi 18.8.7 writes it.
-    const MANIFEST: &str = r#"{
-	"manifest_version": 3,
-	"name": "OMP Browser Relay",
-	"version": "0.1.0",
-	"description": "Lets the omp coding agent drive your existing tabs through a local CDP relay.",
-	"permissions": ["debugger", "tabs", "tabGroups", "storage", "alarms"],
-	"background": { "service_worker": "background.js" },
-	"options_page": "options.html",
-	"action": { "default_title": "OMP Browser Relay (click for settings)" }
-}"#;
+    /// The extension as Oh-my-pi 18.8.7 writes it, kept whole, so that the
+    /// renaming is tried on what an engine really writes. Its licence is the
+    /// harness's own and stays with it.
+    const KEPT: [(&str, &str); 4] = [
+        ("manifest.json", include_str!("../tests/Data/BrowserLink/manifest.json")),
+        ("background.js", include_str!("../tests/Data/BrowserLink/background.js")),
+        ("options.html", include_str!("../tests/Data/BrowserLink/options.html")),
+        ("LICENSE", include_str!("../tests/Data/BrowserLink/LICENSE")),
+    ];
+    const MANIFEST: &str = KEPT[0].1;
+
+    /// A folder of the test's own, thrown away when it is over.
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Scratch {
+            let dir = std::env::temp_dir().join(format!("null-browser-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            Scratch(dir)
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// A stand-in for an engine whose extension is `files`: it writes them
+    /// into the folder named after `--dir`, as `browser-relay install` does.
+    fn engine_writing(scratch: &Scratch, name: &str, files: &[(&str, String)]) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let written = scratch.0.join(format!("{name}-writes"));
+        std::fs::create_dir_all(&written).unwrap();
+        for (file, text) in files {
+            std::fs::write(written.join(file), text).unwrap();
+        }
+        let program = scratch.0.join(name);
+        let script = format!("#!/bin/sh\nwhile [ $# -gt 0 ]; do [ \"$1\" = --dir ] && dir=\"$2\"; shift; done\nmkdir -p \"$dir\" && cp \"{}\"/* \"$dir\"/\n", written.display());
+        std::fs::write(&program, script).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        program
+    }
+
+    fn kept() -> Vec<(&'static str, String)> {
+        KEPT.iter().map(|(file, text)| (*file, text.to_string())).collect()
+    }
+
+    #[test]
+    fn the_extension_18_8_7_writes_is_put_under_null_s_name_whole() {
+        let scratch = Scratch::new("whole");
+        let link = scratch.0.join("BrowserLink");
+        make(&engine_writing(&scratch, "omp", &kept()), &link).expect("Null knows how to name the extension 18.8.7 writes");
+        let read = |file: &str| std::fs::read_to_string(link.join(file)).unwrap();
+        let manifest: Value = serde_json::from_str(&read("manifest.json")).unwrap();
+        assert_eq!((&manifest["name"], &manifest["action"]["default_title"]), (&json!("Null"), &json!("Null")));
+        for (_, icon) in manifest["icons"].as_object().unwrap() {
+            assert!(link.join(icon.as_str().unwrap()).is_file(), "the icon {icon} is in the copy");
+        }
+        let script = read("background.js");
+        assert!(script.contains("async function groupTabs(tabIds, _title, color) {\n  const title = \"Null\";"), "every group the agent's tabs are gathered in is titled Null");
+        assert!(script.contains("discardedTabsProtocol: 1"), "the protocol the relay checks is as the harness wrote it");
+        let undone = CHANGES.iter().filter(|(file, ..)| *file == "background.js").fold(script.clone(), |text, (_, from, to)| text.replacen(to, from, 1));
+        assert_eq!(undone, KEPT[1].1, "nothing of the script is changed but Null's own changes");
+        let page = read("options.html");
+        assert!(page.contains("<title>Null settings</title>") && page.contains("<h1>Null</h1>"));
+        for file in ["manifest.json", "options.html"] {
+            assert!(!read(file).contains("OMP Browser Relay"), "{file} still shows the harness's name");
+        }
+        assert_eq!(read("LICENSE"), KEPT[3].1, "the harness's licence stays with it");
+    }
+
+    #[test]
+    fn an_extension_null_does_not_know_leaves_the_copy_chrome_loads_as_it_was() {
+        let scratch = Scratch::new("unknown");
+        let link = scratch.0.join("BrowserLink");
+        make(&engine_writing(&scratch, "known", &kept()), &link).unwrap();
+        let before = held(&link);
+        for (file, from) in [("background.js", "async function groupTabs(tabIds, title, color) {"), ("options.html", "<h1>OMP Browser Relay</h1>")] {
+            let moved: Vec<_> = kept().into_iter().map(|(name, text)| (name, if name == file { text.replace(from, "") } else { text })).collect();
+            let why = make_again(&engine_writing(&scratch, &format!("moved-{file}"), &moved), &link).expect_err("a change that finds nothing to change stops the copy");
+            assert!(why.contains(file), "{why}");
+            assert_eq!(held(&link), before, "the copy Chrome loads is left as it was");
+            assert!(!link.with_extension("new").exists(), "nothing is left beside it");
+        }
+    }
+
+    #[test]
+    fn the_copy_made_again_for_another_engine_is_said_only_when_it_changed() {
+        let scratch = Scratch::new("again");
+        let link = scratch.0.join("BrowserLink");
+        let same = engine_writing(&scratch, "same", &kept());
+        make(&same, &link).unwrap();
+        assert_eq!(make_again(&same, &link), Ok(false), "the same engine again: nothing for Chrome to reload");
+        let newer: Vec<_> = kept().into_iter().map(|(name, text)| (name, text.replace("discardedTabsProtocol: 1", "discardedTabsProtocol: 2"))).collect();
+        assert_eq!(make_again(&engine_writing(&scratch, "newer", &newer), &link), Ok(true), "a newer protocol: Chrome has to reload the copy");
+        assert!(std::fs::read_to_string(link.join("background.js")).unwrap().contains("discardedTabsProtocol: 2"), "the copy in the folder Chrome loads is the newer one");
+        let manifest: Value = serde_json::from_str(&std::fs::read_to_string(link.join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(manifest["name"], "Null", "and still under Null's name");
+    }
+
+    #[test]
+    fn the_agent_is_told_the_link_s_rules_only_while_it_is_on_and_chrome_loaded_it() {
+        let with = |browser, browser_linked| told(&settings::Settings { browser, browser_linked, ..Default::default() });
+        assert!(with(Some(true), true));
+        assert!(!with(Some(true), false), "on, but Chrome was not seen to load it");
+        assert!(!with(Some(false), true), "switched off");
+        assert!(!with(None, true), "never switched on");
+        assert!(!with(None, false));
+    }
 
     #[test]
     fn chrome_shows_null_s_name_words_and_icon_and_nothing_else_changes() {

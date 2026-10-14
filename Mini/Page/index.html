@@ -2008,6 +2008,8 @@
           const now = await invoke('set_harness', { path: choice.origin === 'own' ? choice.path : null });
           const whose = now.origin === 'own' ? 'your' : 'the built-in';
           line('note', `now on ${whose} ${harnessName(now)}${now.checked ? '' : '. Null was not checked with it'}`);
+          // Null's copy of the browser link follows the harness: said once, when it changed.
+          if (now.browser) line('note', now.browser);
         } catch (error) {
           line('error', `could not change the harness: ${error}`);
         }
@@ -2233,6 +2235,7 @@
         try {
           const did = await invoke('update_harness');
           if (did.outcome === 'updated') line('note', `the built-in Oh-my-pi is now ${did.version}${did.on_own ? '. you are on yours: /harness switches' : ''}`);
+          if (did.browser) line('note', did.browser);
           else if (did.outcome === 'needs_null') line('note', `Oh-my-pi ${did.version} needs Null ${did.null} or newer, and this is Null ${did.this_null}. update Null, then /update again`);
           else line('note', `already on the newest checked Oh-my-pi, ${did.version}`);
           // Null does not replace itself: it says a newer one is out, and what gets it.
