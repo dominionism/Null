@@ -562,6 +562,10 @@ def grade(task, end, reply):
     results = []
     for item in task["check"]:
         (kind, spec), = item.items()
-        ok, why = CHECKS[kind](end, reply or "", spec)
+        try:
+            ok, why = CHECKS[kind](end, reply or "", spec)
+        except (TypeError, KeyError, AttributeError, StopIteration) as e:
+            # What the check looks at is gone, a document deleted, say: a wrong end state, not a broken run.
+            ok, why = False, f"what this check looks at is not there any more ({type(e).__name__}: {e})"
         results.append({"kind": kind, "ok": bool(ok), "why": "" if ok else why})
     return {"ok": all(r["ok"] for r in results), "checks": results}

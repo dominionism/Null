@@ -59,6 +59,13 @@ class EveryChecker(unittest.TestCase):
                 end, _, _ = replay.end_state({"do": [], "reply": ""})
                 self.assertFalse(grade.grade(task, end, "")["ok"], "doing nothing and saying nothing passes")
 
+    def test_judges_a_run_that_removed_what_a_check_looks_at_as_wrong_and_goes_on(self):
+        shared = next(t for t in bench.tasks() if t["id"] == "docs-share-trip")
+        end, _, _ = replay.end_state({"do": [["docs", "delete", {"id": "d08"}]], "reply": "Shared."})
+        judged = grade.grade(shared, end, "Shared.")
+        self.assertFalse(judged["ok"])
+        self.assertIn("not there any more", judged["checks"][0]["why"])
+
 
 class EveryTask(unittest.TestCase):
     def test_is_whole_and_tagged_on_every_axis(self):
