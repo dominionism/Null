@@ -71,9 +71,15 @@ jobs:
             rm ~/ChromeForTesting/chrome.zip
           fi
           echo "NULL_MINI_CHROME=$HOME/ChromeForTesting/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" >> "$GITHUB_ENV"
+          echo "NULL_MINI_CHROME_RAN=$RUNNER_TEMP/chrome-question.txt" >> "$GITHUB_ENV"
 
       # The live checks start the real Oh-my-pi against a stand-in provider. A hosted
       # runner has few cores, so they take turns four at a time.
       - name: Harness check
         working-directory: Mini
         run: cargo test -- --ignored --test-threads=4
+
+      # A question passed over passes too. The one that loads Null's copy in Chrome leaves a
+      # line when it really held, and the run fails without it.
+      - name: Say that the browser link was tried in a Chrome
+        run: cat "$NULL_MINI_CHROME_RAN" >> "$GITHUB_STEP_SUMMARY"
