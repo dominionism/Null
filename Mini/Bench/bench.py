@@ -25,6 +25,10 @@ The two arms:
   and presses in it. It takes the screen and the keyboard: run it only with
   `--screen` at a time the person has chosen, with their own Chrome quit.
 
+In both arms the harness's own browser, which holds none of the person's
+sign-ins, is a headless Chrome for Testing of the bench's own that the harness
+attaches to (`browser.cdpUrl`): asked for a window, it still shows none.
+
 Nothing names a provider or a model: `--model` is whatever the harness offers.
 Results go to /private/tmp/null-bench-results unless `NULL_BENCH_RESULTS` says
 otherwise; Chrome for Testing and the run's scratch folders go to
@@ -67,6 +71,7 @@ CACHE = os.environ.get("NULL_BENCH_CACHE", "/private/tmp/null-bench-cache")
 RESULTS = os.environ.get("NULL_BENCH_RESULTS", "/private/tmp/null-bench-results")
 PAGES_PORT = 8790
 RELAY_PORT = 9334  # never 9224, the port a person's own Chrome reaches its relay on
+OWN_BROWSER_PORT = 9335  # the harness's own browser, which holds none of the person's sign-ins
 CHROME_VERSION = "155.0.8059.79"
 CHROME_SHA256 = "e141a7cbf948780bb7d381860bd5a7944c6736f79b9918b9826fccb199d28ea4"
 CHROME_URL = f"https://storage.googleapis.com/chrome-for-testing-public/{CHROME_VERSION}/mac-arm64/chrome-mac-arm64.zip"
@@ -198,7 +203,7 @@ class Stage:
         self.processes = []
 
     def __enter__(self):
-        for port in (PAGES_PORT, RELAY_PORT):
+        for port in (PAGES_PORT, RELAY_PORT, OWN_BROWSER_PORT):
             if listening(port):
                 raise SystemExit(f"port {port} is already in use; the bench needs it")
         os.makedirs(CACHE, exist_ok=True)
@@ -218,6 +223,15 @@ class Stage:
             flags += [f"--load-extension={copy}", "--headless=new"]
         chrome = subprocess.Popen([fetch_chrome(), *flags, "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.processes.append(chrome)
+        # The harness's own browser: a Chrome with an empty profile, holding no sign-in, as the
+        # harness's is. The harness is pointed at it (`browser.cdpUrl`) instead of launching one,
+        # so it stays headless even when the agent asks for a window, and runs inside the sandbox's
+        # reach on a port of its own.
+        own = os.path.join(CACHE, "profile-own-browser")
+        shutil.rmtree(own, ignore_errors=True)
+        os.makedirs(own)
+        self.processes.append(subprocess.Popen([fetch_chrome(), f"--user-data-dir={own}", f"--remote-debugging-port={OWN_BROWSER_PORT}", "--headless=new", "--no-first-run",
+                                                "--no-default-browser-check", "--disable-sync", "--password-store=basic", "--use-mock-keychain", "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         port_file = os.path.join(profile, "DevToolsActivePort")
         for _ in range(100):
             if os.path.exists(port_file) and open(port_file).read().strip():
@@ -292,7 +306,7 @@ def run_one(stage, task, args, times_done=0):
     rules_file = os.path.join(folder, "rules.md")
     with open(rules_file, "w", encoding="utf-8") as f:
         f.write(rules(stage.arm))
-    overlay = {"startup": {"checkUpdate": False}, "browser": {"headless": True, "relay": False}, "computer": {"enabled": stage.arm == "plain"}}
+    overlay = {"startup": {"checkUpdate": False}, "browser": {"headless": True, "relay": False, "cdpUrl": f"http://127.0.0.1:{OWN_BROWSER_PORT}"}, "computer": {"enabled": stage.arm == "plain"}}
     if stage.arm == "link":
         overlay["browser"]["relayUrl"] = f"http://127.0.0.1:{RELAY_PORT}"
     overlay_file = os.path.join(folder, "harness.yml")
@@ -300,7 +314,7 @@ def run_one(stage, task, args, times_done=0):
         json.dump(overlay, f)
     profile_file = os.path.join(folder, "run.sb")
     with open(profile_file, "w") as f:
-        f.write(isolation.profile(PAGES_PORT, RELAY_PORT if stage.arm == "link" else None, hidden=[TASKS, RESULTS, os.path.join(CACHE, "runs")], readable=[folder]))
+        f.write(isolation.profile(PAGES_PORT, RELAY_PORT if stage.arm == "link" else None, hidden=[TASKS, RESULTS, os.path.join(CACHE, "runs")], readable=[folder], extra_ports=[OWN_BROWSER_PORT]))
 
     get_json(f"{stage.pages}/__bench/reset?key={stage.key}", "POST", {"task": task["id"], "trouble": task.get("trouble", {})})
     person = stage.person_tab(run_id)
@@ -368,7 +382,7 @@ def refuse_screen(args):
 
 def check_or_stop():
     say("Is a run kept away from your own Chrome? Asked of the sandbox, with no model:")
-    if not isolation.check(PAGES_PORT, RELAY_PORT, hidden=[TASKS, RESULTS, os.path.join(CACHE, "runs")], say=lambda line: say("  " + line)):
+    if not isolation.check(PAGES_PORT, RELAY_PORT, hidden=[TASKS, RESULTS, os.path.join(CACHE, "runs")], extra_ports=[OWN_BROWSER_PORT], say=lambda line: say("  " + line)):
         raise SystemExit("not every way into your own Chrome is shut; no run was started")
 
 

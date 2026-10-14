@@ -13,6 +13,9 @@ person's own Chrome that is open to a program on this Mac:
   its profile folder and its sockets;
 - the person's own harness services, which run outside any sandbox.
 
+The harness's own browser is a headless Chrome of the bench's own, on a port
+of its own that is let through, so the agent can use it as it would anywhere.
+
 It also keeps pictures of the screen from the shell, and keeps the bench's own
 answers and results out of the agent's reach. The providers are reached over
 HTTPS (port 443), as the harness needs.
@@ -128,19 +131,19 @@ def _connects_inside(profile_path, port):
     return status == 0
 
 
-def check(pages_port, relay_port, hidden=(), say=print):
+def check(pages_port, relay_port, hidden=(), extra_ports=(), say=print):
     """Ask the sandbox, from inside it, about each way to the person's Chrome. True when all of them are shut."""
     results = []
     note = lambda ok, what, how: (results.append(ok), say(f"{'held  ' if ok else 'FAILED'}  {what}: {how}"))
     work = tempfile.mkdtemp(prefix="null-bench-check-")
     path = os.path.join(work, "run.sb")
     with open(path, "w") as f:
-        f.write(profile(pages_port, relay_port, hidden))
+        f.write(profile(pages_port, relay_port, hidden, extra_ports=extra_ports))
 
     # Ports: the person's relay and any other port are shut; the bench's two are open. Listeners
     # of the check's own stand in for the bench's when they are not up, so the open ones are proven too.
     held = []
-    for port in (pages_port, relay_port):
+    for port in (pages_port, relay_port, *extra_ports):
         if not _listening(port):
             s = socket.socket()
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -154,7 +157,8 @@ def check(pages_port, relay_port, hidden=(), say=print):
         note(not _connects_inside(path, PERSONS_RELAY), f"the relay a person's Chrome links to, port {PERSONS_RELAY}",
              "no connection from inside" + (" (and a relay is listening there now)" if _listening(PERSONS_RELAY) else ""))
         note(not _connects_inside(path, other.getsockname()[1]), "any other port on this Mac", f"port {other.getsockname()[1]}, listening, refused from inside")
-        note(_connects_inside(path, pages_port) and _connects_inside(path, relay_port), "the bench's own pages and relay", f"ports {pages_port} and {relay_port} reached from inside")
+        ours = (pages_port, relay_port, *extra_ports)
+        note(all(_connects_inside(path, p) for p in ours), "the bench's own pages, relay and the harness's own browser", f"ports {', '.join(map(str, ours))} reached from inside")
     finally:
         for s in held + [other]:
             s.close()
