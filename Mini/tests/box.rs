@@ -842,6 +842,62 @@ fn the_browser_link_is_off_until_chrome_is_set_up_and_a_scripted_run_opens_nothi
 
 #[test]
 #[ignore]
+fn switched_on_the_link_s_rules_reach_the_harness_and_switched_off_they_are_taken_away() {
+    // Switching on needs Google Chrome on the Mac; a runner without it has nothing to switch.
+    if !std::path::Path::new("/Applications/Google Chrome.app").exists() {
+        eprintln!("passed over: Google Chrome is not on this Mac");
+        return;
+    }
+    let mac = Mac::on("slow");
+    // As if Chrome had been set up and seen to load Null's copy.
+    mac.keep("null/settings.json", r#"{"model":"standin-anthropic/slow","welcomed":true,"asked_full_disk":true,"browser_linked":true}"#);
+    mac.keep("null/BrowserLink/manifest.json", r#"{"name":"Null"}"#);
+    let lines = [
+        "/browser",
+        "<until list browser link>",
+        "<show before>",
+        "<key ArrowDown>",
+        "<key Enter>",
+        "<until shows the browser link is on>",
+        "<show on>",
+        "hello with the link on",
+        "<settle>",
+        "/browser",
+        "<until list browser link>",
+        "<key ArrowUp>",
+        "<key Enter>",
+        "<until shows the browser link is off>",
+        "<show off>",
+        "hello with the link off",
+        "<settle>",
+    ];
+    let seen = mac.run(&lines);
+    let page = seen.at("before");
+    assert!(page.has("list", "● off"), "off is what is in force {page}");
+    assert!(page.has("list", "linked. enter sets it up again"), "{page}");
+    assert!(seen.at("on").has("shows", "the browser link is on: the agent may work your Chrome as you"), "{}", seen.at("on"));
+    assert!(seen.logged("browser link: on") && seen.logged("browser link: off"), "{}", seen.log);
+    // The harness started with it on was told the link's rules, and the one started after it was switched off was not.
+    assert_eq!(seen.log.matches("the agent is told Null's rules for the browser link").count(), 1, "{}", seen.log);
+    assert!(seen.at("off").has("shows", "the browser link is off"), "{}", seen.at("off"));
+    assert_eq!(mac.kept("null/rules.md"), "", "with the link and computer use off, no rules are left for the harness");
+    let kept: serde_json::Value = serde_json::from_str(&mac.kept("null/settings.json")).expect("Null's settings");
+    assert_eq!((&kept["browser"], &kept["browser_linked"]), (&serde_json::json!(false), &serde_json::json!(true)), "what Null keeps: {kept}");
+}
+
+#[test]
+#[ignore]
+fn the_browser_link_is_not_changed_while_a_reply_is_under_way() {
+    let working = format!("{} &", long(2));
+    let lines = [working.as_str(), "<type /browser>", "<key Enter>", "<until notice changing the browser link>", "<show browser>", "<type >", "<key ctrl+c>", "<settle>"];
+    let seen = Mac::on("slow").run(&lines);
+    let page = seen.at("browser");
+    assert_eq!(page.text("notice"), "stop the reply with ctrl+c before changing the browser link", "{page}");
+    assert!(page.text("list").is_empty() && page.is("busy"), "no list is opened, and the reply goes on {page}");
+}
+
+#[test]
+#[ignore]
 fn update_says_when_nothing_is_newer_and_when_a_newer_null_is_out() {
     let mac = Mac::on("slow");
     mac.keep("null-v9.9.9", "");

@@ -41,13 +41,15 @@ struct Folder {
     root: PathBuf,
     /// The port everything the harness sends goes to, when it is kept behind the stand-in.
     way_out: Option<u16>,
+    /// Whether the harness keeps its services here too, and not beside the user's.
+    own_services: bool,
 }
 
 impl Folder {
     fn new(standin: &StandIn) -> Folder {
         static MADE: AtomicU32 = AtomicU32::new(0);
         let root = std::env::temp_dir().join(format!("null-harness-check-{}-{}", std::process::id(), MADE.fetch_add(1, Ordering::Relaxed)));
-        let folder = Folder { root, way_out: None };
+        let folder = Folder { root, way_out: None, own_services: false };
         std::fs::create_dir_all(folder.settings()).unwrap();
         std::fs::create_dir_all(folder.work()).unwrap();
         std::fs::write(folder.settings().join("models.yml"), standin.models_yml()).unwrap();
@@ -58,6 +60,14 @@ impl Folder {
     /// which writes the address down and lets nothing through.
     fn behind(mut self, standin: &StandIn) -> Folder {
         self.way_out = Some(standin.port);
+        self
+    }
+
+    /// Keep the harness's background services, its relay's among them, in this
+    /// folder too, and away from the ones a user's own harness runs.
+    fn with_own_services(mut self) -> Folder {
+        std::fs::create_dir_all(self.root.join("state/omp")).unwrap();
+        self.own_services = true;
         self
     }
 
@@ -82,6 +92,9 @@ impl Folder {
     fn command(&self, binary: &Path) -> Command {
         let mut command = Command::new(binary);
         command.env("PI_CODING_AGENT_DIR", self.settings());
+        if self.own_services {
+            command.env("XDG_STATE_HOME", self.root.join("state"));
+        }
         if let Some(port) = self.way_out {
             let stand_in = format!("http://127.0.0.1:{port}");
             command.envs([("HTTPS_PROXY", &stand_in), ("HTTP_PROXY", &stand_in), ("https_proxy", &stand_in), ("http_proxy", &stand_in)]);
@@ -204,6 +217,30 @@ impl Agent {
             Err(mpsc::RecvTimeoutError::Timeout) => panic!("no {awaited} in {} s", PATIENCE.as_secs()),
             Err(mpsc::RecvTimeoutError::Disconnected) => panic!("the harness went away with no {awaited}"),
         };
+        self.take(message);
+    }
+
+    /// Wait for the answer to a request sent earlier, but no later than
+    /// `deadline`, however much the harness says meanwhile. None when it did not come.
+    fn answer_by(&mut self, sent: u64, deadline: Instant) -> Option<Result<Value, Value>> {
+        loop {
+            if let Some(answer) = self.answers.remove(&sent) {
+                return Some(answer);
+            }
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return None;
+            }
+            match self.said.recv_timeout(left.min(Duration::from_secs(1))) {
+                Ok(message) => self.take(message),
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => return None,
+            }
+        }
+    }
+
+    /// Keep one thing the harness said, or answer it.
+    fn take(&mut self, message: Value) {
         match (message.get("method").and_then(Value::as_str), message.get("id")) {
             (None, Some(answered)) => {
                 let answer = match message.get("error") {
@@ -1029,7 +1066,9 @@ impl Drop for Stopped {
 /// an engine whose extension has moved them would give a link half under the
 /// harness's name; Null then makes none. The extension this engine writes has
 /// to be one Null knows how to name, and a copy made again, as for a newer
-/// engine, has to stand in the same folder Chrome loads.
+/// engine, has to stand in the same folder Chrome loads. Made again from the
+/// same engine, it has to come out the same, or the box would ask the person
+/// to reload Chrome's copy after every `/harness` and `/update`.
 #[test]
 #[ignore]
 fn the_extension_null_makes_from_the_engine_is_under_null_s_name() {
@@ -1039,7 +1078,12 @@ fn the_extension_null_makes_from_the_engine_is_under_null_s_name() {
     let link = browser::folder(&folder.root);
     let read = |file: &str| std::fs::read_to_string(link.join(file)).unwrap_or_default();
     for time in ["first", "again"] {
-        browser::make(&binary, &link).unwrap_or_else(|why| panic!("Null could not make its copy, the {time} time: {why}"));
+        if time == "first" {
+            browser::make(&binary, &link).unwrap_or_else(|why| panic!("Null could not make its copy, the first time: {why}"));
+        } else {
+            let changed = browser::make_again(&binary, &link).unwrap_or_else(|why| panic!("Null could not make its copy again: {why}"));
+            assert!(!changed, "made again from the same engine, the copy came out different, so the box would ask for a reload for nothing");
+        }
         let manifest: Value = serde_json::from_str(&read("manifest.json")).expect("the copy has a manifest");
         assert_eq!((&manifest["name"], &manifest["action"]["default_title"]), (&json!("Null"), &json!("Null")), "{manifest}");
         for (_, icon) in manifest["icons"].as_object().expect("the copy names its icons") {
@@ -1099,18 +1143,145 @@ fn setting_chrome_up_waits_for_the_extension_and_stops_the_relay_it_started() {
     assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err(), "the relay Null started went on listening once the wait was over");
 }
 
-/// Connect to a relay as its extension does, with no origin, and say one
-/// thing. The connection is given back: the relay forgets an extension that
-/// has gone.
-fn as_the_extension(port: u16, said: &Value) -> std::net::TcpStream {
+/// Null's copy of the link's extension in a Chrome that really loads it from
+/// its folder: it reaches the relay this engine starts, the agent works a tab
+/// through it, and Chrome gathers that tab in a group under Null's name. Only
+/// Chrome for Testing loads an extension from the command line, so the check
+/// needs one: `NULL_MINI_CHROME` names its program, and without it this
+/// question is passed over, saying so. It runs headless, with a profile of its
+/// own, and nothing is shown, unless `NULL_MINI_CHROME_SHOWN` asks for a window,
+/// as on GitHub's Mac: a headless Chrome has no tab groups at all, so only a
+/// Chrome with a window can show the group's title. Null's copy is pointed at
+/// the check's own relay on a free port, the one word changed from what
+/// `/browser` makes, so that it never reaches a relay a person's own Chrome
+/// may be linked to.
+#[test]
+#[ignore]
+fn chrome_loads_null_s_copy_and_the_agent_works_a_tab_through_it_under_null_s_name() {
+    let Some(chrome) = std::env::var_os("NULL_MINI_CHROME").map(PathBuf::from) else {
+        eprintln!("passed over: NULL_MINI_CHROME names no Chrome for Testing to load Null's copy in");
+        return;
+    };
+    let standin = StandIn::start();
+    let folder = Folder::new(&standin).with_own_services();
+    let binary = engine::under_test();
+    let link = browser::folder(&folder.root);
+    browser::make(&binary, &link).expect("Null makes its copy of the extension");
+    let port = std::net::TcpListener::bind("127.0.0.1:0").and_then(|free| free.local_addr()).expect("a free port").port();
+    let script = std::fs::read_to_string(link.join("background.js")).unwrap();
+    assert_eq!(script.matches("var DEFAULT_PORT = 9224;").count(), 1, "the extension no longer says which port it looks for its relay on");
+    std::fs::write(link.join("background.js"), script.replace("var DEFAULT_PORT = 9224;", &format!("var DEFAULT_PORT = {port};"))).unwrap();
+
+    let _relay = Stopped(folder.command(&binary).args(["browser-relay", "--port", &port.to_string()]).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().expect("the relay starts"));
+    let profile = folder.root.join("chrome");
+    let page = "data:text/html,<title>null-link-check</title><p>read through the link</p>";
+    let shown = std::env::var_os("NULL_MINI_CHROME_SHOWN").is_some();
+    let mut flags = vec![format!("--user-data-dir={}", profile.display()), format!("--load-extension={}", link.display()), "--no-first-run".into(), "--no-default-browser-check".into(), "--remote-debugging-port=0".into()];
+    if !shown {
+        flags.push("--headless=new".into());
+    }
+    flags.push(page.into());
+    let _chrome = Stopped(Command::new(&chrome).args(&flags).stdout(Stdio::null()).stderr(Stdio::null()).spawn().expect("Chrome for Testing starts"));
+    let until = Instant::now() + PATIENCE;
+    while browser::relay_says(port).get("ompExtensionDiscardedTabsProtocol").is_none() {
+        assert!(Instant::now() < until, "Chrome did not load Null's copy from its folder, or it never reached the relay");
+        std::thread::sleep(Duration::from_millis(250));
+    }
+
+    let mut agent = Agent::start(&binary, &folder, Some(json!({ "browser": { "relayUrl": format!("http://127.0.0.1:{port}") } })));
+    let (session, _) = agent.open(&folder);
+    agent.set(&session, "model", json!("standin-anthropic/ok"));
+    let code = "const tab = await browser.open({ name: \"check\", timeout: 20000, app: { relay: true, target: \"null-link-check\" } }); return await tab.evaluate(() => document.body.innerText)";
+    let begun = agent.begin(&session, &format!("{MESSAGE}\n{}{code}", standin::ASK_FOR_CODE));
+    if agent.answer_by(begun, Instant::now() + PATIENCE).is_none() {
+        let said: Vec<String> = agent.updates.iter().rev().take(6).map(Value::to_string).collect();
+        panic!("the harness did not finish working the tab through the link in {} s. Last said: {said:#?}", PATIENCE.as_secs());
+    }
+    let sent = last_sent(&standin);
+    assert!(sent.contains("read through the link"), "the agent did not read the tab through the link: {sent}");
+
+    if !shown {
+        eprintln!("the group's title is passed over: a headless Chrome has no tab groups; NULL_MINI_CHROME_SHOWN=1 gives it a window");
+        return;
+    }
+    let active = std::fs::read_to_string(profile.join("DevToolsActivePort")).expect("Chrome says where its DevTools are");
+    let devtools = active.lines().next().unwrap_or_default().trim().to_string();
+    let targets: Value = serde_json::from_str(&http_get(&format!("127.0.0.1:{devtools}"), "/json/list")).expect("Chrome lists what it runs");
+    let worker = targets.as_array().into_iter().flatten().find(|t| t["type"] == "service_worker" && t["url"].as_str().is_some_and(|url| url.ends_with("/background.js"))).expect("the extension's worker is running");
+    let answer = devtools_evaluate(worker["webSocketDebuggerUrl"].as_str().unwrap(), "chrome.tabGroups.query({}).then((groups) => groups.map((group) => group.title).join(','))");
+    assert_eq!(answer["result"]["value"], json!("Null"), "the agent's tab is not gathered under Null's name: {answer}");
+}
+
+/// One plain request to a server on this Mac, and the body of its answer.
+/// Chrome keeps the connection open whatever it is asked, so the body is read
+/// to the length it says, not to the end.
+fn http_get(host: &str, path: &str) -> String {
+    let mut socket = BufReader::new(std::net::TcpStream::connect(host).expect("the server takes the connection"));
+    socket.get_ref().set_read_timeout(Some(PATIENCE)).unwrap();
+    write!(socket.get_mut(), "GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n").unwrap();
+    let mut length = 0;
+    loop {
+        let mut line = String::new();
+        socket.read_line(&mut line).expect("the server answers");
+        if line.trim().is_empty() {
+            break;
+        }
+        if let Some((name, value)) = line.split_once(':') {
+            if name.eq_ignore_ascii_case("content-length") {
+                length = value.trim().parse().unwrap_or(0);
+            }
+        }
+    }
+    let mut body = vec![0u8; length];
+    std::io::Read::read_exact(&mut socket, &mut body).expect("the server sends what it said it would");
+    String::from_utf8_lossy(&body).into_owned()
+}
+
+/// Have a page or worker of a Chrome work out `expression` over its DevTools
+/// socket, and give back Chrome's answer: what it came to, or why it could not.
+fn devtools_evaluate(address: &str, expression: &str) -> Value {
     use std::io::Read;
-    let mut socket = std::net::TcpStream::connect(("127.0.0.1", port)).expect("the relay takes the connection");
-    // The key is the protocol's own example: sixteen bytes, as a key has to be.
-    write!(socket, "GET /ext HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").unwrap();
-    let mut answer = [0u8; 512];
-    let read = socket.read(&mut answer).expect("the relay answers");
-    assert!(answer[..read].starts_with(b"HTTP/1.1 101"), "the relay would not take the extension: {}", String::from_utf8_lossy(&answer[..read]));
-    // One text message, masked as a client's has to be.
+    let (host, path) = address.strip_prefix("ws://").and_then(|rest| rest.split_once('/')).expect("a DevTools address");
+    let mut socket = std::net::TcpStream::connect(host).expect("Chrome takes the connection");
+    socket.set_read_timeout(Some(PATIENCE)).unwrap();
+    write!(socket, "GET /{path} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").unwrap();
+    let mut head = Vec::new();
+    let mut byte = [0u8; 1];
+    while !head.ends_with(b"\r\n\r\n") {
+        socket.read_exact(&mut byte).expect("Chrome answers");
+        head.push(byte[0]);
+    }
+    assert!(head.starts_with(b"HTTP/1.1 101"), "Chrome would not open its DevTools socket: {}", String::from_utf8_lossy(&head));
+    let asked = json!({ "id": 1, "method": "Runtime.evaluate", "params": { "expression": expression, "awaitPromise": true, "returnByValue": true } });
+    send_frame(&mut socket, &asked);
+    loop {
+        // A server's frames come unmasked: a byte of kind, a length, and the words.
+        let mut top = [0u8; 2];
+        socket.read_exact(&mut top).expect("Chrome says something");
+        let length = match top[1] & 0x7f {
+            126 => {
+                let mut more = [0u8; 2];
+                socket.read_exact(&mut more).unwrap();
+                u16::from_be_bytes(more) as usize
+            }
+            127 => {
+                let mut more = [0u8; 8];
+                socket.read_exact(&mut more).unwrap();
+                u64::from_be_bytes(more) as usize
+            }
+            short => short as usize,
+        };
+        let mut words = vec![0u8; length];
+        socket.read_exact(&mut words).unwrap();
+        let said: Value = serde_json::from_slice(&words).unwrap_or(Value::Null);
+        if top[0] & 0x0f == 1 && said["id"] == 1 {
+            return said["result"].clone();
+        }
+    }
+}
+
+/// One text message on a socket, masked as a client's has to be.
+fn send_frame(socket: &mut std::net::TcpStream, said: &Value) {
     let text = said.to_string().into_bytes();
     let mask = [7u8, 11, 13, 17];
     let mut frame = vec![0x81];
@@ -1124,6 +1295,20 @@ fn as_the_extension(port: u16, said: &Value) -> std::net::TcpStream {
     frame.extend_from_slice(&mask);
     frame.extend(text.iter().enumerate().map(|(at, byte)| byte ^ mask[at % 4]));
     socket.write_all(&frame).unwrap();
+}
+
+/// Connect to a relay as its extension does, with no origin, and say one
+/// thing. The connection is given back: the relay forgets an extension that
+/// has gone.
+fn as_the_extension(port: u16, said: &Value) -> std::net::TcpStream {
+    use std::io::Read;
+    let mut socket = std::net::TcpStream::connect(("127.0.0.1", port)).expect("the relay takes the connection");
+    // The key is the protocol's own example: sixteen bytes, as a key has to be.
+    write!(socket, "GET /ext HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").unwrap();
+    let mut answer = [0u8; 512];
+    let read = socket.read(&mut answer).expect("the relay answers");
+    assert!(answer[..read].starts_with(b"HTTP/1.1 101"), "the relay would not take the extension: {}", String::from_utf8_lossy(&answer[..read]));
+    send_frame(&mut socket, said);
     socket
 }
 
