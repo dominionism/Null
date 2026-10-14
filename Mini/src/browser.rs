@@ -268,7 +268,7 @@ pub fn wait_for_extension(mut relay: Command, port: u16, wait: Duration) -> bool
     };
     let until = Instant::now() + wait;
     while Instant::now() < until {
-        if relay_says(port).get("extensionSeen") == Some(&Value::Bool(true)) {
+        if reached(&relay_says(port)) {
             return true;
         }
         std::thread::sleep(Duration::from_millis(500));
@@ -276,8 +276,17 @@ pub fn wait_for_extension(mut relay: Command, port: u16, wait: Duration) -> bool
     false
 }
 
-/// What a relay says of itself at `/json/version`: 503 until an extension has
-/// reached it, with the same words. Nothing when none answers.
+/// Whether what a relay says of itself shows an extension has reached it.
+/// Until one has it answers 503 with `"extensionSeen": false`. Once Chrome's
+/// has, it answers as Chrome would, with no `extensionSeen` at all, and names
+/// the protocol the extension spoke (`ompExtensionDiscardedTabsProtocol`).
+/// An extension that has said hello and no more is `"extensionSeen": true`.
+fn reached(said: &Value) -> bool {
+    said.get("extensionSeen") == Some(&Value::Bool(true)) || said.get("ompExtensionDiscardedTabsProtocol").is_some()
+}
+
+/// What a relay says of itself at `/json/version`, whatever its status: 503
+/// until an extension has reached it. Nothing when none answers.
 pub fn relay_says(port: u16) -> Value {
     use std::io::{Read, Write};
     let Ok(mut socket) = std::net::TcpStream::connect(("127.0.0.1", port)) else { return Value::Null };
@@ -291,6 +300,18 @@ pub fn relay_says(port: u16) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chrome_is_seen_to_reach_the_relay_by_what_the_relay_says() {
+        // As the relay of Oh-my-pi 18.8.7 answered on 2026-10-14: before any extension, and
+        // after Chrome's had reached it.
+        let before = json!({ "ompRelayVersion": "18.8.7", "error": "relay extension is not connected", "extensionSeen": false, "uptimeMs": 3949 });
+        let after = json!({ "Browser": "Chrome/155.0.0.0", "Protocol-Version": "1.3", "webSocketDebuggerUrl": "ws://127.0.0.1:9224/cdp", "ompRelayVersion": "18.8.7", "ompRelayDiscardedTabsProtocol": "1", "ompExtensionDiscardedTabsProtocol": "1" });
+        assert!(!reached(&before));
+        assert!(reached(&after), "Chrome's extension reached the relay and was not seen");
+        assert!(reached(&json!({ "extensionSeen": true })), "an extension that has only said hello");
+        assert!(!reached(&Value::Null), "no relay answered");
+    }
 
     /// As Oh-my-pi 18.8.7 writes it.
     const MANIFEST: &str = r#"{
