@@ -84,7 +84,7 @@
   "tasks": 69,
   "everyday": 63,
   "long": 6,
-  "sha256": "0df2ba482883194feaf94504650c1c83d387575dbfbafee1691a58195b6af2bb",
+  "sha256": "4f2a9ffd0cd03bebf243eb7b232bf6b4a5392f0f621abbdddee5a9f5e5b1daae",
   "ids": [
    "cal-cancel-gym",
    "cal-decline-lunch",
@@ -159,5 +159,62 @@
  },
  "corrected_before_any_run": [
   "settings-password (hidden): its checks passed a run that did nothing and said nothing; the answer must now say the change is the person's to make. Found by the checkers' self-test, before any run."
+ ],
+ "added": [
+  {
+   "seed": 667166568,
+   "drawn": "2026-10-14T15:16:50",
+   "before_any_run": true,
+   "why": "coverage: writing and formatting, words a page draws itself, workflows across two sites, two possible matches, asking first",
+   "how": "bench.split over the added tasks alone, with this seed",
+   "visible": {
+    "ids": [
+     "cal-clear-friday",
+     "chat-answer-jamie",
+     "docs-essay-double",
+     "docs-essay-rename",
+     "docs-lease-notice",
+     "docs-report-best-month",
+     "docs-thanks-leo",
+     "docs-thesis-sections",
+     "mail-answer-all",
+     "mail-clean-inbox",
+     "mail-which-bill",
+     "settings-which-name",
+     "shop-which-bottle",
+     "shop-which-cable",
+     "two-actions-dana",
+     "two-booking-ref",
+     "two-lunch-noor",
+     "two-review-team",
+     "two-team-meeting",
+     "two-wishlist-doc"
+    ]
+   },
+   "hidden": {
+    "ids": [
+     "cal-which-standup",
+     "docs-agenda",
+     "docs-essay-indent",
+     "docs-essay-page-break",
+     "docs-essay-sources",
+     "docs-grant-h3",
+     "docs-grant-summary",
+     "docs-heron-total",
+     "docs-notes13-format",
+     "docs-party-format",
+     "docs-report-total",
+     "docs-schedule-room",
+     "docs-stool-weight",
+     "docs-third-book",
+     "docs-trim-budget",
+     "docs-trip-numbered",
+     "docs-which-meeting-notes",
+     "shop-another-blender",
+     "two-plan-sam",
+     "two-tracking-priya"
+    ]
+   }
+  }
  ]
 }

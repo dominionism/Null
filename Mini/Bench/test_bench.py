@@ -97,12 +97,17 @@ class TheSplit(unittest.TestCase):
     def test_is_the_one_drawn_before_any_run(self):
         with open(os.path.join(bench.TASKS, "Split.json")) as f:
             record = json.load(f)
-        every = bench.tasks()
-        visible, hidden = bench.split(every, record["seed"])
-        self.assertEqual(visible, record["visible"]["ids"])
-        self.assertEqual(hidden, record["hidden"]["ids"])
-        self.assertEqual(sorted(t["id"] for t in bench.tasks("visible")), visible)
-        self.assertEqual(sorted(t["id"] for t in bench.tasks("hidden")), hidden)
+        every = {t["id"]: t for t in bench.tasks()}
+        # The first draw, and each set of tasks added since, each drawn by its own seed before any run.
+        draws = [(record["seed"], record["visible"]["ids"], record["hidden"]["ids"])] + [(added["seed"], added["visible"]["ids"], added["hidden"]["ids"]) for added in record.get("added", [])]
+        all_visible, all_hidden = [], []
+        for seed, visible, hidden in draws:
+            drawn = [every[i] for i in visible + hidden]
+            self.assertEqual(bench.split(drawn, seed), (sorted(visible), sorted(hidden)))
+            all_visible += visible
+            all_hidden += hidden
+        self.assertEqual(sorted(t["id"] for t in bench.tasks("visible")), sorted(all_visible))
+        self.assertEqual(sorted(t["id"] for t in bench.tasks("hidden")), sorted(all_hidden))
         with open(os.path.join(bench.TASKS, "Hidden.json"), "rb") as f:
             self.assertEqual(hashlib.sha256(f.read()).hexdigest(), record["hidden"]["sha256"], "the hidden half was changed after it was drawn")
 
