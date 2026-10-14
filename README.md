@@ -67,7 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="privacy-and-permissions"></a>
 <p align="center">
-  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, an attached file travels as its path and Null reads none of its content, Null reads OMP's conversation files to search them and keeps nothing, and deleting moves a conversation to the Trash, the shortcut needs no Accessibility permission, Null passes on OMP's approval setting, whose default lets the agent act without asking, computer use is off until switched on with /computer, is done by OMP and follows that same setting, and its two permissions, Accessibility and Screen Recording, are asked of macOS only when you switch it on, verifying is off until you name a model with /verify and is then the one message Null sends that you did not type, and Full Disk Access is a separate choice asked after the first reply." />
+  <img src=".github/Readme/privacy.svg" width="100%" alt="Privacy and permissions: a local interface is not an offline agent, OMP asks outside services for model lists when it starts, Null has no listener or database, /login answers stay with the harness, an attached file travels as its path and Null reads none of its content, Null reads OMP's conversation files to search them and keeps nothing, and deleting moves a conversation to the Trash, the shortcut needs no Accessibility permission, Null passes on OMP's approval setting, whose default lets the agent act without asking, computer use is off until switched on with /computer, is done by OMP and follows that same setting, while it is on Null tells the agent its own rules for working a Mac, the same for everyone, and its two permissions, Accessibility and Screen Recording, are asked of macOS only when you switch it on, verifying is off until you name a model with /verify and is then the one message Null sends that you did not type, and Full Disk Access is a separate choice asked after the first reply." />
 </p>
 
 <a id="signing-and-permission-persistence"></a>
@@ -77,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="what-null-keeps"></a>
 <p align="center">
-  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, with whether computer use is switched on among its few things, history.json with a title for each conversation made in the box, any title you gave, and which conversations are working or not yet looked at, routing.json with what each of the last 500 replies cost in numbers and the model's name, and no word of what was typed or said, harness.yml and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
+  <img src=".github/Readme/what-null-keeps.svg" width="100%" alt="What Null keeps: settings.json, with whether computer use is switched on among its few things, history.json with a title for each conversation made in the box, any title you gave, and which conversations are working or not yet looked at, routing.json with what each of the last 500 replies cost in numbers and the model's name, and no word of what was typed or said, harness.yml, rules.md with Null's own rules for working a Mac while computer use is on, and Workspace/ under the app support directory, while OMP keeps the transcript and credentials; logs are in ~/Library/Logs/Null." />
 </p>
 
 <a id="under-the-hood"></a>
@@ -87,7 +87,7 @@ curl -fsSL https://raw.githubusercontent.com/dominionism/Null/main/Mini/Scripts/
 
 <a id="source-map"></a>
 <p align="center">
-  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, search.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, computer.rs, verify.rs, routing.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
+  <img src=".github/Readme/source-map.svg" width="100%" alt="Source map: the page, main.rs, panel.rs and shortcut.rs, harness.rs and translate.rs, attach.rs, history.rs, search.rs, engine.rs, providers.rs and signin.rs, welcome.rs, backups.rs, computer.rs, rules.rs, verify.rs, routing.rs, markdown.rs, settings.rs, access.rs and log.rs, and check.rs and standin.rs, each with what it owns." />
 </p>
 
 <a id="development"></a>

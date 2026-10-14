@@ -46,6 +46,7 @@ mod markdown;
 mod panel;
 mod providers;
 mod routing;
+mod rules;
 mod search;
 mod settings;
 mod shortcut;
