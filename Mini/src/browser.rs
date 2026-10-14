@@ -12,11 +12,24 @@
 //! extension of a newer engine is written into the same place.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
+use serde::Serialize;
 use serde_json::{json, Value};
+use tauri::AppHandle;
 
-use crate::{harness, settings};
+use crate::log::log;
+use crate::{engine, harness, settings};
+
+/// The port the harness's relay listens on, and where the extension looks for it.
+const PORT: u16 = 9224;
+
+/// How long set-up waits for Chrome to load the extension.
+const WAIT: Duration = Duration::from_secs(120);
+
+/// The places Google Chrome is installed in.
+const CHROME: [&str; 2] = ["/Applications/Google Chrome.app", "Applications/Google Chrome.app"];
 
 /// The name Chrome shows for the extension, wherever it shows one.
 pub const NAME: &str = "Null";
@@ -116,6 +129,163 @@ fn changed(text: &str, from: &str, to: &str, file: &str) -> Result<String, Strin
 /// What is said when the harness's extension is not the one Null knows.
 fn unknown(file: &str) -> String {
     format!("this {}'s browser extension is not the one Null knows how to name ({file})", harness::HARNESS_NAME)
+}
+
+/// How the browser link stands, for the box to say.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Standing {
+    /// Whether Google Chrome is on this Mac. The link is Chrome's only.
+    pub chrome: bool,
+    /// Whether Null's copy of the extension is in its folder.
+    pub made: bool,
+    /// Whether Chrome was seen to load it, the last time it was set up.
+    pub linked: bool,
+    /// Whether the agent may use it (`/browser`).
+    pub on: bool,
+    /// Whether the harness acts without asking. Set to ask, it asks before each step, link or not.
+    pub freely: bool,
+    /// The folder Chrome is to load, for the steps the box shows.
+    pub folder: String,
+}
+
+/// Whether Google Chrome is on this Mac, in the system's Applications or the person's own.
+fn chrome() -> bool {
+    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+    CHROME.iter().any(|place| if place.starts_with('/') { Path::new(place).exists() } else { home.join(place).exists() })
+}
+
+/// The folder of Null's copy, under Null's own.
+fn folder_of(app: &AppHandle) -> Result<PathBuf, String> {
+    settings::dir(app).map(|dir| folder(&dir)).ok_or_else(|| "Null has no folder of its own to keep the extension in".to_string())
+}
+
+/// How the link stands with the harness in use.
+#[tauri::command(async)]
+pub fn browser(app: AppHandle) -> Result<Standing, String> {
+    let (binary, _) = engine::in_use(&app).ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
+    let folder = folder_of(&app)?;
+    let kept = settings::get(&app);
+    let made = folder.join("manifest.json").is_file();
+    Ok(Standing {
+        chrome: chrome(),
+        made,
+        linked: made && kept.browser_linked,
+        on: kept.browser == Some(true),
+        freely: !matches!(harness::approval_mode(&binary).as_deref(), Some("always-ask" | "write")),
+        folder: folder.display().to_string(),
+    })
+}
+
+/// Let the agent use the link, or not. Its rules reach the agent when the
+/// harness starts, so the one that is running is let go. On needs the link
+/// set up first: the box sets it up when it is not.
+#[tauri::command(async)]
+pub fn set_browser(app: AppHandle, on: bool) -> Result<Standing, String> {
+    let now = browser(app.clone())?;
+    if on && !now.linked {
+        return Err("Chrome is not linked yet: choose set up Chrome first".into());
+    }
+    settings::update(&app, |settings| settings.browser = Some(on));
+    log!("browser link: {}", if on { "on" } else { "off" });
+    harness::restart(&app);
+    browser(app)
+}
+
+/// Set Chrome up: make Null's copy of the extension from the harness in use,
+/// put the folder's path on the clipboard, show the folder in Finder and open
+/// Chrome on its extensions page, where the person loads it. Whether Chrome
+/// did is for `browser_linked` to see.
+#[tauri::command(async)]
+pub fn link_browser(app: AppHandle) -> Result<Standing, String> {
+    if !chrome() {
+        return Err("the browser link needs Google Chrome, and it is not on this Mac".into());
+    }
+    let (binary, _) = engine::in_use(&app).ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
+    let folder = folder_of(&app)?;
+    make(&binary, &folder)?;
+    settings::update(&app, |settings| settings.browser_linked = false);
+    log!("Null's copy of the browser link's extension is made");
+    if settings::own_folder().is_some() {
+        // A scripted run on a folder of its own sends nobody anywhere.
+        log!("a run on a folder of its own opens neither Chrome nor Finder");
+    } else {
+        let path = folder.display().to_string();
+        if let Ok(mut copy) = Command::new("pbcopy").stdin(Stdio::piped()).spawn() {
+            use std::io::Write;
+            let _ = copy.stdin.take().map(|mut input| input.write_all(path.as_bytes()));
+            let _ = copy.wait();
+        }
+        // Finder first, so that Chrome, opened last, is the window in front.
+        let _ = Command::new("open").arg("-R").arg(&folder).status();
+        let _ = Command::new("open").args(["-a", "Google Chrome", "chrome://extensions"]).status();
+    }
+    browser(app)
+}
+
+/// Wait for Chrome to load the extension: true once it reaches the link,
+/// false after two minutes. Seen, the link is noted as set up.
+#[tauri::command(async)]
+pub fn browser_linked(app: AppHandle) -> Result<Standing, String> {
+    let (binary, _) = engine::in_use(&app).ok_or(format!("{} is not installed", harness::HARNESS_NAME))?;
+    let seen = if settings::own_folder().is_some() {
+        // Another relay on this Mac would be the person's own Chrome reaching it.
+        log!("a run on a folder of its own does not wait for Chrome");
+        false
+    } else {
+        let mut relay = Command::new(&binary);
+        relay.args(harness::extra_args()).args(["browser-relay", "--port", &PORT.to_string()]);
+        wait_for_extension(relay, PORT, WAIT)
+    };
+    log!("{}", if seen { "Chrome loaded the browser link" } else { "Chrome was not seen to load the browser link" });
+    settings::update(&app, |settings| settings.browser_linked = seen);
+    browser(app)
+}
+
+/// A relay of Null's own, stopped however the wait ends.
+struct Relay(Child);
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// Wait up to `wait` for the extension to reach a relay on `port`. When the
+/// harness's own relay is already there it is asked; when none is, Null
+/// starts one with `relay` for the wait and stops it afterwards. A relay
+/// started with no input quits at once, so it is given one that stays open.
+pub fn wait_for_extension(mut relay: Command, port: u16, wait: Duration) -> bool {
+    let _own = match std::net::TcpStream::connect(("127.0.0.1", port)) {
+        Ok(_) => None,
+        Err(_) => match relay.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn() {
+            Ok(child) => Some(Relay(child)),
+            Err(e) => {
+                log!("the browser link's relay could not be started: {e}");
+                return false;
+            }
+        },
+    };
+    let until = Instant::now() + wait;
+    while Instant::now() < until {
+        if relay_says(port).get("extensionSeen") == Some(&Value::Bool(true)) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    false
+}
+
+/// What a relay says of itself at `/json/version`: 503 until an extension has
+/// reached it, with the same words. Nothing when none answers.
+pub fn relay_says(port: u16) -> Value {
+    use std::io::{Read, Write};
+    let Ok(mut socket) = std::net::TcpStream::connect(("127.0.0.1", port)) else { return Value::Null };
+    let _ = socket.set_read_timeout(Some(Duration::from_secs(2)));
+    let _ = write!(socket, "GET /json/version HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    let mut answer = String::new();
+    let _ = socket.read_to_string(&mut answer);
+    answer.find('{').and_then(|start| serde_json::from_str(&answer[start..answer.rfind('}')? + 1]).ok()).unwrap_or(Value::Null)
 }
 
 #[cfg(test)]

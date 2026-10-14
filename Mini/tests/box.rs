@@ -799,6 +799,49 @@ fn computer_use_is_not_changed_while_a_reply_is_under_way() {
 
 #[test]
 #[ignore]
+fn the_browser_link_is_off_until_chrome_is_set_up_and_a_scripted_run_opens_nothing() {
+    let mac = Mac::on("slow");
+    let lines = [
+        "/",
+        "<until list /browser>",
+        "<show commands>",
+        "<key Escape>",
+        "/browser",
+        "<until list browser link>",
+        "<show before>",
+        "<key ArrowDown>",
+        "<key ArrowDown>",
+        "<key Enter>",
+        "<until shows to try again>",
+        "<show set>",
+    ];
+    let seen = mac.run(&lines);
+    assert_eq!(seen.at("commands").rows("/browser"), 1, "the box's own command, listed once {}", seen.at("commands"));
+
+    let page = seen.at("before");
+    assert!(page.has("list", "● off the agent works only in a browser of its own, with none of your sign-ins"), "off is what is in force {page}");
+    assert!(page.has("list", "on the agent may work your Chrome as you, on any site you are signed in to, without asking you first"), "{page}");
+    assert!(page.has("list", "set up Chrome"), "{page}");
+
+    // Whether the Mac this runs on has Chrome or not, nothing is opened and nothing is switched on.
+    let page = seen.at("set");
+    if page.has("shows", "needs Google Chrome") {
+        assert!(!seen.logged("Null's copy of the browser link's extension is made"), "{page}");
+    } else {
+        assert!(seen.logged("Null's copy of the browser link's extension is made"));
+        assert!(seen.logged("a run on a folder of its own opens neither Chrome nor Finder"), "a scripted run opened Chrome or Finder");
+        assert!(seen.logged("a run on a folder of its own does not wait for Chrome"));
+        assert!(page.has("shows", "Chrome did not load Null in two minutes"), "{page}");
+        let manifest: serde_json::Value = serde_json::from_str(&mac.kept("null/BrowserLink/manifest.json")).expect("Null's copy of the extension");
+        assert_eq!(manifest["name"], "Null", "{manifest}");
+    }
+    assert!(!seen.logged("browser link: on"), "set up but not linked, the link was switched on");
+    let kept: serde_json::Value = serde_json::from_str(&mac.kept("null/settings.json")).expect("Null's settings");
+    assert_eq!(kept["browser_linked"], false, "what Null keeps: {kept}");
+}
+
+#[test]
+#[ignore]
 fn update_says_when_nothing_is_newer_and_when_a_newer_null_is_out() {
     let mac = Mac::on("slow");
     mac.keep("null-v9.9.9", "");

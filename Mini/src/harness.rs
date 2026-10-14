@@ -839,9 +839,10 @@ async fn serve(
     let mut argv = vec![binary.display().to_string()];
     argv.extend(extra_args());
     argv.extend(launch_args(&binary));
-    let computer = (settings::get(app).computer, computer::own(&binary));
+    let kept = settings::get(app);
+    let computer = (kept.computer, computer::own(&binary));
     argv.extend(settings_args(app, &binary, computer));
-    argv.extend(rules::args(app, computer::on(computer.0, computer.1)));
+    argv.extend(rules::args(app, computer::on(computer.0, computer.1), kept.browser == Some(true) && kept.browser_linked));
     argv.push("acp".into());
     let whose = if origin == Origin::BuiltIn { "the built-in harness" } else { "the user's own harness" };
     log!("starting {whose}: {}", argv.join(" "));
