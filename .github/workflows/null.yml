@@ -46,6 +46,34 @@ jobs:
         working-directory: Mini
         run: cargo test
 
+      # The browser link's bench: every checker tried on a right and a wrong end state of
+      # its own, with no model and no Chrome.
+      - name: Bench self-tests
+        run: python3 -m unittest discover -s Mini/Bench
+
+      # One harness-check question loads Null's copy of the browser link's extension in a
+      # Chrome, which only Chrome for Testing allows from the command line. It is kept between
+      # runs, and kept at all only if its checksum is the one the bench names.
+      - name: Keep Chrome for Testing between runs
+        uses: actions/cache@v4
+        with:
+          path: ~/ChromeForTesting
+          key: chrome-for-testing-155.0.8059.79
+
+      - name: Fetch Chrome for Testing
+        run: |
+          if [ ! -d ~/ChromeForTesting/chrome-mac-arm64 ]; then
+            mkdir -p ~/ChromeForTesting
+            curl --fail --location --silent --show-error --output ~/ChromeForTesting/chrome.zip \
+              https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.79/mac-arm64/chrome-mac-arm64.zip
+            echo "e141a7cbf948780bb7d381860bd5a7944c6736f79b9918b9826fccb199d28ea4  $HOME/ChromeForTesting/chrome.zip" | shasum -a 256 -c -
+            ditto -x -k ~/ChromeForTesting/chrome.zip ~/ChromeForTesting
+            rm ~/ChromeForTesting/chrome.zip
+          fi
+          echo "NULL_MINI_CHROME=$HOME/ChromeForTesting/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" >> "$GITHUB_ENV"
+          # The runner has a screen of its own, so Chrome gets a window: only then has it tab groups.
+          echo "NULL_MINI_CHROME_SHOWN=1" >> "$GITHUB_ENV"
+
       # The live checks start the real Oh-my-pi against a stand-in provider. A hosted
       # runner has few cores, so they take turns four at a time.
       - name: Harness check
