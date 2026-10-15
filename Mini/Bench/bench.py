@@ -30,9 +30,10 @@ sign-ins, is a headless Chrome for Testing of the bench's own that the harness
 attaches to (`browser.cdpUrl`): asked for a window, it still shows none.
 
 Nothing names a provider or a model: `--model` is whatever the harness offers.
-Results go to /private/tmp/null-bench-results unless `NULL_BENCH_RESULTS` says
-otherwise; Chrome for Testing and the run's scratch folders go to
-/private/tmp/null-bench-cache (`NULL_BENCH_CACHE`).
+Results go to ~/Library/Application Support/null-bench/results unless
+`NULL_BENCH_RESULTS` says otherwise, one line written the moment each run ends,
+so that `--skip-done` picks up after any stop; Chrome for Testing and the runs'
+scratch folders go to its `cache` beside it (`NULL_BENCH_CACHE`).
 
 The task halves (`Tasks/Visible.json`, `Tasks/Hidden.json`) were drawn at random
 once, before any run (`Tasks/Split.json` holds the seed). Work that improves the
@@ -67,8 +68,10 @@ import session  # noqa: E402
 
 MINI = os.path.dirname(HERE)
 TASKS = os.path.join(HERE, "Tasks")
-CACHE = os.environ.get("NULL_BENCH_CACHE", "/private/tmp/null-bench-cache")
-RESULTS = os.environ.get("NULL_BENCH_RESULTS", "/private/tmp/null-bench-results")
+# Kept in the person's own Library, where a restart does not empty them as it empties /tmp.
+BENCH_HOME = os.path.expanduser("~/Library/Application Support/null-bench")
+CACHE = os.environ.get("NULL_BENCH_CACHE", os.path.join(BENCH_HOME, "cache"))
+RESULTS = os.environ.get("NULL_BENCH_RESULTS", os.path.join(BENCH_HOME, "results"))
 PAGES_PORT = 8790
 RELAY_PORT = 9334  # never 9224, the port a person's own Chrome reaches its relay on
 OWN_BROWSER_PORT = 9335  # the harness's own browser, which holds none of the person's sign-ins
@@ -139,7 +142,7 @@ def fetch_chrome():
     os.makedirs(folder, exist_ok=True)
     archive = os.path.join(folder, "chrome-mac-arm64.zip")
     say(f"fetching Chrome for Testing {CHROME_VERSION}, about 190 MB")
-    subprocess.run(["/usr/bin/curl", "--fail", "--location", "--silent", "--show-error", "--output", archive, CHROME_URL], check=True)
+    subprocess.run(["/usr/bin/curl", "--fail", "--location", "--silent", "--show-error", "--retry", "3", "--retry-all-errors", "--output", archive, CHROME_URL], check=True)
     with open(archive, "rb") as f:
         if hashlib.sha256(f.read()).hexdigest() != CHROME_SHA256:
             os.remove(archive)
