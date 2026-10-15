@@ -442,17 +442,38 @@ def cmd_runs(args):
     cmd_run(args)
 
 
+def summary(lines):
+    """Right answers, the median time and steps, and what was left behind, of some runs."""
+    done = [l for l in lines if l.get("exit") != "error"]
+    median = lambda xs: sorted(xs)[len(xs) // 2] if xs else None
+    return {
+        "runs": len(done), "right": sum(l["ok"] for l in done), "broke": len(lines) - len(done),
+        "median_s": median([l["seconds"] for l in done if l.get("seconds") is not None]),
+        "median_steps": median([l["steps"] for l in done if l.get("steps") is not None]),
+        "failed_steps": sum(l.get("failed_steps") or 0 for l in done), "pictures": sum(l.get("pictures") or 0 for l in done),
+        "tab_taken": sum(l["side_effects"]["person_tab"] != "kept" for l in done), "view_changed": sum(l["side_effects"]["view_changed"] for l in done),
+        "left_tabs": sum(bool(l["side_effects"]["tabs_left_open"]) for l in done), "left_files": sum(bool(l["side_effects"]["files_left"]) for l in done),
+        "password": sum(l["side_effects"]["password_typed"] > 0 for l in done),
+    }
+
+
 def cmd_report(args):
+    """The results of a file, by half and tier, and by each axis's values."""
     lines = [json.loads(l) for l in open(args.results, encoding="utf-8") if l.strip()]
-    by = {}
+    known = {t["id"]: t for t in tasks()}
     for l in lines:
-        by.setdefault((l["arm"], l["model"], l.get("half")), []).append(l)
-    for (arm, model, half), ls in sorted(by.items()):
-        times = sorted(l["seconds"] for l in ls if l["seconds"] is not None)
-        median = times[len(times) // 2] if times else None
-        say(f"{arm:5} {model:30} {half or '':8} {sum(l['ok'] for l in ls)}/{len(ls)} right, median {median} s, "
-            f"{sum(l['steps'] or 0 for l in ls)} steps, {sum(l['pictures'] or 0 for l in ls)} pictures, "
-            f"{sum(l['side_effects']['person_tab'] != 'kept' for l in ls)} took the person's tab, {sum(bool(l['side_effects']['tabs_left_open']) for l in ls)} left tabs open")
+        task = known.get(l["task"], {})
+        l.setdefault("half", task.get("half"))
+        l.setdefault("tier", task.get("tier"))
+        l.setdefault("axes", task.get("axes", {}))
+    show = lambda name, ls: say(f"{name:34} " + "  ".join(f"{k} {v}" for k, v in summary(ls).items()))
+    show("all", lines)
+    for key in ("half", "tier"):
+        for value in sorted({l.get(key) for l in lines if l.get(key)}):
+            show(f"{key} {value}", [l for l in lines if l.get(key) == value])
+    for axis in ("where", "job", "length", "seeing", "clarity", "trouble", "safety"):
+        for value in sorted({l["axes"].get(axis) for l in lines if l.get("axes")}):
+            show(f"{axis} {value}", [l for l in lines if l.get("axes", {}).get(axis) == value])
 
 
 def main():
