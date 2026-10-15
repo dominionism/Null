@@ -61,12 +61,26 @@ fn read(attempt: std::io::Result<()>) -> FullDisk {
     }
 }
 
+/// Files that only Full Disk Access unlocks, in the order they are tried: the
+/// person's own list of permissions, then folders macOS guards for them. macOS
+/// 27 keeps no such list in that place any more, and opens the system's own to
+/// every program, so there Safari's, Mail's or Messages' folder tells. Each is
+/// only opened, and nothing in it is read.
+fn guarded() -> Vec<PathBuf> {
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else { return Vec::new() };
+    ["Application Support/com.apple.TCC/TCC.db", "Safari", "Containers/com.apple.Safari", "Mail", "Messages"].iter().map(|place| home.join("Library").join(place)).collect()
+}
+
+/// How it stands by the first of the attempts that tells anything: one that
+/// finds no file goes on to the next.
+fn first_told(attempts: impl IntoIterator<Item = std::io::Result<()>>) -> FullDisk {
+    attempts.into_iter().map(read).find(|state| *state != FullDisk::Unknown).unwrap_or(FullDisk::Unknown)
+}
+
 /// Try to open a file that only Full Disk Access unlocks. The attempt is also
 /// what puts Null in the Full Disk Access list, switched off.
 fn full_disk() -> FullDisk {
-    let Some(home) = std::env::var_os("HOME") else { return FullDisk::Unknown };
-    let guarded = PathBuf::from(home).join("Library/Application Support/com.apple.TCC/TCC.db");
-    read(std::fs::File::open(guarded).map(|_| ()))
+    first_told(guarded().into_iter().map(|file| std::fs::File::open(file).map(|_| ())))
 }
 
 /// Whether Null is to send the user to the switch: it is off, and they have
@@ -275,6 +289,29 @@ mod tests {
     #[test]
     fn a_file_that_is_not_there_tells_nothing() {
         assert_eq!(read(Err(ErrorKind::NotFound.into())), FullDisk::Unknown);
+    }
+
+    #[test]
+    fn a_missing_file_hands_over_to_the_next_and_the_first_that_tells_decides() {
+        let missing = || Err(ErrorKind::NotFound.into());
+        let refused = || Err(ErrorKind::PermissionDenied.into());
+        // As on macOS 27: the person's own list is gone, and a guarded folder tells.
+        assert_eq!(first_told([missing(), Ok(())]), FullDisk::On);
+        assert_eq!(first_told([missing(), refused()]), FullDisk::Off);
+        // As before it: the person's own list tells, and the folders are not tried.
+        assert_eq!(first_told([refused(), Ok(())]), FullDisk::Off);
+        assert_eq!(first_told([Ok(()), refused()]), FullDisk::On);
+        assert_eq!(first_told([missing(), missing()]), FullDisk::Unknown);
+        assert_eq!(first_told(Vec::<std::io::Result<()>>::new()), FullDisk::Unknown);
+    }
+
+    #[test]
+    fn the_person_s_own_list_is_tried_first_and_a_file_every_program_opens_never() {
+        let files = guarded();
+        assert!(files.first().is_some_and(|file| file.ends_with("Library/Application Support/com.apple.TCC/TCC.db")), "{files:?}");
+        assert!(files.iter().any(|file| file.ends_with("Library/Safari")), "{files:?}");
+        // On macOS 27 the system's list opens without Full Disk Access, so it would always say on.
+        assert!(!files.contains(&PathBuf::from("/Library/Application Support/com.apple.TCC/TCC.db")));
     }
 
     #[test]
