@@ -1046,6 +1046,7 @@ fn the_extension_null_makes_from_the_engine_is_under_null_s_name() {
             assert!(link.join(icon.as_str().unwrap()).is_file(), "the icon {icon} is in the copy");
         }
         assert!(read("background.js").contains("const title = \"Null\";"), "the agent's tabs are gathered under Null's name");
+        assert!(read("background.js").contains("connected ? \"on\" : \"\""), "the toolbar says nothing, not \"off\", while the agent is not linked");
         assert!(read("options.html").contains("<h1>Null</h1>"), "its settings page is headed with Null's name");
         assert!(link.join("LICENSE").is_file() && link.join("THIRD-PARTY-NOTICES.txt").is_file(), "the harness's licence and notices stay with it");
         assert!(!link.with_extension("new").exists(), "nothing is left beside the folder");
