@@ -42,9 +42,12 @@ const ICONS: [(&str, &str, &[u8]); 2] = [("32", "null-32.png", include_bytes!(".
 
 /// Each change to the extension's own files: the file, what stands there, and
 /// what goes in its place. The tab group's title is the relay's to give, and
-/// the extension is made to keep its own instead.
-const CHANGES: [(&str, &str, &str); 3] = [
+/// the extension is made to keep its own instead. Its toolbar badge says "on"
+/// while the agent is linked and nothing otherwise: "off" read as broken,
+/// though it only means the agent is not working in Chrome just now.
+const CHANGES: [(&str, &str, &str); 4] = [
     ("background.js", "async function groupTabs(tabIds, title, color) {", "async function groupTabs(tabIds, _title, color) {\n  const title = \"Null\";"),
+    ("background.js", "chrome.action.setBadgeText({ text: connected ? \"on\" : \"off\" });", "chrome.action.setBadgeText({ text: connected ? \"on\" : \"\" });"),
     ("options.html", "<title>OMP Browser Relay settings</title>", "<title>Null settings</title>"),
     ("options.html", "<h1>OMP Browser Relay</h1>", "<h1>Null</h1>"),
 ];
