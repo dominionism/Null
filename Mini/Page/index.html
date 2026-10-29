@@ -497,7 +497,8 @@
       #out > .you + .steps {
         margin-top: 9px;
       }
-      /* The Marks: who wrote what. The person's is a dot. Null's is Nil, still,
+      /* The Marks: who wrote what. The person's is a figure of its own: a head
+         with the cursor for a face, and shoulders drawn as brackets. Null's is Nil, still,
          beside the first part of its answer. Both are drawn, so that they are the
          same in any typeface, and neither is the arrow: that is the field's. */
       .you .mark {
@@ -1091,17 +1092,21 @@
       };
 
       const SVG = 'http://www.w3.org/2000/svg';
-      // The person's Mark: a dot, where the null sign used to stand.
-      const dotMark = () => {
+      // The person's Mark: a head with the cursor for a face, and shoulders drawn
+      // as brackets, a pixel to a point as Nil is.
+      const youMark = () => {
         const mark = document.createElementNS(SVG, 'svg');
-        mark.setAttribute('viewBox', '0 0 10 11');
-        mark.setAttribute('width', '10');
+        mark.setAttribute('class', 'you-mark');
+        mark.setAttribute('viewBox', '0 0 12 11');
+        mark.setAttribute('width', '12');
         mark.setAttribute('height', '11');
-        const dot = document.createElementNS(SVG, 'circle');
-        dot.setAttribute('cx', '5');
-        dot.setAttribute('cy', '5.5');
-        dot.setAttribute('r', '2.5');
-        mark.append(dot);
+        mark.setAttribute('shape-rendering', 'crispEdges');
+        const figure = document.createElementNS(SVG, 'path');
+        figure.setAttribute(
+          'd',
+          'M4 0h4v1h-4zM3 1h1v4h-1zM8 1h1v4h-1zM5 2h2v2h-2zM4 5h4v1h-4zM1 7h2v1h-2zM9 7h2v1h-2zM1 8h1v2h-1zM10 8h1v2h-1zM1 10h2v1h-2zM9 10h2v1h-2z',
+        );
+        mark.append(figure);
         return mark;
       };
 
@@ -1508,7 +1513,7 @@
             foldSteps();
             following = true;
             answerMarked = false;
-            anchor = add(el('div', 'you', el('span', 'mark', dotMark()), el('div', 'text', event.text)));
+            anchor = add(el('div', 'you', el('span', 'mark', youMark()), el('div', 'text', event.text)));
             wentWith(anchor, event.files);
             place();
             break;
