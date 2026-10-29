@@ -150,7 +150,12 @@
         overflow: visible;
         fill: #0b0b0d;
         shape-rendering: crispEdges;
-        filter: drop-shadow(1px 0 0 #f4f4f7) drop-shadow(-1px 0 0 #f4f4f7) drop-shadow(0 1px 0 #f4f4f7) drop-shadow(0 -1px 0 #f4f4f7);
+      }
+      /* Its white edge: half one of its pixels, out on four sides and not across
+         the corners, which keep small steps, as in the app's icon. Set on the
+         figure, so it moves with it, and only the pet's: Nil's Mark has none. */
+      .pet .all {
+        filter: url(#pet-edge);
       }
       body.with-pet .pet {
         display: block;
@@ -986,6 +991,23 @@
          as an antenna (.flag) above and a tail below, three pairs of eyes, and two
          feet. The grid's rows 2 to 18 are shown, so that its middle is the picture's. -->
     <svg class="pet rest" id="pet" viewBox="0 2 16 16" width="48" height="48" aria-hidden="true">
+      <defs>
+        <filter id="pet-edge" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+          <feFlood flood-color="#f4f4f7" />
+          <feComposite in2="SourceAlpha" operator="in" result="edge" />
+          <feOffset in="edge" dx="0.5" result="right" />
+          <feOffset in="edge" dx="-0.5" result="left" />
+          <feOffset in="edge" dy="0.5" result="down" />
+          <feOffset in="edge" dy="-0.5" result="up" />
+          <feMerge>
+            <feMergeNode in="right" />
+            <feMergeNode in="left" />
+            <feMergeNode in="down" />
+            <feMergeNode in="up" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
       <g class="all">
         <g class="top">
           <path d="M6 5h4v1h-4zM4 6h8v2h-8zM3 8h10v4h-10zM4 12h8v2h-8zM6 14h4v1h-4z" />
