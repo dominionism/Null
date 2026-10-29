@@ -2154,9 +2154,9 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
             shows: out.innerText,
             lines: [...out.children].map((one) => one.className).join(','),
             tags: [...out.querySelectorAll('*')].reduce((count, one) => ({ ...count, [one.tagName]: (count[one.tagName] || 0) + 1 }), {}),
-            // The Marks: Nil beside the answers, the dot beside the person's messages.
+            // The Marks: Nil beside the answers, the person's figure beside their messages.
             nils: out.querySelectorAll('.nil').length,
-            dots: out.querySelectorAll('.you .mark circle').length,
+            yous: out.querySelectorAll('.you .you-mark').length,
             // Where the person's words and each part of an answer start: one edge.
             edges: [...new Set([...out.querySelectorAll('.you .text, #out > .reply, #out > .steps')].map((one) => Math.round(one.getBoundingClientRect().left)))].join(','),
             // Where the Marks stand: left of that edge.
