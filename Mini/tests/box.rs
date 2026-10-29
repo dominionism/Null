@@ -332,6 +332,26 @@ fn who_wrote_what_is_marked_and_on_one_edge() {
     assert!(!marks.is_empty() && marks.iter().all(|at| *at < edges[0]), "the Marks stand left of the edge {page}");
 }
 
+/// The end of the row says what the agent is doing while a reply is under
+/// way, in words: thinking before anything is to be seen, working and the
+/// step's name while a step runs, writing while its words arrive, and nothing
+/// once the reply has ended.
+#[test]
+#[ignore]
+fn the_row_says_whether_the_agent_thinks_works_or_writes() {
+    let lines = ["ask the shell: sleep 6 &", "<show sent>", "<until shows $ sleep 6>", "<show step>", "<settle>", "<show ended>"];
+    let seen = Mac::on("ok").run(&lines);
+    assert_eq!(seen.at("sent").text("doingSaid"), "thinking", "{}", seen.at("sent"));
+    let page = seen.at("step");
+    assert_eq!((page.text("doing"), page.text("doingSaid")), ("working", "working · $ sleep 6"), "{page}");
+    assert_eq!(seen.at("ended").text("doing"), "", "nothing is said once the reply has ended {}", seen.at("ended"));
+
+    let working = format!("{} &", long(2));
+    let seen = Mac::on("slow").run(&[working.as_str(), "<wait 3000>", "<show words>", "<key ctrl+c>", "<settle>"]);
+    let page = seen.at("words");
+    assert_eq!((page.text("doing"), page.text("doingSaid")), ("writing", "writing"), "{page}");
+}
+
 #[test]
 #[ignore]
 fn the_up_arrow_brings_the_last_message_back_and_an_empty_enter_sends_nothing() {

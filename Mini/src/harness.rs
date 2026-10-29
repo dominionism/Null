@@ -2157,6 +2157,9 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
             // The Marks: Nil beside the answers, the person's figure beside their messages.
             nils: out.querySelectorAll('.nil').length,
             yous: out.querySelectorAll('.you .you-mark').length,
+            // What the end of the row says the agent is doing, and its words.
+            doing: document.getElementById('work').className.replace('work', '').trim(),
+            doingSaid: document.querySelector('#work .words').textContent,
             // Where the person's words and each part of an answer start: one edge.
             edges: [...new Set([...out.querySelectorAll('.you .text, #out > .reply, #out > .steps')].map((one) => Math.round(one.getBoundingClientRect().left)))].join(','),
             // Where the Marks stand: left of that edge.

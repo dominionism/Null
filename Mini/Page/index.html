@@ -400,6 +400,40 @@
         stroke-linecap: round;
         stroke-linejoin: round;
       }
+      /* What the agent is doing, at the end of the row while a reply is under
+         way: thinking (nothing to show yet), working (a step running, named),
+         writing (its words arriving). Said in words, so that it reads without
+         the motion; the spinner beside them only says it has not stalled. */
+      .work {
+        display: none;
+        flex: none;
+        align-items: center;
+        gap: 7px;
+        max-width: 260px;
+        font: 11px/22px var(--mono);
+        color: var(--dim);
+        white-space: nowrap;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .work.thinking,
+      .work.working,
+      .work.writing {
+        display: flex;
+      }
+      .work.working {
+        color: var(--soft);
+      }
+      .work .spin {
+        flex: none;
+        width: 1ch;
+        font-size: 13px;
+        color: var(--text);
+      }
+      .work .words {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
       /* Never seen: measures where the typed text ends, so the unused part of the
          field can be used to move the box. */
       #ruler {
@@ -941,6 +975,9 @@
         .caret.working {
           opacity: 0.45;
         }
+        .work .spin {
+          display: none;
+        }
       }
     </style>
   </head>
@@ -970,6 +1007,9 @@
           ><svg viewBox="0 0 10 22" width="10" height="22"><path d="M3 7l4 4-4 4" /></svg
         ></span>
         <input id="q" autofocus spellcheck="false" />
+        <span class="work" id="work"
+          ><span class="spin" aria-hidden="true"></span><span class="words" role="status" aria-live="polite"></span
+        ></span>
         <button class="tool" id="attach" type="button" tabindex="-1" aria-label="attach a file">
           <svg viewBox="0 0 22 22" width="22" height="22"><path d="M11 6.5v9M6.5 11h9" /></svg>
         </button>
@@ -1369,6 +1409,36 @@
         // The pet moves when the arrow changes. Told again that nothing is
         // running, it keeps the gesture it is making.
         if (caret.className !== before) mood(allSay(state));
+        sayWork();
+      };
+
+      // ── What the agent is doing, said at the end of the row ────────────
+      //
+      // Thinking: the reply is under way and nothing of it is to be seen yet,
+      // or the model is reasoning, or it is deciding what to do after a step.
+      // Working: a step is running, and its name is said. Writing: its words
+      // are arriving. Nothing while it asks (the question says so in amber) and
+      // nothing at rest.
+      const doing = document.getElementById('work');
+      const workWords = doing.querySelector('.words');
+      const workSpin = doing.querySelector('.spin');
+      const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+      let spinTimer = null;
+      let lastOut = 'thinking'; // what the agent last sent: 'thinking' or 'words'
+      let stepOn = ''; // the name of the step under way
+      const sayWork = () => {
+        const state = !busy || pendingAsk ? '' : running.size ? 'working' : lastOut === 'words' ? 'writing' : 'thinking';
+        const words = state === 'working' ? (stepOn ? `working · ${stepOn}` : 'working') : state;
+        doing.className = state ? `work ${state}` : 'work';
+        if (workWords.textContent !== words) workWords.textContent = words;
+        if (state && !spinTimer) {
+          let frame = 0;
+          workSpin.textContent = SPIN[0];
+          spinTimer = setInterval(() => (workSpin.textContent = SPIN[(frame = (frame + 1) % SPIN.length)]), 90);
+        } else if (!state && spinTimer) {
+          clearInterval(spinTimer);
+          spinTimer = null;
+        }
       };
 
       // The box's own commands, each with a few words for the list that a lone "/" or
@@ -1513,6 +1583,7 @@
             foldSteps();
             following = true;
             answerMarked = false;
+            lastOut = 'thinking';
             anchor = add(el('div', 'you', el('span', 'mark', youMark()), el('div', 'text', event.text)));
             wentWith(anchor, event.files);
             place();
@@ -1520,9 +1591,11 @@
           }
           case 'text_delta':
             if (event.thinking) {
+              lastOut = 'thinking';
               mark('working');
               break;
             }
+            lastOut = 'words';
             if (!reply) {
               foldSteps();
               reply = { element: add(el('div', 'reply')), text: '', drawn: false, busy: false, again: false };
@@ -1538,7 +1611,12 @@
             reply = null;
             step(event);
             if (event.status === 'completed' || event.status === 'failed') running.delete(event.call_id);
-            else running.add(event.call_id);
+            else {
+              running.add(event.call_id);
+              stepOn = event.title;
+            }
+            // After a step the model decides what to do next: it thinks again.
+            lastOut = 'thinking';
             // The step the agent asks about arrives after its question. The arrow
             // goes on saying that it waits for an answer.
             mark(pendingAsk ? 'asking' : 'working');
@@ -1623,6 +1701,7 @@
           noAnswer = false;
         }
         watchQuiet();
+        sayWork();
       };
 
       // ── Talking to the app ─────────────────────────────────────────────
@@ -3375,6 +3454,7 @@
           return;
         }
         busy = true;
+        lastOut = 'thinking';
         lastPrompt = text;
         mark('working');
         watchQuiet();
