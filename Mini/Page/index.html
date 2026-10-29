@@ -39,10 +39,10 @@
          24px below (the .box margin). FRAME in the script is top + bottom (32);
          WIDTH on the Rust side is the 584px box plus both sides (616). Every height
          here is a fixed number of pixels so MAX_HEIGHT there can be exact:
-         2 border + 42 row + 212 transcript + 26 notice + 32 margins = 314.
-         The transcript and the model list stop at 212px (about ten lines of
-         transcript) and scroll past that, so the box stays compact however long the
-         chat gets. */
+         2 border + 42 row + 331 transcript + 26 notice + 32 margins = 433.
+         The transcript and the model list stop at 331px (sixteen lines of
+         transcript: 16 × 19 + 26 padding + 1 border) and scroll past that, so the
+         box stays compact however long the chat gets. */
       :root {
         --accent: 255, 255, 255;
         --amber: 255, 212, 121;
@@ -464,7 +464,7 @@
          gutter is the null sign beside the owner's message, under the field's arrow. */
       #out {
         position: relative;
-        max-height: 212px;
+        max-height: 331px;
         padding: 12px 12px 14px 14px;
         font: 12.5px/19px var(--mono);
         color: var(--soft);
@@ -702,7 +702,7 @@
          rounded shape of its own inside it. So the list keeps no room at its
          sides, and each row brings its own: its words start 18px in, as before. */
       #pick {
-        max-height: 212px;
+        max-height: 331px;
         padding: 6px 0;
         scroll-padding: 25px 0; /* the chosen row keeps clear of the fade when keys scroll to it */
         font: 12.5px/19px var(--mono);

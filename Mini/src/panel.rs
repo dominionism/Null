@@ -37,8 +37,8 @@ const WIDTH: f64 = 616.0;
 const LANE: f64 = 46.0;
 /// The idle box (44 px) plus 8 px above and 24 px below.
 const HEIGHT: f64 = 76.0;
-/// The tallest the box gets (2 border + 42 row + 212 transcript + 26 notice = 282) plus 32.
-const MAX_HEIGHT: f64 = 314.0;
+/// The tallest the box gets (2 border + 42 row + 331 transcript + 26 notice = 401) plus 32.
+const MAX_HEIGHT: f64 = 433.0;
 
 // PROTOTYPE (`BackgroundWork.md`, item 15): the pet stays while work
 // goes on. It is not promised and is in no release: the owner lives with it
@@ -558,16 +558,16 @@ mod tests {
     // PROTOTYPE (item 15): the box coming back from a pet that was moved.
     #[test]
     fn a_box_that_fits_comes_back_where_the_pet_is() {
-        assert_eq!(whole_on((700, 400), (1324, 628), LAPTOP), (700, 400));
+        assert_eq!(whole_on((700, 400), (1324, 866), LAPTOP), (700, 400));
     }
 
     #[test]
     fn a_box_back_from_a_pet_at_the_edge_is_whole_on_the_screen() {
-        let size = (1324, 628); // 662 by 314, two pixels to the point
-        assert_eq!(whole_on((2448, 1480), size, LAPTOP), (1236, 972), "from the bottom right corner");
+        let size = (1324, 866); // 662 by 433, two pixels to the point
+        assert_eq!(whole_on((2448, 1480), size, LAPTOP), (1236, 734), "from the bottom right corner");
         assert_eq!(whole_on((-20, -10), size, LAPTOP), (0, 0), "from past the top left corner");
         let left: Screen = (-1920, 0, 1920, 1080);
-        assert_eq!(whole_on((-100, 1000), size, left), (-1324, 452), "on a second screen to the left");
+        assert_eq!(whole_on((-100, 1000), size, left), (-1324, 214), "on a second screen to the left");
     }
 
     #[test]
