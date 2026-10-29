@@ -316,6 +316,22 @@ fn markdown_is_drawn_and_nothing_a_model_writes_becomes_html() {
     assert!(page.has("shows", "bold and soft and code and <b>raw</b> <script>alert(1)</script>"), "the marks are gone and the html is words {page}");
 }
 
+/// Who wrote what: each message has its dot, and each answer one Nil, beside
+/// its steps when it begins with them, however often its words are drawn
+/// again. Words start on one edge and the Marks stand left of it.
+#[test]
+#[ignore]
+fn who_wrote_what_is_marked_and_on_one_edge() {
+    let seen = Mac::on("ok").run(&["ask the shell: true", "<settle>", "a second message", "<settle>", "<show marked>"]);
+    let page = seen.at("marked");
+    assert_eq!((page.number("dots"), page.number("nils")), (2.0, 2.0), "one Mark a message and one an answer {page}");
+    assert!(page.text("lines").split(',').any(|line| line.starts_with("steps") && line.contains("first")), "the answer that began with a step has Nil beside its steps {page}");
+    let edges: Vec<f64> = page.text("edges").split(',').filter_map(|edge| edge.parse().ok()).collect();
+    assert_eq!(edges.len(), 1, "every message and every part of an answer starts on one edge {page}");
+    let marks: Vec<f64> = page.text("marksAt").split(',').filter_map(|at| at.parse().ok()).collect();
+    assert!(!marks.is_empty() && marks.iter().all(|at| *at < edges[0]), "the Marks stand left of the edge {page}");
+}
+
 #[test]
 #[ignore]
 fn the_up_arrow_brings_the_last_message_back_and_an_empty_enter_sends_nothing() {

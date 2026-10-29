@@ -2154,6 +2154,13 @@ const SELFTEST_TYPING: &str = r#"async (lines) => {
             shows: out.innerText,
             lines: [...out.children].map((one) => one.className).join(','),
             tags: [...out.querySelectorAll('*')].reduce((count, one) => ({ ...count, [one.tagName]: (count[one.tagName] || 0) + 1 }), {}),
+            // The Marks: Nil beside the answers, the dot beside the person's messages.
+            nils: out.querySelectorAll('.nil').length,
+            dots: out.querySelectorAll('.you .mark circle').length,
+            // Where the person's words and each part of an answer start: one edge.
+            edges: [...new Set([...out.querySelectorAll('.you .text, #out > .reply, #out > .steps')].map((one) => Math.round(one.getBoundingClientRect().left)))].join(','),
+            // Where the Marks stand: left of that edge.
+            marksAt: [...new Set([...out.querySelectorAll('.nil, .you .mark svg')].map((one) => Math.round(one.getBoundingClientRect().left)))].join(','),
             // How far the page has moved sideways inside its window, and how wide that is.
             aside: document.scrollingElement.scrollLeft,
             wide: window.innerWidth,
