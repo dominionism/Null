@@ -491,11 +491,15 @@
       #out > .you:first-child {
         margin-top: 0;
       }
-      #out > .you + .reply {
-        margin-top: 3px;
+      /* The first part of Null's answer stands a little apart from the message it
+         answers, a paragraph's space, less than the space between two exchanges. */
+      #out > .you + .reply,
+      #out > .you + .steps {
+        margin-top: 9px;
       }
-      /* The null sign, the sign of the app's name. Drawn, so that it is the same
-         shape in any typeface, and not the arrow: that is the field's. */
+      /* The Marks: who wrote what. The person's is a dot. Null's is Nil, still,
+         beside the first part of its answer. Both are drawn, so that they are the
+         same in any typeface, and neither is the arrow: that is the field's. */
       .you .mark {
         height: 19px;
         color: var(--dim);
@@ -503,10 +507,24 @@
       .you .mark svg {
         display: block;
         margin-top: 4px;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 1.3;
-        stroke-linecap: round;
+        fill: currentColor;
+      }
+      #out > .first {
+        position: relative;
+      }
+      /* Nil a pixel to a point, as the pet is drawn at three: light, with the
+         box's own dark for its eyes, and no outline. It stands in the gutter. */
+      .nil {
+        position: absolute;
+        top: 3.5px;
+        left: -19px;
+        fill: var(--soft);
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .nil .eyes {
+        fill: #18181c;
       }
       .note {
         color: var(--dim);
@@ -1073,19 +1091,47 @@
       };
 
       const SVG = 'http://www.w3.org/2000/svg';
-      const nullSign = () => {
-        const sign = document.createElementNS(SVG, 'svg');
-        sign.setAttribute('viewBox', '0 0 10 11');
-        sign.setAttribute('width', '10');
-        sign.setAttribute('height', '11');
-        const ring = document.createElementNS(SVG, 'circle');
-        ring.setAttribute('cx', '5');
-        ring.setAttribute('cy', '5.5');
-        ring.setAttribute('r', '3.4');
-        const stroke = document.createElementNS(SVG, 'path');
-        stroke.setAttribute('d', 'M8.3 1.3L1.7 9.7');
-        sign.append(ring, stroke);
-        return sign;
+      // The person's Mark: a dot, where the null sign used to stand.
+      const dotMark = () => {
+        const mark = document.createElementNS(SVG, 'svg');
+        mark.setAttribute('viewBox', '0 0 10 11');
+        mark.setAttribute('width', '10');
+        mark.setAttribute('height', '11');
+        const dot = document.createElementNS(SVG, 'circle');
+        dot.setAttribute('cx', '5');
+        dot.setAttribute('cy', '5.5');
+        dot.setAttribute('r', '2.5');
+        mark.append(dot);
+        return mark;
+      };
+
+      // Null's Mark: Nil as the pet is drawn, its eyes open, never moving. Only
+      // the figure is taken, so none of the pet's moods reach it.
+      const nilMark = () => {
+        const mark = document.createElementNS(SVG, 'svg');
+        mark.setAttribute('class', 'nil');
+        mark.setAttribute('viewBox', '2 4 12 12');
+        mark.setAttribute('width', '12');
+        mark.setAttribute('height', '12');
+        mark.setAttribute('shape-rendering', 'crispEdges');
+        mark.setAttribute('aria-hidden', 'true');
+        const figure = pet.querySelector('.all').cloneNode(true);
+        figure.querySelectorAll('.glad, .flat').forEach((one) => one.remove());
+        mark.append(figure);
+        return mark;
+      };
+
+      // Whether the answer to the person's latest message has its Mark yet. The
+      // first part of it to be shown, its steps or its words, carries Nil; the
+      // parts after it do not.
+      let answerMarked = false;
+      const markAnswer = (element) => {
+        if (answerMarked) return null;
+        answerMarked = true;
+        element.classList.add('first');
+        const mark = nilMark();
+        element.prepend(mark);
+        return mark;
       };
 
       // ── A reply, drawn as its parts ────────────────────────────────────
@@ -1185,7 +1231,7 @@
       const drawReply = (target, blocks) => {
         target.drawn = true;
         target.element.classList.add('drawn');
-        target.element.replaceChildren(...blocks.map(block));
+        target.element.replaceChildren(...(target.mark ? [target.mark] : []), ...blocks.map(block));
         fitBlocks(target.element);
         place();
         fit();
@@ -1248,6 +1294,7 @@
             });
             steps = { element, sum, each };
             add(element);
+            markAnswer(element);
           }
           known = { row: steps.each.appendChild(el('div')), block: steps };
           toolLines.set(event.call_id, known);
@@ -1460,7 +1507,8 @@
             reply = null;
             foldSteps();
             following = true;
-            anchor = add(el('div', 'you', el('span', 'mark', nullSign()), el('div', 'text', event.text)));
+            answerMarked = false;
+            anchor = add(el('div', 'you', el('span', 'mark', dotMark()), el('div', 'text', event.text)));
             wentWith(anchor, event.files);
             place();
             break;
@@ -1473,9 +1521,10 @@
             if (!reply) {
               foldSteps();
               reply = { element: add(el('div', 'reply')), text: '', drawn: false, busy: false, again: false };
+              reply.mark = markAnswer(reply.element);
             }
             reply.text += event.text;
-            if (!reply.drawn) reply.element.textContent = reply.text;
+            if (!reply.drawn) reply.element.replaceChildren(...(reply.mark ? [reply.mark] : []), reply.text);
             layoutSoon(reply);
             place();
             fit();
@@ -2602,6 +2651,7 @@
         toolLines.clear();
         reply = null;
         steps = null;
+        answerMarked = false;
         anchor = null;
         pendingAsk = null;
         // It is at rest, whatever the conversation shown before it is doing.
@@ -3078,6 +3128,7 @@
         toolLines.clear();
         reply = null;
         steps = null;
+        answerMarked = false;
         anchor = null;
         busy = false;
         running.clear();
