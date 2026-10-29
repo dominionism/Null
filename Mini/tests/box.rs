@@ -8,7 +8,7 @@
 //!
 //! Every run is also held to three things the box promises everywhere: the
 //! window is never asked to be taller than the tallest it gets, the transcript
-//! never taller than its ten lines, and no message a person typed is in the log.
+//! never taller than its sixteen lines, and no message a person typed is in the log.
 //!
 //! They run only when asked (`cargo test -- --ignored`), and one at a time,
 //! since each opens the box on the screen and takes the keyboard for a few
@@ -27,9 +27,9 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
-/// The tallest the window gets, and the transcript's ten lines (`src/panel.rs`).
-const MAX_HEIGHT: f64 = 314.0;
-const TEN_LINES: f64 = 212.0;
+/// The tallest the window gets, and the transcript's sixteen lines (`src/panel.rs`).
+const MAX_HEIGHT: f64 = 433.0;
+const SIXTEEN_LINES: f64 = 331.0;
 
 /// How long one run of the app is waited for.
 const PATIENCE: Duration = Duration::from_secs(150);
@@ -211,7 +211,7 @@ impl Seen {
         // What the box promises in every state, whatever the test is about.
         for (name, page) in &seen.pages {
             assert!(page["height"].as_f64().unwrap_or(0.0) <= MAX_HEIGHT, "at {name} the box asked for a window taller than the window gets: {page}");
-            assert!(page["transcript"].as_f64().unwrap_or(0.0) <= TEN_LINES, "at {name} the transcript is taller than its ten lines: {page}");
+            assert!(page["transcript"].as_f64().unwrap_or(0.0) <= SIXTEEN_LINES, "at {name} the transcript is taller than its sixteen lines: {page}");
         }
         // A message is a line of several words: one word alone is a choice from a list.
         for typed in lines.iter().filter(|line| !line.starts_with('<') && !line.starts_with('/') && line.contains(' ')) {
@@ -328,12 +328,12 @@ fn the_up_arrow_brings_the_last_message_back_and_an_empty_enter_sends_nothing() 
 
 #[test]
 #[ignore]
-fn a_long_reply_scrolls_inside_ten_lines() {
-    let seen = Mac::on("slow").run(&[&long(3), "<settle>", "<show long>"]);
+fn a_long_reply_scrolls_inside_sixteen_lines() {
+    let seen = Mac::on("slow").run(&[&long(4), "<settle>", "<show long>"]);
     let page = seen.at("long");
     assert!(page.is("scrolls"), "{page}");
-    assert!(page.number("transcript") > 200.0, "the transcript has grown to its ten lines {page}");
-    assert_eq!(page.number("height"), 288.0, "the box with a full transcript and no notice {page}");
+    assert!(page.number("transcript") > 320.0, "the transcript has grown to its sixteen lines {page}");
+    assert_eq!(page.number("height"), 407.0, "the box with a full transcript and no notice {page}");
 }
 
 // ── The list of commands ──────────────────────────────────────────────────
